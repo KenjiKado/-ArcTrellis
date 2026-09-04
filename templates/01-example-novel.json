@@ -1,0 +1,53 @@
+{
+  "name": "The Glass Horizon (worked example)",
+  "description": "A populated science-fantasy example with two plotlines, scenes, characters, places, notes, and a relationship.",
+  "category": "Example",
+  "project": {
+    "formatVersion": 1,
+    "id": "10000000-0000-0000-0000-000000000001",
+    "title": "The Glass Horizon",
+    "author": "Sample Author",
+    "genre": "Science Fantasy",
+    "description": "When a cartographer discovers the horizon is a machine, she must choose between repairing her dying city and freeing the intelligence trapped inside it.",
+    "wordCountGoal": 90000,
+    "currentWordCount": 12500,
+    "books": [{
+      "id": "11000000-0000-0000-0000-000000000001", "title": "The Glass Horizon", "subtitle": "Book One", "summary": "Mara maps a forbidden region and uncovers a civic conspiracy.", "order": 0, "wordCountGoal": 90000,
+      "chapters": [
+        {"id":"12000000-0000-0000-0000-000000000001","title":"The Broken Compass","summary":"Mara's instrument points beyond the city wall.","order":0,"section":"Act I","wordCount":3200},
+        {"id":"12000000-0000-0000-0000-000000000002","title":"Beyond the Wall","summary":"The expedition crosses into unmapped light.","order":1,"section":"Act I","wordCount":4100},
+        {"id":"12000000-0000-0000-0000-000000000003","title":"A Voice in Glass","summary":"The horizon speaks through Mara's compass.","order":2,"section":"Act II","wordCount":5200},
+        {"id":"12000000-0000-0000-0000-000000000004","title":"The Council's Map","summary":"Mara finds proof the danger was engineered.","order":3,"section":"Act II","wordCount":0},
+        {"id":"12000000-0000-0000-0000-000000000005","title":"Open Sky","summary":"She makes an irreversible choice.","order":4,"section":"Act III","wordCount":0}
+      ]
+    }],
+    "plotlines": [
+      {"id":"13000000-0000-0000-0000-000000000001","name":"Main Quest","description":"Mara's discovery and choice.","color":"#5B7CFA","order":0},
+      {"id":"13000000-0000-0000-0000-000000000002","name":"Trust & Betrayal","description":"Mara and Iven's damaged friendship.","color":"#D9577A","order":1}
+    ],
+    "scenes": [
+      {"id":"14000000-0000-0000-0000-000000000001","bookId":"11000000-0000-0000-0000-000000000001","chapterId":"12000000-0000-0000-0000-000000000001","plotlineId":"13000000-0000-0000-0000-000000000001","title":"The needle turns","summary":"Mara demonstrates a compass that points toward the forbidden horizon.","content":"Open on the survey hall at dawn. The ordinary compasses agree; Mara's prototype does not.","status":"Revised","pointOfView":"Mara Venn","setting":"Survey Hall","editingNotes":"Plant the hairline crack in the lens.","order":0,"wordCount":1800,"tags":["inciting clue"],"characterIds":["15000000-0000-0000-0000-000000000001"],"placeIds":["16000000-0000-0000-0000-000000000001"],"fields":[{"name":"Conflict","value":"Mara versus institutional certainty"}]},
+      {"id":"14000000-0000-0000-0000-000000000002","bookId":"11000000-0000-0000-0000-000000000001","chapterId":"12000000-0000-0000-0000-000000000001","plotlineId":"13000000-0000-0000-0000-000000000002","title":"Iven burns the order","summary":"Iven hides the council's command to confiscate the compass.","content":"He chooses Mara over his oath, but keeps the choice secret.","status":"Drafted","pointOfView":"Iven Ro","setting":"Archive furnace","editingNotes":"Make his motive ambiguous.","order":1,"wordCount":1400,"tags":["secret"],"characterIds":["15000000-0000-0000-0000-000000000002"],"placeIds":[],"fields":[]},
+      {"id":"14000000-0000-0000-0000-000000000003","bookId":"11000000-0000-0000-0000-000000000001","chapterId":"12000000-0000-0000-0000-000000000002","plotlineId":"13000000-0000-0000-0000-000000000001","title":"Crossing the white line","summary":"The team steps beyond the last official marker.","content":"The sky refracts into geometric bands. Mara hears a pulse through the compass casing.","status":"Drafted","pointOfView":"Mara Venn","setting":"Western Wall","editingNotes":"Increase sensory contrast.","order":2,"wordCount":2700,"tags":["threshold"],"characterIds":["15000000-0000-0000-0000-000000000001","15000000-0000-0000-0000-000000000002"],"placeIds":["16000000-0000-0000-0000-000000000002"],"fields":[]},
+      {"id":"14000000-0000-0000-0000-000000000004","bookId":"11000000-0000-0000-0000-000000000001","chapterId":"12000000-0000-0000-0000-000000000003","plotlineId":"13000000-0000-0000-0000-000000000001","title":"The horizon answers","summary":"A trapped intelligence identifies Mara by her mother's name.","content":"The revelation turns a geographic mystery into a family one.","status":"Planned","pointOfView":"Mara Venn","setting":"Glass Desert","editingNotes":"End chapter on the name.","order":3,"wordCount":0,"tags":["midpoint","revelation"],"characterIds":["15000000-0000-0000-0000-000000000001"],"placeIds":["16000000-0000-0000-0000-000000000003"],"fields":[]},
+      {"id":"14000000-0000-0000-0000-000000000005","bookId":"11000000-0000-0000-0000-000000000001","chapterId":"12000000-0000-0000-0000-000000000004","plotlineId":"13000000-0000-0000-0000-000000000002","title":"The hidden commission","summary":"Iven admits the council sent him to sabotage the expedition.","content":"His earlier protection now reads as guilt as well as loyalty.","status":"Planned","pointOfView":"Iven Ro","setting":"Council map vault","editingNotes":"Echo the burned order.","order":4,"wordCount":0,"tags":["betrayal"],"characterIds":["15000000-0000-0000-0000-000000000002"],"placeIds":[],"fields":[]},
+      {"id":"14000000-0000-0000-0000-000000000006","bookId":"11000000-0000-0000-0000-000000000001","chapterId":"12000000-0000-0000-0000-000000000005","plotlineId":"13000000-0000-0000-0000-000000000001","title":"Open the horizon","summary":"Mara frees the intelligence, accepting an unknown sky.","content":"The city loses its shield and gains a world.","status":"Planned","pointOfView":"Mara Venn","setting":"Horizon Engine","editingNotes":"Resolve the compass image.","order":5,"wordCount":0,"tags":["climax"],"characterIds":["15000000-0000-0000-0000-000000000001","15000000-0000-0000-0000-000000000002"],"placeIds":["16000000-0000-0000-0000-000000000003"],"fields":[]}
+    ],
+    "characters": [
+      {"id":"15000000-0000-0000-0000-000000000001","name":"Mara Venn","category":"Protagonist","summary":"A precise cartographer who distrusts intuition.","description":"Mara measures everything because uncertainty cost her mother an expedition. Her external goal is to repair the horizon; her inner need is to accept that maps are choices, not truth.","imagePath":"","tags":["expedition","Venn family"],"bookIds":["11000000-0000-0000-0000-000000000001"],"fields":[{"name":"Goal","value":"Repair the city's failing shield"},{"name":"Fear","value":"Causing another expedition disaster"},{"name":"False belief","value":"Only measured facts are trustworthy"}]},
+      {"id":"15000000-0000-0000-0000-000000000002","name":"Iven Ro","category":"Ally","summary":"A council archivist divided between loyalty and conscience.","description":"Iven was assigned to watch Mara but believes the council has hidden too much.","imagePath":"","tags":["council"],"bookIds":["11000000-0000-0000-0000-000000000001"],"fields":[{"name":"Secret","value":"He carries a sabotage order"},{"name":"Strength","value":"Remembers any map he has seen"}]}
+    ],
+    "places": [
+      {"id":"16000000-0000-0000-0000-000000000001","name":"Survey Hall","category":"City","summary":"The official center of accepted geography.","description":"A circular brass room whose floor is the city's master map.","imagePath":"","tags":["institution"],"bookIds":[],"fields":[{"name":"Atmosphere","value":"Orderly, resonant, watchful"}]},
+      {"id":"16000000-0000-0000-0000-000000000002","name":"Western Wall","category":"Boundary","summary":"The last place where the sky looks ordinary.","description":"White stone markers count down to zero at the sealed gate.","imagePath":"","tags":["threshold"],"bookIds":[],"fields":[]},
+      {"id":"16000000-0000-0000-0000-000000000003","name":"Horizon Engine","category":"Ancient technology","summary":"A planetary machine mistaken for the edge of the world.","description":"Concentric planes of glass bend light around the city and imprison a navigation intelligence.","imagePath":"","tags":["mystery"],"bookIds":[],"fields":[{"name":"Rule","value":"It can communicate only through directional instruments"}]}
+    ],
+    "notes": [
+      {"id":"17000000-0000-0000-0000-000000000001","name":"Continuity checklist","category":"Continuity","summary":"Recurring details to track during revision.","description":"The compass crack grows after each contact. Iven never lies directly; he omits. The geometric sky is visible only past marker three.","imagePath":"","tags":["revision"],"bookIds":[],"fields":[]},
+      {"id":"17000000-0000-0000-0000-000000000002","name":"Theme","category":"Worldbuilding","summary":"A map is an argument about what matters.","description":"Every major choice should contrast safe certainty with meaningful uncertainty.","imagePath":"","tags":["theme"],"bookIds":[],"fields":[]}
+    ],
+    "relationships": [{"id":"18000000-0000-0000-0000-000000000001","fromEntityId":"15000000-0000-0000-0000-000000000001","toEntityId":"15000000-0000-0000-0000-000000000002","type":"Friends under strain","description":"Mara trusts Iven's memory but not his council allegiance."}],
+    "tags": ["inciting clue","secret","threshold","midpoint","revelation","betrayal","climax","revision"],
+    "categories": ["Research","Worldbuilding","Continuity","Editing"]
+  }
+}

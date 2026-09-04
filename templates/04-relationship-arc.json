@@ -1,0 +1,15 @@
+{
+  "name":"Relationship arc","description":"Plan two viewpoints through connection, friction, vulnerability, rupture, and chosen future.","category":"Genre",
+  "project":{"formatVersion":1,"id":"40000000-0000-0000-0000-000000000001","title":"Untitled Relationship Story","author":"","genre":"Romance / Relationship Drama","description":"A dual-viewpoint emotional structure.","wordCountGoal":80000,"currentWordCount":0,
+  "books":[{"id":"41000000-0000-0000-0000-000000000001","title":"Book One","subtitle":"","summary":"","order":0,"wordCountGoal":80000,"chapters":[
+    {"id":"42000000-0000-0000-0000-000000000001","title":"Separate Worlds","summary":"Show what each person is protecting.","order":0,"section":"Beginning","wordCount":0},
+    {"id":"42000000-0000-0000-0000-000000000002","title":"Meaningful Contact","summary":"Circumstances require genuine attention.","order":1,"section":"Beginning","wordCount":0},
+    {"id":"42000000-0000-0000-0000-000000000003","title":"Unexpected Alignment","summary":"A shared value appears beneath surface conflict.","order":2,"section":"Deepening","wordCount":0},
+    {"id":"42000000-0000-0000-0000-000000000004","title":"Vulnerability","summary":"One risk makes reciprocal honesty possible.","order":3,"section":"Deepening","wordCount":0},
+    {"id":"42000000-0000-0000-0000-000000000005","title":"Rupture","summary":"Fear turns a real difference into separation.","order":4,"section":"Crisis","wordCount":0},
+    {"id":"42000000-0000-0000-0000-000000000006","title":"Chosen Future","summary":"Both act in a way their earlier selves could not.","order":5,"section":"Resolution","wordCount":0}
+  ]}],"plotlines":[
+    {"id":"43000000-0000-0000-0000-000000000001","name":"Person A","description":"Goal, defenses, and change.","color":"#5B7CFA","order":0},
+    {"id":"43000000-0000-0000-0000-000000000002","name":"Person B","description":"Goal, defenses, and change.","color":"#D9577A","order":1},
+    {"id":"43000000-0000-0000-0000-000000000003","name":"Shared Relationship","description":"What exists between them at each stage.","color":"#2E9D78","order":2}
+  ],"scenes":[],"characters":[],"places":[],"notes":[],"relationships":[],"tags":["connection","conflict","vulnerability","choice"],"categories":["Research","Continuity","Emotional arc","Editing"]}}

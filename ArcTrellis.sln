@@ -1,0 +1,30 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArcTrellis.Core", "src\ArcTrellis.Core\ArcTrellis.Core.csproj", "{347C1C44-C06B-4EEB-84A1-0CF0A8363179}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArcTrellis.App", "src\ArcTrellis.App\ArcTrellis.App.csproj", "{F737A848-C844-4DE0-9BAA-CB522981B9F2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArcTrellis.SmokeTests", "tests\ArcTrellis.SmokeTests\ArcTrellis.SmokeTests.csproj", "{092027A0-3D28-4B85-B8A8-E65C5B04768A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{347C1C44-C06B-4EEB-84A1-0CF0A8363179}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{347C1C44-C06B-4EEB-84A1-0CF0A8363179}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{347C1C44-C06B-4EEB-84A1-0CF0A8363179}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{347C1C44-C06B-4EEB-84A1-0CF0A8363179}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F737A848-C844-4DE0-9BAA-CB522981B9F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F737A848-C844-4DE0-9BAA-CB522981B9F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F737A848-C844-4DE0-9BAA-CB522981B9F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F737A848-C844-4DE0-9BAA-CB522981B9F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{092027A0-3D28-4B85-B8A8-E65C5B04768A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{092027A0-3D28-4B85-B8A8-E65C5B04768A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{092027A0-3D28-4B85-B8A8-E65C5B04768A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{092027A0-3D28-4B85-B8A8-E65C5B04768A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

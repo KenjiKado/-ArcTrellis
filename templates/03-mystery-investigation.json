@@ -1,0 +1,15 @@
+{
+  "name":"Mystery investigation","description":"Track the crime, clues, competing theories, reversal, and reveal across parallel plotlines.","category":"Genre",
+  "project":{"formatVersion":1,"id":"30000000-0000-0000-0000-000000000001","title":"Untitled Mystery","author":"","genre":"Mystery","description":"Replace each prompt with a story-specific event.","wordCountGoal":75000,"currentWordCount":0,
+  "books":[{"id":"31000000-0000-0000-0000-000000000001","title":"Book One","subtitle":"","summary":"","order":0,"wordCountGoal":75000,"chapters":[
+    {"id":"32000000-0000-0000-0000-000000000001","title":"Disturbance","summary":"A crime or disappearance breaks the surface.","order":0,"section":"Setup","wordCount":0},
+    {"id":"32000000-0000-0000-0000-000000000002","title":"First Inquiry","summary":"The investigator forms an initial theory.","order":1,"section":"Investigation","wordCount":0},
+    {"id":"32000000-0000-0000-0000-000000000003","title":"Contradiction","summary":"Evidence weakens the obvious answer.","order":2,"section":"Investigation","wordCount":0},
+    {"id":"32000000-0000-0000-0000-000000000004","title":"Pressure","summary":"The hidden actor pushes back.","order":3,"section":"Escalation","wordCount":0},
+    {"id":"32000000-0000-0000-0000-000000000005","title":"Reconstruction","summary":"Clues form a new sequence of events.","order":4,"section":"Reveal","wordCount":0},
+    {"id":"32000000-0000-0000-0000-000000000006","title":"Confrontation","summary":"The investigator tests the final theory.","order":5,"section":"Reveal","wordCount":0}
+  ]}],"plotlines":[
+    {"id":"33000000-0000-0000-0000-000000000001","name":"Investigation","description":"What the investigator learns.","color":"#5B7CFA","order":0},
+    {"id":"33000000-0000-0000-0000-000000000002","name":"Hidden Truth","description":"What actually happened, tracked chronologically.","color":"#D9577A","order":1},
+    {"id":"33000000-0000-0000-0000-000000000003","name":"False Theory","description":"A plausible interpretation and its cracks.","color":"#E39B35","order":2}
+  ],"scenes":[],"characters":[],"places":[],"notes":[{"id":"37000000-0000-0000-0000-000000000001","name":"Clue ledger","category":"Continuity","summary":"For every clue, record discovery, apparent meaning, true meaning, and payoff.","description":"Add custom fields for Placement, Discoverer, Surface interpretation, Actual significance, and Resolution.","imagePath":"","tags":["clues"],"bookIds":[],"fields":[{"name":"Fair-play rule","value":"The reader receives decisive evidence before the reveal."}]}],"relationships":[],"tags":["clue","red herring","reveal"],"categories":["Clues","Suspects","Research","Continuity"]}}
