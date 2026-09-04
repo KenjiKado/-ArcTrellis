@@ -46,6 +46,24 @@ try {
     if (-not $setup) { throw "Installer output was not found." }
     $hash = Get-FileHash $setup.FullName -Algorithm SHA256
     Set-Content -Path ($setup.FullName + ".sha256") -Value ("{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $setup.Name)
+
+    # Exercise the actual installer and installed executable on the Windows runner.
+    $installTest = Join-Path $env:RUNNER_TEMP "ArcTrellis-Install-Test"
+    if (Test-Path $installTest) { Remove-Item -Recurse -Force $installTest }
+    $installResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installTest" -Wait -PassThru
+    if ($installResult.ExitCode -ne 0) { throw "Silent installer test failed with exit code $($installResult.ExitCode)." }
+    $installedExe = Join-Path $installTest "ArcTrellis.exe"
+    if (-not (Test-Path $installedExe)) { throw "The installer completed but ArcTrellis.exe was not installed." }
+    $appProcess = Start-Process $installedExe -PassThru
+    Start-Sleep -Seconds 5
+    if ($appProcess.HasExited) { throw "The installed application exited during its launch smoke test (code $($appProcess.ExitCode))." }
+    Stop-Process -Id $appProcess.Id -Force
+    $uninstaller = Join-Path $installTest "unins000.exe"
+    if (Test-Path $uninstaller) {
+        $uninstallResult = Start-Process $uninstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
+        if ($uninstallResult.ExitCode -ne 0) { throw "Silent uninstall test failed with exit code $($uninstallResult.ExitCode)." }
+    }
+    Write-Host "Install, launch, and uninstall smoke test passed."
     Write-Host "Installer ready: $($setup.FullName)"
     Write-Host "SHA-256: $($hash.Hash)"
 }
