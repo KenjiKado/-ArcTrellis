@@ -2,7 +2,7 @@
   #define AppPublishDir "..\artifacts\publish\win-x64"
 #endif
 #define AppName "ArcTrellis"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppPublisher "ArcTrellis"
 #define AppExeName "ArcTrellis.exe"
 
@@ -33,9 +33,18 @@ VersionInfoProductName=ArcTrellis
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
+
+[CustomMessages]
+english.DesktopShortcut=Create a desktop shortcut
+english.AdditionalShortcuts=Additional shortcuts:
+english.LaunchApp=Launch ArcTrellis
+russian.DesktopShortcut=Создать ярлык на рабочем столе
+russian.AdditionalShortcuts=Дополнительные ярлыки:
+russian.LaunchApp=Запустить ArcTrellis
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; GroupDescription: "{cm:AdditionalShortcuts}"; Flags: unchecked
 
 [Files]
 Source: "{#AppPublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -51,4 +60,4 @@ Root: HKA; Subkey: "Software\Classes\ArcTrellis.Project\DefaultIcon"; ValueType:
 Root: HKA; Subkey: "Software\Classes\ArcTrellis.Project\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
 
 [Run]
-Filename: "{app}\{#AppExeName}"; Description: "Launch ArcTrellis"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent

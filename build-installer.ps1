@@ -42,7 +42,7 @@ try {
     & $iscc "/DAppPublishDir=$publish" ".\installer\ArcTrellis.iss"
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
 
-    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-*-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.0-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $setup) { throw "Installer output was not found." }
     $hash = Get-FileHash $setup.FullName -Algorithm SHA256
     Set-Content -Path ($setup.FullName + ".sha256") -Value ("{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $setup.Name)
@@ -50,11 +50,11 @@ try {
     # Exercise the actual installer and installed executable on the Windows runner.
     $installTest = Join-Path $env:RUNNER_TEMP "ArcTrellis-Install-Test"
     if (Test-Path $installTest) { Remove-Item -Recurse -Force $installTest }
-    $installResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installTest" -Wait -PassThru
+    $installResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LANG=russian", "/DIR=$installTest" -Wait -PassThru
     if ($installResult.ExitCode -ne 0) { throw "Silent installer test failed with exit code $($installResult.ExitCode)." }
     $installedExe = Join-Path $installTest "ArcTrellis.exe"
     if (-not (Test-Path $installedExe)) { throw "The installer completed but ArcTrellis.exe was not installed." }
-    $appProcess = Start-Process $installedExe -PassThru
+    $appProcess = Start-Process $installedExe -ArgumentList "--language=ru-RU" -PassThru
     Start-Sleep -Seconds 5
     if ($appProcess.HasExited) { throw "The installed application exited during its launch smoke test (code $($appProcess.ExitCode))." }
     Stop-Process -Id $appProcess.Id -Force

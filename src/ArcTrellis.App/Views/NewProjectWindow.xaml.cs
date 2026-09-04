@@ -10,7 +10,8 @@ public partial class NewProjectWindow : Window
     public NewProjectWindow(IEnumerable<TemplateInfo> templates)
     {
         InitializeComponent();
-        TemplateList.ItemsSource = templates;
+        TemplateList.ItemsSource = templates.Select(t => new TemplateInfo(Loc.T(t.Name), Loc.T(t.Description), Loc.T(t.Category), t.FilePath)).ToList();
+        Loaded += (_, _) => Loc.Apply(this);
     }
 
     private void Create_Click(object sender, RoutedEventArgs e)

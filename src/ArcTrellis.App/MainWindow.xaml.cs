@@ -2,11 +2,13 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Interop;
 using ArcTrellis.App.Views;
 using ArcTrellis.Core.Models;
 using ArcTrellis.Core.Services;
@@ -21,15 +23,19 @@ public partial class MainWindow : Window
     private readonly ExportService _exports = new();
     private readonly ImportService _imports = new();
     private readonly DispatcherTimer _autosaveTimer = new() { Interval = TimeSpan.FromSeconds(45) };
+    private static readonly string ThemeSettingsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ArcTrellis", "theme.txt");
     private MainViewModel Vm => (MainViewModel)DataContext;
     private bool _loaded;
     private bool _closingAfterSave;
     private double _timelineCardWidth = 220;
+    private bool _isDark;
 
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = new MainViewModel(_templates.CreateBlank());
+        DataContext = new MainViewModel(CreateBlankProject());
+        SetTheme(LoadDarkTheme(), false);
+        SourceInitialized += (_, _) => ApplyWindowChromeTheme();
         Vm.ProjectReplaced += Vm_ProjectReplaced;
         _autosaveTimer.Tick += AutosaveTimer_Tick;
         AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(AnyTextChanged));
@@ -41,6 +47,7 @@ public partial class MainWindow : Window
         _loaded = true;
         _autosaveTimer.Start();
         RefreshAll();
+        ApplyLocalization();
         if (Environment.GetCommandLineArgs().Skip(1).FirstOrDefault() is { } startupFile && File.Exists(startupFile))
             _ = OpenProjectAsync(startupFile);
         else
@@ -63,6 +70,7 @@ public partial class MainWindow : Window
         BuildTimeline();
         RefreshRelations();
         RefreshStats();
+        Loc.Apply(this);
     }
 
     private void RefreshStats()
@@ -71,10 +79,10 @@ public partial class MainWindow : Window
         int chapters = Vm.Project.Books.Sum(b => b.Chapters.Count);
         int scenes = Vm.Project.Scenes.Count;
         int drafted = Vm.Project.Scenes.Count(s => s.Status is "Drafted" or "Revised" or "Final");
-        StatsText.Text = $"{books} book(s)\n{chapters} chapter(s)\n{scenes} scene card(s)\n{Vm.Project.Plotlines.Count} plotline(s)\n{Vm.Project.Characters.Count} character(s)\n{Vm.Project.Places.Count} place(s)\n{drafted} scenes drafted";
+        StatsText.Text = string.Join("\n", Loc.F("{0} book(s)", books), Loc.F("{0} chapter(s)", chapters), Loc.F("{0} scene card(s)", scenes), Loc.F("{0} plotline(s)", Vm.Project.Plotlines.Count), Loc.F("{0} character(s)", Vm.Project.Characters.Count), Loc.F("{0} place(s)", Vm.Project.Places.Count), Loc.F("{0} scenes drafted", drafted));
         double progress = Vm.Project.WordCountGoal <= 0 ? 0 : Math.Min(100, Vm.Project.CurrentWordCount * 100d / Vm.Project.WordCountGoal);
         ProgressBar.Value = progress;
-        ProgressText.Text = $"{Vm.Project.CurrentWordCount:N0} / {Vm.Project.WordCountGoal:N0} words ({progress:0}%)";
+        ProgressText.Text = Loc.F("{0:N0} / {1:N0} words ({2:0}%)", Vm.Project.CurrentWordCount, Vm.Project.WordCountGoal, progress);
     }
 
     private void BuildTimeline()
@@ -89,7 +97,7 @@ public partial class MainWindow : Window
         TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         foreach (var _ in plotlines) TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        AddTimelineCell(new TextBlock { Text = "PLOTLINE / CHAPTER", FontWeight = FontWeights.SemiBold, Margin = new Thickness(8) }, 0, 0, false);
+        AddTimelineCell(new TextBlock { Text = Loc.T("PLOTLINE / CHAPTER"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(8) }, 0, 0, false);
         for (int c = 0; c < chapters.Count; c++)
         {
             var header = new StackPanel { Margin = new Thickness(5) };
@@ -107,7 +115,7 @@ public partial class MainWindow : Window
                 var stack = new StackPanel { MinHeight = 105 };
                 foreach (var scene in Vm.Project.Scenes.Where(s => s.BookId == book.Id && s.ChapterId == chapters[c].Id && s.PlotlineId == plot.Id).OrderBy(s => s.Order))
                     stack.Children.Add(CreateSceneCard(scene, plot));
-                if (stack.Children.Count == 0) stack.Children.Add(new TextBlock { Text = "Drop a scene here or double-click", Foreground = FindBrush("MutedBrush"), Margin = new Thickness(8), TextWrapping = TextWrapping.Wrap });
+                if (stack.Children.Count == 0) stack.Children.Add(new TextBlock { Text = Loc.T("Drop a scene here or double-click"), Foreground = FindBrush("MutedBrush"), Margin = new Thickness(8), TextWrapping = TextWrapping.Wrap });
                 var border = AddTimelineCell(stack, r + 1, c + 1, true);
                 border.Tag = (chapters[c].Id, plot.Id);
                 border.Drop += TimelineCell_Drop;
@@ -127,7 +135,7 @@ public partial class MainWindow : Window
         var panel = new StackPanel();
         panel.Children.Add(new TextBlock { Text = scene.Title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
         if (!string.IsNullOrWhiteSpace(scene.Summary)) panel.Children.Add(new TextBlock { Text = scene.Summary, TextWrapping = TextWrapping.Wrap, MaxHeight = 54, Foreground = FindBrush("MutedBrush"), Margin = new Thickness(0, 4, 0, 0) });
-        panel.Children.Add(new TextBlock { Text = scene.Status, FontSize = 11, Foreground = BrushFrom(plot.Color), Margin = new Thickness(0, 5, 0, 0) });
+        panel.Children.Add(new TextBlock { Text = Loc.T(scene.Status), FontSize = 11, Foreground = BrushFrom(plot.Color), Margin = new Thickness(0, 5, 0, 0) });
         var card = new Border { Tag = scene, Child = panel, Background = new SolidColorBrush(Color.FromArgb(24, BrushColor(plot.Color).R, BrushColor(plot.Color).G, BrushColor(plot.Color).B)), BorderBrush = BrushFrom(plot.Color), BorderThickness = new Thickness(3, 0, 0, 0), CornerRadius = new CornerRadius(5), Margin = new Thickness(2, 3, 2, 3), Padding = new Thickness(9), Cursor = Cursors.Hand };
         card.PreviewMouseMove += SceneCard_MouseMove;
         card.MouseLeftButtonDown += SceneCard_MouseLeftButtonDown;
@@ -177,9 +185,9 @@ public partial class MainWindow : Window
         try
         {
             await _projects.SaveAsync(Vm.Project, _projects.GetAutosavePath(Vm.Project.Id), false);
-            Vm.Status = "Autosaved locally at " + DateTime.Now.ToShortTimeString();
+            Vm.Status = Loc.F("Autosaved locally at {0}", DateTime.Now.ToShortTimeString());
         }
-        catch (Exception ex) { Vm.Status = "Autosave failed: " + ex.Message; }
+        catch (Exception ex) { Vm.Status = Loc.F("Autosave failed: {0}", ex.Message); }
     }
 
     private void New_Click(object sender, RoutedEventArgs e) => ShowNewProjectDialog(false);
@@ -191,17 +199,17 @@ public partial class MainWindow : Window
         var dialog = new NewProjectWindow(options) { Owner = this };
         if (dialog.ShowDialog() != true)
         {
-            if (firstRun) Vm.Status = "Blank project ready";
+            if (firstRun) Vm.Status = Loc.T("Blank project ready");
             return;
         }
-        var project = string.IsNullOrEmpty(dialog.SelectedTemplate!.FilePath) ? _templates.CreateBlank() : _templates.CreateFromTemplate(dialog.SelectedTemplate);
+        var project = string.IsNullOrEmpty(dialog.SelectedTemplate!.FilePath) ? CreateBlankProject() : _templates.CreateFromTemplate(dialog.SelectedTemplate);
         Vm.ReplaceProject(project); RefreshAll();
     }
 
     private async void Open_Click(object sender, RoutedEventArgs e)
     {
         if (!ConfirmDiscard()) return;
-        var dialog = new OpenFileDialog { Title = "Open ArcTrellis project", Filter = "ArcTrellis projects (*.arctrellis)|*.arctrellis|All files (*.*)|*.*" };
+        var dialog = new OpenFileDialog { Title = Loc.T("Open ArcTrellis project"), Filter = Loc.T("ArcTrellis projects (*.arctrellis)|*.arctrellis|All files (*.*)|*.*") };
         if (dialog.ShowDialog() == true) await OpenProjectAsync(dialog.FileName);
     }
 
@@ -211,45 +219,45 @@ public partial class MainWindow : Window
         {
             var project = await _projects.LoadAsync(path);
             string autosave = _projects.GetAutosavePath(project.Id);
-            if (File.Exists(autosave) && File.GetLastWriteTimeUtc(autosave) > File.GetLastWriteTimeUtc(path) && MessageBox.Show("A newer local autosave exists. Recover it?", "Recover project", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            if (File.Exists(autosave) && File.GetLastWriteTimeUtc(autosave) > File.GetLastWriteTimeUtc(path) && MessageBox.Show(Loc.T("A newer local autosave exists. Recover it?"), Loc.T("Recover project"), MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 project = await _projects.LoadAsync(autosave);
-            Vm.ReplaceProject(project, path); Vm.Status = "Opened " + Path.GetFileName(path); RefreshAll();
+            Vm.ReplaceProject(project, path); Vm.Status = Loc.F("Opened {0}", Path.GetFileName(path)); RefreshAll();
         }
-        catch (Exception ex) { MessageBox.Show("Could not open the project.\n\n" + ex.Message, "ArcTrellis", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex) { MessageBox.Show(Loc.F("Could not open the project.\n\n{0}", ex.Message), "ArcTrellis", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e) => await SaveAsync(false);
     private async void SaveAs_Click(object sender, RoutedEventArgs e) => await SaveAsync(true);
     private void SaveTemplate_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SaveFileDialog { Title = "Save reusable template", Filter = "ArcTrellis template (*.json)|*.json", DefaultExt = ".json", AddExtension = true, InitialDirectory = _templates.UserTemplateDirectory, FileName = SafeName(Vm.Project.Title) + " Template" };
+        var dialog = new SaveFileDialog { Title = Loc.T("Save reusable template"), Filter = Loc.T("ArcTrellis template (*.json)|*.json"), DefaultExt = ".json", AddExtension = true, InitialDirectory = _templates.UserTemplateDirectory, FileName = SafeName(Vm.Project.Title) + Loc.T(" Template") };
         if (dialog.ShowDialog() != true) return;
-        try { _templates.SaveTemplate(dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName), "Custom template created from " + Vm.Project.Title, Vm.Project); Vm.Status = "Reusable template saved"; }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Template save failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+        try { _templates.SaveTemplate(dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName), Loc.F("Custom template created from {0}", Vm.Project.Title), Vm.Project); Vm.Status = Loc.T("Reusable template saved"); }
+        catch (Exception ex) { MessageBox.Show(ex.Message, Loc.T("Template save failed"), MessageBoxButton.OK, MessageBoxImage.Error); }
     }
     private async Task<bool> SaveAsync(bool saveAs)
     {
         string? path = Vm.FilePath;
         if (saveAs || string.IsNullOrWhiteSpace(path))
         {
-            var dialog = new SaveFileDialog { Title = "Save ArcTrellis project", Filter = "ArcTrellis project (*.arctrellis)|*.arctrellis", DefaultExt = ".arctrellis", AddExtension = true, FileName = SafeName(Vm.Project.Title) };
+            var dialog = new SaveFileDialog { Title = Loc.T("Save ArcTrellis project"), Filter = Loc.T("ArcTrellis project (*.arctrellis)|*.arctrellis"), DefaultExt = ".arctrellis", AddExtension = true, FileName = SafeName(Vm.Project.Title) };
             if (dialog.ShowDialog() != true) return false;
             path = dialog.FileName;
         }
         try
         {
-            await _projects.SaveAsync(Vm.Project, path!); Vm.FilePath = path; Vm.IsDirty = false; Vm.Status = "Saved " + Path.GetFileName(path); Title = Vm.WindowTitle; return true;
+            await _projects.SaveAsync(Vm.Project, path!); Vm.FilePath = path; Vm.IsDirty = false; Vm.Status = Loc.F("Saved {0}", Path.GetFileName(path)); Title = Vm.WindowTitle; return true;
         }
-        catch (Exception ex) { MessageBox.Show("Could not save the project.\n\n" + ex.Message, "ArcTrellis", MessageBoxButton.OK, MessageBoxImage.Error); return false; }
+        catch (Exception ex) { MessageBox.Show(Loc.F("Could not save the project.\n\n{0}", ex.Message), "ArcTrellis", MessageBoxButton.OK, MessageBoxImage.Error); return false; }
     }
 
     private void ImportMarkdown_Click(object sender, RoutedEventArgs e)
     {
         if (!ConfirmDiscard()) return;
-        var dialog = new OpenFileDialog { Filter = "Markdown files (*.md;*.markdown)|*.md;*.markdown|Text files (*.txt)|*.txt" };
+        var dialog = new OpenFileDialog { Filter = Loc.T("Markdown files (*.md;*.markdown)|*.md;*.markdown|Text files (*.txt)|*.txt") };
         if (dialog.ShowDialog() != true) return;
         try { Vm.ReplaceProject(_imports.ImportMarkdown(dialog.FileName)); Vm.MarkDirty(); RefreshAll(); }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Import failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex) { MessageBox.Show(ex.Message, Loc.T("Import failed"), MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private void ExportDocx_Click(object sender, RoutedEventArgs e) => ExportFile("Word document (*.docx)|*.docx", ".docx", _exports.ExportDocx);
@@ -257,18 +265,18 @@ public partial class MainWindow : Window
     private void ExportCsv_Click(object sender, RoutedEventArgs e) => ExportFile("CSV spreadsheet (*.csv)|*.csv", ".csv", _exports.ExportCsv);
     private void ExportFile(string filter, string extension, Action<StoryProject, string> export)
     {
-        var dialog = new SaveFileDialog { Filter = filter, DefaultExt = extension, AddExtension = true, FileName = SafeName(Vm.Project.Title) };
+        var dialog = new SaveFileDialog { Filter = Loc.T(filter), DefaultExt = extension, AddExtension = true, FileName = SafeName(Vm.Project.Title) };
         if (dialog.ShowDialog() != true) return;
-        try { export(Vm.Project, dialog.FileName); Vm.Status = "Exported " + Path.GetFileName(dialog.FileName); }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Export failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+        try { export(Vm.Project, dialog.FileName); Vm.Status = Loc.F("Exported {0}", Path.GetFileName(dialog.FileName)); }
+        catch (Exception ex) { MessageBox.Show(ex.Message, Loc.T("Export failed"), MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private void ExportScrivener_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new OpenFolderDialog { Title = "Choose a folder for the Scrivener project" };
+        var dialog = new OpenFolderDialog { Title = Loc.T("Choose a folder for the Scrivener project") };
         if (dialog.ShowDialog() != true) return;
-        try { _exports.ExportScrivenerFolder(Vm.Project, dialog.FolderName); Vm.Status = "Scrivener project exported"; }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "Export failed", MessageBoxButton.OK, MessageBoxImage.Error); }
+        try { _exports.ExportScrivenerFolder(Vm.Project, dialog.FolderName); Vm.Status = Loc.T("Scrivener project exported"); }
+        catch (Exception ex) { MessageBox.Show(ex.Message, Loc.T("Export failed"), MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private void AddBook_Click(object sender, RoutedEventArgs e) { Vm.AddBook(); RefreshAll(); }
@@ -301,37 +309,77 @@ public partial class MainWindow : Window
         if (sender is not ListView { SelectedItem: SearchResult result }) return;
         switch (result.Kind)
         {
-            case "Scene": Vm.SelectedScene = Vm.Project.Scenes.FirstOrDefault(x => x.Id == result.ItemId); WorkspaceTabs.SelectedIndex = 3; break;
-            case "Character": Vm.SelectedCharacter = Vm.Project.Characters.FirstOrDefault(x => x.Id == result.ItemId); WorkspaceTabs.SelectedIndex = 4; break;
-            case "Place": Vm.SelectedPlace = Vm.Project.Places.FirstOrDefault(x => x.Id == result.ItemId); WorkspaceTabs.SelectedIndex = 5; break;
-            case "Note": Vm.SelectedNote = Vm.Project.Notes.FirstOrDefault(x => x.Id == result.ItemId); WorkspaceTabs.SelectedIndex = 6; break;
-            case "Chapter": WorkspaceTabs.SelectedIndex = 2; break;
+            case "Scene" or "Сцена": Vm.SelectedScene = Vm.Project.Scenes.FirstOrDefault(x => x.Id == result.ItemId); WorkspaceTabs.SelectedIndex = 3; break;
+            case "Character" or "Персонаж": Vm.SelectedCharacter = Vm.Project.Characters.FirstOrDefault(x => x.Id == result.ItemId); WorkspaceTabs.SelectedIndex = 4; break;
+            case "Place" or "Место": Vm.SelectedPlace = Vm.Project.Places.FirstOrDefault(x => x.Id == result.ItemId); WorkspaceTabs.SelectedIndex = 5; break;
+            case "Note" or "Заметка": Vm.SelectedNote = Vm.Project.Notes.FirstOrDefault(x => x.Id == result.ItemId); WorkspaceTabs.SelectedIndex = 6; break;
+            case "Chapter" or "Глава": WorkspaceTabs.SelectedIndex = 2; break;
         }
     }
 
     private void LightTheme_Click(object sender, RoutedEventArgs e) => SetTheme(false);
     private void DarkTheme_Click(object sender, RoutedEventArgs e) => SetTheme(true);
-    private void SetTheme(bool dark)
+    private void EnglishLanguage_Click(object sender, RoutedEventArgs e) => ChangeLanguage("en-US");
+    private void RussianLanguage_Click(object sender, RoutedEventArgs e) => ChangeLanguage("ru-RU");
+    private void ChangeLanguage(string language)
     {
-        Application.Current.Resources["PageBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? "#171A22" : "#F4F6FA"));
-        Application.Current.Resources["PanelBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? "#222733" : "#FFFFFF"));
-        Application.Current.Resources["TextBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? "#EEF1F7" : "#202638"));
-        Application.Current.Resources["MutedBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? "#AAB3C5" : "#667085"));
-        Application.Current.Resources["BorderBrush"] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(dark ? "#394154" : "#D8DEEA"));
+        Loc.SetLanguage(language);
+        Vm.RefreshLocalization();
+        ApplyLocalization();
+        RefreshAll();
+    }
+    private void ApplyLocalization()
+    {
+        EnglishLanguageItem.IsChecked = !Loc.IsRussian;
+        RussianLanguageItem.IsChecked = Loc.IsRussian;
+        Loc.Apply(this);
+    }
+    private void SetTheme(bool dark, bool persist = true)
+    {
+        _isDark = dark;
+        var palette = dark
+            ? new Dictionary<string, string> { ["AccentBrush"] = "#7895FF", ["AccentHoverBrush"] = "#8AA3FF", ["AccentPressedBrush"] = "#5A76E8", ["PageBrush"] = "#111722", ["PanelBrush"] = "#192130", ["ElevatedBrush"] = "#222C3D", ["InputBrush"] = "#121925", ["TextBrush"] = "#F2F5FA", ["MutedBrush"] = "#AAB5C6", ["BorderBrush"] = "#354154", ["HoverBrush"] = "#273247", ["SelectedBrush"] = "#304263", ["HeaderBrush"] = "#0E141E", ["DangerBrush"] = "#FF7188" }
+            : new Dictionary<string, string> { ["AccentBrush"] = "#5B7CFA", ["AccentHoverBrush"] = "#6D89FA", ["AccentPressedBrush"] = "#4264DF", ["PageBrush"] = "#F4F6FA", ["PanelBrush"] = "#FFFFFF", ["ElevatedBrush"] = "#FFFFFF", ["InputBrush"] = "#FFFFFF", ["TextBrush"] = "#202638", ["MutedBrush"] = "#667085", ["BorderBrush"] = "#D8DEEA", ["HoverBrush"] = "#EEF2FF", ["SelectedBrush"] = "#E2E9FF", ["HeaderBrush"] = "#FFFFFF", ["DangerBrush"] = "#D84B63" };
+        foreach (var (key, color) in palette) Application.Current.Resources[key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+        LightThemeItem.IsChecked = !dark;
+        DarkThemeItem.IsChecked = dark;
+        ApplyWindowChromeTheme();
+        if (persist)
+        {
+            try { Directory.CreateDirectory(Path.GetDirectoryName(ThemeSettingsPath)!); File.WriteAllText(ThemeSettingsPath, dark ? "dark" : "light"); } catch { }
+        }
         BuildTimeline();
     }
+
+    private static bool LoadDarkTheme()
+    {
+        try { return File.Exists(ThemeSettingsPath) && File.ReadAllText(ThemeSettingsPath).Trim().Equals("dark", StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
+    }
+
+    private void ApplyWindowChromeTheme()
+    {
+        IntPtr handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return;
+        int enabled = _isDark ? 1 : 0;
+        if (DwmSetWindowAttribute(handle, 20, ref enabled, sizeof(int)) != 0)
+            _ = DwmSetWindowAttribute(handle, 19, ref enabled, sizeof(int));
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int valueSize);
 
     private void Print_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new PrintDialog();
-        if (dialog.ShowDialog() == true) dialog.PrintVisual(TimelineGrid, Vm.Project.Title + " timeline");
+        if (dialog.ShowDialog() == true) dialog.PrintVisual(TimelineGrid, Vm.Project.Title + " — " + Loc.T("Timeline"));
     }
     private void Guide_Click(object sender, RoutedEventArgs e)
     {
-        string path = Path.Combine(AppContext.BaseDirectory, "Docs", "USER_GUIDE.md");
+        string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.0\n\nA private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required.", "About ArcTrellis", MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -348,7 +396,7 @@ public partial class MainWindow : Window
     private async void Window_Closing(object? sender, CancelEventArgs e)
     {
         if (_closingAfterSave || !Vm.IsDirty) return;
-        var result = MessageBox.Show("Save changes before closing?", "ArcTrellis", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        var result = MessageBox.Show(Loc.T("Save changes before closing?"), "ArcTrellis", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
         if (result == MessageBoxResult.Cancel) { e.Cancel = true; return; }
         if (result == MessageBoxResult.No) return;
         e.Cancel = true;
@@ -358,10 +406,20 @@ public partial class MainWindow : Window
     private bool ConfirmDiscard()
     {
         if (!Vm.IsDirty) return true;
-        var result = MessageBox.Show("This project has unsaved changes. Continue and discard them?", "ArcTrellis", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        var result = MessageBox.Show(Loc.T("This project has unsaved changes. Continue and discard them?"), "ArcTrellis", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         return result == MessageBoxResult.Yes;
     }
-    private static bool ConfirmDelete(string item) => MessageBox.Show($"Delete this {item}?", "ArcTrellis", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    private static bool ConfirmDelete(string item) => MessageBox.Show(Loc.F("Delete this {0}?", Loc.T(item)), "ArcTrellis", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    private StoryProject CreateBlankProject()
+    {
+        var project = _templates.CreateBlank();
+        project.Title = Loc.T(project.Title);
+        project.Books[0].Title = Loc.T(project.Books[0].Title);
+        project.Books[0].Chapters[0].Title = Loc.T(project.Books[0].Chapters[0].Title);
+        project.Books[0].Chapters[0].Section = Loc.T(project.Books[0].Chapters[0].Section);
+        project.Plotlines[0].Name = Loc.T(project.Plotlines[0].Name);
+        return project;
+    }
     private static string SafeName(string name) => string.Concat(name.Where(c => !Path.GetInvalidFileNameChars().Contains(c))) is { Length: > 0 } value ? value : "Story";
     private Brush FindBrush(string key) => (Brush)FindResource(key);
     private static SolidColorBrush BrushFrom(string color) => new(BrushColor(color));

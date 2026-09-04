@@ -24,7 +24,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _searchText = "";
     private string? _filePath;
     private bool _isDirty;
-    private string _status = "Ready";
+    private string _status = Loc.T("Ready");
 
     public MainViewModel(StoryProject project)
     {
@@ -51,7 +51,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public IEnumerable<Scene> BookScenes => SelectedBook is null ? [] : Project.Scenes.Where(s => s.BookId == SelectedBook.Id).OrderBy(s => s.Order);
     public IEnumerable<Scene> ChapterScenes => SelectedChapter is null ? [] : Project.Scenes.Where(s => s.ChapterId == SelectedChapter.Id).OrderBy(s => s.Order);
     public ObservableCollection<SearchResult> SearchResults { get; } = [];
-    public IReadOnlyList<string> SceneStatuses { get; } = ["Planned", "Drafted", "Revised", "Final", "Cut"];
+    public IReadOnlyList<SceneStatusOption> SceneStatuses => [new("Planned", Loc.T("Planned")), new("Drafted", Loc.T("Drafted")), new("Revised", Loc.T("Revised")), new("Final", Loc.T("Final")), new("Cut", Loc.T("Cut"))];
+    public void RefreshLocalization() { Raise(nameof(SceneStatuses)); Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Status = Loc.T("Ready"); }
 
     public void ReplaceProject(StoryProject project, string? path = null)
     {
@@ -65,8 +66,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void AddBook()
     {
         Snapshot();
-        var book = new Book { Title = $"Book {Project.Books.Count + 1}", Order = Project.Books.Count };
-        book.Chapters.Add(new Chapter { Title = "Chapter 1" });
+        var book = new Book { Title = Loc.F("Book {0}", Project.Books.Count + 1), Order = Project.Books.Count };
+        book.Chapters.Add(new Chapter { Title = Loc.F("Chapter {0}", 1), Section = Loc.T("Act I") });
         Project.Books.Add(book); SelectedBook = book; Dirty("Book added");
     }
 
@@ -84,7 +85,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         if (SelectedBook is null) return;
         Snapshot();
-        var chapter = new Chapter { Title = $"Chapter {SelectedBook.Chapters.Count + 1}", Order = SelectedBook.Chapters.Count };
+        var chapter = new Chapter { Title = Loc.F("Chapter {0}", SelectedBook.Chapters.Count + 1), Section = Loc.T("Act I"), Order = SelectedBook.Chapters.Count };
         SelectedBook.Chapters.Add(chapter); SelectedChapter = chapter; Dirty("Chapter added");
     }
 
@@ -110,7 +111,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         Snapshot();
         string[] colors = ["#5B7CFA", "#D9577A", "#2E9D78", "#E39B35", "#8A63D2", "#3B9AB2"];
-        var plot = new Plotline { Name = $"Plotline {Project.Plotlines.Count + 1}", Order = Project.Plotlines.Count, Color = colors[Project.Plotlines.Count % colors.Length] };
+        var plot = new Plotline { Name = Loc.F("Plotline {0}", Project.Plotlines.Count + 1), Order = Project.Plotlines.Count, Color = colors[Project.Plotlines.Count % colors.Length] };
         Project.Plotlines.Add(plot); SelectedPlotline = plot; Dirty("Plotline added");
     }
 
@@ -128,7 +129,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (SelectedBook is null || (SelectedChapter is null && chapterId is null) || Project.Plotlines.Count == 0) return;
         Snapshot();
         Guid cid = chapterId ?? SelectedChapter!.Id;
-        var scene = new Scene { Title = $"Scene {Project.Scenes.Count + 1}", BookId = SelectedBook.Id, ChapterId = cid,
+        var scene = new Scene { Title = Loc.F("Scene {0}", Project.Scenes.Count + 1), BookId = SelectedBook.Id, ChapterId = cid,
             PlotlineId = plotlineId ?? SelectedPlotline?.Id ?? Project.Plotlines.OrderBy(x => x.Order).First().Id,
             Order = Project.Scenes.Count };
         Project.Scenes.Add(scene); SelectedScene = scene; Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene added");
@@ -150,7 +151,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public StoryEntity AddEntity(ObservableCollection<StoryEntity> collection, string kind)
     {
         Snapshot();
-        var item = new StoryEntity { Name = $"New {kind}", Category = kind == "Note" ? "Research" : "General" };
+        var item = new StoryEntity { Name = Loc.T($"New {kind}"), Category = Loc.T(kind == "Note" ? "Research" : "General") };
         collection.Add(item); Dirty(kind + " added"); return item;
     }
 
@@ -167,15 +168,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var entities = Project.Characters.Concat(Project.Places).ToList();
         if (entities.Count < 2) return;
         Snapshot();
-        var relation = new Relationship { FromEntityId = entities[0].Id, ToEntityId = entities[1].Id };
+        var relation = new Relationship { FromEntityId = entities[0].Id, ToEntityId = entities[1].Id, Type = Loc.T("Related to") };
         Project.Relationships.Add(relation); SelectedRelationship = relation; Dirty("Relationship added");
     }
 
     public void RunSearch()
     {
         SearchResults.Clear();
-        foreach (var item in SearchService.Search(Project, SearchText)) SearchResults.Add(item);
-        Status = $"{SearchResults.Count} result(s)";
+        foreach (var item in SearchService.Search(Project, SearchText)) SearchResults.Add(new SearchResult(Loc.T(item.Kind), item.Title, item.Context, item.ItemId));
+        Status = Loc.F("{0} result(s)", SearchResults.Count);
     }
 
     public bool CanUndo => _undo.Count > 0;
@@ -193,7 +194,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void MarkDirty() { IsDirty = true; }
     private void Snapshot() { _undo.Push(_projects.Serialize(Project)); while (_undo.Count > 50) TrimBottom(_undo); _redo.Clear(); }
-    private void Dirty(string message) { IsDirty = true; Status = message; Project.ModifiedUtc = DateTime.UtcNow; ProjectReplaced?.Invoke(this, EventArgs.Empty); }
+    private void Dirty(string message) { IsDirty = true; Status = Loc.T(message); Project.ModifiedUtc = DateTime.UtcNow; ProjectReplaced?.Invoke(this, EventArgs.Empty); }
     private void SelectDefaults()
     {
         _selectedBook = Project.Books.OrderBy(x => x.Order).FirstOrDefault();
