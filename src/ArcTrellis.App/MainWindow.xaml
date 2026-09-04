@@ -12,7 +12,7 @@
   </Window.Resources>
   <DockPanel>
     <Menu DockPanel.Dock="Top">
-      <MenuItem Header="_File">
+      <MenuItem Header="_File" Style="{StaticResource TopMenuItemStyle}">
         <MenuItem Header="_New from Template…" InputGestureText="Ctrl+N" Click="New_Click"/>
         <MenuItem Header="_Open…" InputGestureText="Ctrl+O" Click="Open_Click"/>
         <Separator/>
@@ -31,7 +31,7 @@
         <MenuItem Header="_Print Timeline…" Click="Print_Click"/>
         <MenuItem Header="E_xit" Click="Exit_Click"/>
       </MenuItem>
-      <MenuItem Header="_Edit">
+      <MenuItem Header="_Edit" Style="{StaticResource TopMenuItemStyle}">
         <MenuItem Header="_Undo" InputGestureText="Ctrl+Z" Click="Undo_Click"/>
         <MenuItem Header="_Redo" InputGestureText="Ctrl+Y" Click="Redo_Click"/>
         <Separator/>
@@ -39,17 +39,17 @@
         <MenuItem Header="Add _Plotline" Click="AddPlotline_Click"/>
         <MenuItem Header="Add _Scene" InputGestureText="Ctrl+Shift+S" Click="AddScene_Click"/>
       </MenuItem>
-      <MenuItem Header="_View">
+      <MenuItem Header="_View" Style="{StaticResource TopMenuItemStyle}">
         <MenuItem x:Name="LightThemeItem" Header="Light theme" IsCheckable="True" Click="LightTheme_Click"/>
         <MenuItem x:Name="DarkThemeItem" Header="Dark theme" IsCheckable="True" Click="DarkTheme_Click"/>
         <Separator/>
         <MenuItem Header="Refresh timeline" InputGestureText="F5" Click="Refresh_Click"/>
       </MenuItem>
-      <MenuItem Header="_Language">
+      <MenuItem Header="_Language" Style="{StaticResource TopMenuItemStyle}">
         <MenuItem x:Name="EnglishLanguageItem" Header="English" IsCheckable="True" Click="EnglishLanguage_Click"/>
         <MenuItem x:Name="RussianLanguageItem" Header="Russian" IsCheckable="True" Click="RussianLanguage_Click"/>
       </MenuItem>
-      <MenuItem Header="_Help">
+      <MenuItem Header="_Help" Style="{StaticResource TopMenuItemStyle}">
         <MenuItem Header="User Guide" Click="Guide_Click"/>
         <MenuItem Header="About ArcTrellis" Click="About_Click"/>
       </MenuItem>
@@ -116,7 +116,7 @@
         <TabItem Header="Timeline">
           <DockPanel>
             <Border DockPanel.Dock="Top" Background="{DynamicResource PanelBrush}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-              <WrapPanel><TextBlock Text="Book:" VerticalAlignment="Center"/><ComboBox ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" DisplayMemberPath="Title" Width="190" Margin="8,0"/><TextBlock Text="Plotline:" VerticalAlignment="Center" Margin="10,0,0,0"/><ComboBox ItemsSource="{Binding Project.Plotlines}" SelectedItem="{Binding SelectedPlotline}" DisplayMemberPath="Name" Width="150" Margin="8,0"/><TextBox Text="{Binding SelectedPlotline.Name, UpdateSourceTrigger=PropertyChanged}" Width="150" ToolTip="Rename selected plotline"/><TextBox Text="{Binding SelectedPlotline.Color, UpdateSourceTrigger=PropertyChanged}" Width="80" ToolTip="Color in #RRGGBB format"/><Button Content="＋ Plotline" Click="AddPlotline_Click"/><Button Content="Delete plotline" Click="DeletePlotline_Click"/><Button Content="＋ Chapter" Click="AddChapter_Click"/><Button Content="Zoom −" Click="ZoomOut_Click"/><Button Content="Zoom +" Click="ZoomIn_Click"/></WrapPanel>
+              <WrapPanel><TextBlock Text="Book:" VerticalAlignment="Center"/><ComboBox x:Name="TimelineBookCombo" ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" DisplayMemberPath="Title" Width="190" Margin="8,0"/><TextBlock Text="Plotline:" VerticalAlignment="Center" Margin="10,0,0,0"/><ComboBox x:Name="TimelinePlotlineCombo" ItemsSource="{Binding Project.Plotlines}" SelectedItem="{Binding SelectedPlotline}" DisplayMemberPath="Name" Width="150" Margin="8,0"/><TextBox Text="{Binding SelectedPlotline.Name, UpdateSourceTrigger=PropertyChanged}" Width="150" ToolTip="Rename selected plotline"/><TextBox Text="{Binding SelectedPlotline.Color, UpdateSourceTrigger=PropertyChanged}" Width="80" ToolTip="Color in #RRGGBB format"/><Button Content="＋ Plotline" Click="AddPlotline_Click"/><Button Content="Delete plotline" Click="DeletePlotline_Click"/><Button Content="＋ Chapter" Click="AddChapter_Click"/><Button Content="Zoom −" Click="ZoomOut_Click"/><Button Content="Zoom +" Click="ZoomIn_Click"/></WrapPanel>
             </Border>
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="{DynamicResource PageBrush}"><Grid x:Name="TimelineGrid" Margin="10"/></ScrollViewer>
           </DockPanel>

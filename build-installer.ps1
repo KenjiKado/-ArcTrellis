@@ -42,7 +42,7 @@ try {
     & $iscc "/DAppPublishDir=$publish" ".\installer\ArcTrellis.iss"
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
 
-    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.0-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.1-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $setup) { throw "Installer output was not found." }
     $hash = Get-FileHash $setup.FullName -Algorithm SHA256
     Set-Content -Path ($setup.FullName + ".sha256") -Value ("{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $setup.Name)
@@ -54,9 +54,14 @@ try {
     if ($installResult.ExitCode -ne 0) { throw "Silent installer test failed with exit code $($installResult.ExitCode)." }
     $installedExe = Join-Path $installTest "ArcTrellis.exe"
     if (-not (Test-Path $installedExe)) { throw "The installer completed but ArcTrellis.exe was not installed." }
-    $appProcess = Start-Process $installedExe -ArgumentList "--language=ru-RU" -PassThru
-    Start-Sleep -Seconds 5
+    $uiSmokeReport = Join-Path $env:RUNNER_TEMP "ArcTrellis-UI-Smoke.txt"
+    if (Test-Path $uiSmokeReport) { Remove-Item -Force $uiSmokeReport }
+    $appProcess = Start-Process $installedExe -ArgumentList "--language=ru-RU", "--ui-smoke=$uiSmokeReport" -PassThru
+    for ($attempt = 0; $attempt -lt 20 -and -not (Test-Path $uiSmokeReport); $attempt++) { Start-Sleep -Seconds 1 }
     if ($appProcess.HasExited) { throw "The installed application exited during its launch smoke test (code $($appProcess.ExitCode))." }
+    if (-not (Test-Path $uiSmokeReport)) { throw "The installed application did not complete its UI smoke test." }
+    $uiSmokeResult = Get-Content $uiSmokeReport -Raw
+    if (-not $uiSmokeResult.StartsWith("PASS")) { throw "Installed UI smoke test failed: $uiSmokeResult" }
     Stop-Process -Id $appProcess.Id -Force
     $uninstaller = Join-Path $installTest "unins000.exe"
     if (Test-Path $uninstaller) {

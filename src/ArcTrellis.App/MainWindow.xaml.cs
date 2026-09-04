@@ -38,6 +38,7 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) => ApplyWindowChromeTheme();
         Vm.ProjectReplaced += Vm_ProjectReplaced;
         _autosaveTimer.Tick += AutosaveTimer_Tick;
+        WorkspaceTabs.SelectionChanged += WorkspaceTabs_SelectionChanged;
         AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(AnyTextChanged));
         AddHandler(ComboBox.SelectionChangedEvent, new SelectionChangedEventHandler(AnySelectionChanged));
     }
@@ -48,13 +49,27 @@ public partial class MainWindow : Window
         _autosaveTimer.Start();
         RefreshAll();
         ApplyLocalization();
-        if (Environment.GetCommandLineArgs().Skip(1).FirstOrDefault() is { } startupFile && File.Exists(startupFile))
+        Dispatcher.BeginInvoke(new Action(ApplyLocalization), DispatcherPriority.Loaded);
+        string? uiSmokeReport = Environment.GetCommandLineArgs().Skip(1).FirstOrDefault(x => x.StartsWith("--ui-smoke=", StringComparison.OrdinalIgnoreCase))?.Split('=', 2).LastOrDefault();
+        if (!string.IsNullOrWhiteSpace(uiSmokeReport))
+        {
+            SetTheme(true, false);
+            WorkspaceTabs.SelectedIndex = 1;
+            Dispatcher.BeginInvoke(new Action(() => RunUiSmoke(uiSmokeReport)), DispatcherPriority.ApplicationIdle);
+            return;
+        }
+        if (Environment.GetCommandLineArgs().Skip(1).FirstOrDefault(x => !x.StartsWith("--", StringComparison.Ordinal)) is { } startupFile && File.Exists(startupFile))
             _ = OpenProjectAsync(startupFile);
         else
             ShowNewProjectDialog(firstRun: true);
     }
 
     private void Vm_ProjectReplaced(object? sender, EventArgs e) => Dispatcher.BeginInvoke(new Action(RefreshAll));
+    private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!ReferenceEquals(e.OriginalSource, WorkspaceTabs)) return;
+        Dispatcher.BeginInvoke(new Action(ApplyLocalization), DispatcherPriority.Loaded);
+    }
     private void AnyTextChanged(object sender, TextChangedEventArgs e) { if (_loaded && e.OriginalSource is TextBox box && box.IsKeyboardFocusWithin) { Vm.MarkDirty(); Title = Vm.WindowTitle; RefreshStats(); } }
     private void AnySelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -325,8 +340,47 @@ public partial class MainWindow : Window
     {
         Loc.SetLanguage(language);
         Vm.RefreshLocalization();
-        ApplyLocalization();
         RefreshAll();
+        ApplyLocalization();
+        Dispatcher.BeginInvoke(new Action(() => { RefreshAll(); ApplyLocalization(); }), DispatcherPriority.Loaded);
+    }
+
+    private void RunUiSmoke(string reportPath)
+    {
+        try
+        {
+            var failures = new List<string>();
+            ChangeLanguage("en-US");
+            UpdateLayout();
+            if ((WorkspaceTabs.Items[0] as TabItem)?.Header?.ToString() != "Dashboard") failures.Add("English tab localization failed");
+
+            ChangeLanguage("ru-RU");
+            WorkspaceTabs.SelectedIndex = 1;
+            ApplyLocalization();
+            TimelineBookCombo.ApplyTemplate();
+            TimelinePlotlineCombo.ApplyTemplate();
+            UpdateLayout();
+            if ((WorkspaceTabs.Items[0] as TabItem)?.Header?.ToString() != "Обзор") failures.Add("Russian tab localization failed");
+            var visibleText = CollectVisibleText(this).ToList();
+            if (!visibleText.Contains("Книга:")) failures.Add("Deferred tab content was not translated");
+            if (visibleText.Any(x => x.Contains("ArcTrellis.Core.Models", StringComparison.Ordinal))) failures.Add("A model class name is visible instead of its display member");
+            if (((SolidColorBrush)Application.Current.Resources["InputBrush"]).Color == Colors.White) failures.Add("Dark input palette was not applied");
+            Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
+            File.WriteAllText(reportPath, failures.Count == 0 ? "PASS" : "FAIL: " + string.Join("; ", failures));
+        }
+        catch (Exception ex)
+        {
+            try { File.WriteAllText(reportPath, "FAIL: " + ex); } catch { }
+        }
+    }
+
+    private static IEnumerable<string> CollectVisibleText(DependencyObject root)
+    {
+        if (root is TextBlock { Text: { Length: > 0 } } text) yield return text.Text;
+        int count = 0;
+        try { count = VisualTreeHelper.GetChildrenCount(root); } catch { }
+        for (int i = 0; i < count; i++)
+            foreach (string value in CollectVisibleText(VisualTreeHelper.GetChild(root, i))) yield return value;
     }
     private void ApplyLocalization()
     {
@@ -379,7 +433,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.1\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

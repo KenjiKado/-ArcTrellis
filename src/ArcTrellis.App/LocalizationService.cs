@@ -126,6 +126,12 @@ public static class Loc
         try { count = VisualTreeHelper.GetChildrenCount(item); } catch { }
         for (int i = 0; i < count; i++) Visit(VisualTreeHelper.GetChild(item, i), visited);
         foreach (object child in LogicalTreeHelper.GetChildren(item)) if (child is DependencyObject dependency) Visit(dependency, visited);
+        // Some custom control templates and unopened tabs are not represented by the
+        // same WPF logical/visual route. Walk their owned content explicitly as well.
+        if (item is Panel panel) foreach (UIElement child in panel.Children) Visit(child, visited);
+        if (item is Decorator { Child: { } decoratedChild }) Visit(decoratedChild, visited);
+        if (item is ContentControl { Content: DependencyObject contentObject }) Visit(contentObject, visited);
+        if (item is ItemsControl itemControl) foreach (object child in itemControl.Items) if (child is DependencyObject dependency) Visit(dependency, visited);
         if (item is DataGrid dataGrid) foreach (var column in dataGrid.Columns) Visit(column, visited);
         if (item is ListView { View: GridView gridView }) foreach (var column in gridView.Columns) Visit(column, visited);
     }
