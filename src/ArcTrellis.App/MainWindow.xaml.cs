@@ -358,7 +358,16 @@ public partial class MainWindow : Window
             var englishText = CollectVisibleText(this).ToList();
             if (!englishText.Contains("Scene card") || !englishText.Contains("Status")) failures.Add("English deferred content localization failed");
 
+            WorkspaceTabs.SelectedIndex = 0;
+            RefreshStats();
+            ApplyLocalization();
+            UpdateLayout();
+            if (!StatsText.Text.Contains("book(s)", StringComparison.Ordinal) || StatsText.Text.Contains("Книг:", StringComparison.Ordinal)) failures.Add("English dashboard statistics did not refresh immediately");
+
             ChangeLanguage("ru-RU");
+            WorkspaceTabs.SelectedIndex = 0;
+            UpdateLayout();
+            if (!StatsText.Text.Contains("Книг:", StringComparison.Ordinal) || StatsText.Text.Contains("book(s)", StringComparison.Ordinal)) failures.Add("Russian dashboard statistics did not refresh immediately");
             WorkspaceTabs.SelectedIndex = 1;
             ApplyLocalization();
             TimelineBookCombo.ApplyTemplate();
@@ -376,7 +385,10 @@ public partial class MainWindow : Window
             if (lightMenu.Color == lightMenuText.Color) failures.Add("Light menu text has no contrast");
             var probeInput = new TextBox();
             probeInput.ApplyTemplate();
-            if (probeInput.Padding.Top > 1 || probeInput.Padding.Left > 5) failures.Add("Text input padding is too large");
+            if (probeInput.Padding != new Thickness(3, 4, 3, 4) || probeInput.MinHeight < 30) failures.Add("Single-line text input spacing is incorrect");
+            var probeEditor = new TextBox { AcceptsReturn = true };
+            probeEditor.ApplyTemplate();
+            if (probeEditor.Padding != new Thickness(3, 4, 3, 4) || probeEditor.VerticalContentAlignment != VerticalAlignment.Top) failures.Add("Multiline text editor spacing is incorrect");
 
             SetTheme(true, false);
             FileMenuItem.IsSubmenuOpen = true;
@@ -386,6 +398,7 @@ public partial class MainWindow : Window
                 popupContent.UpdateLayout();
                 SaveVisualPng(popupContent, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-file-menu.png"));
                 if (popupContent.Background is SolidColorBrush popupBackground && popupBackground.Color.R > 64) failures.Add("Dark submenu background is too light");
+                if (FindVisualChildren<ScrollViewer>(popupContent).Any(x => x.ComputedVerticalScrollBarVisibility == Visibility.Visible)) failures.Add("Dark submenu shows an unnecessary scrollbar");
             }
             else failures.Add("Dark submenu popup was not created");
             FileMenuItem.IsSubmenuOpen = false;
@@ -397,6 +410,8 @@ public partial class MainWindow : Window
             SaveVisualPng(preview, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-template-window.png"));
             preview.Close();
             if (((SolidColorBrush)Application.Current.Resources["InputBrush"]).Color == Colors.White) failures.Add("Dark input palette was not applied");
+            WorkspaceTabs.SelectedIndex = 0;
+            ChangeLanguage("ru-RU");
             UpdateLayout();
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-main-window.png"));
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
@@ -415,6 +430,18 @@ public partial class MainWindow : Window
         try { count = VisualTreeHelper.GetChildrenCount(root); } catch { }
         for (int i = 0; i < count; i++)
             foreach (string value in CollectVisibleText(VisualTreeHelper.GetChild(root, i))) yield return value;
+    }
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root) where T : DependencyObject
+    {
+        int count = 0;
+        try { count = VisualTreeHelper.GetChildrenCount(root); } catch { }
+        for (int i = 0; i < count; i++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match) yield return match;
+            foreach (T descendant in FindVisualChildren<T>(child)) yield return descendant;
+        }
     }
 
     private static void SaveVisualPng(FrameworkElement visual, string path)
@@ -481,7 +508,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.3\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.4\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

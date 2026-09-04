@@ -114,7 +114,10 @@ public static class Loc
         switch (item)
         {
             case Window window when !BindingOperations.IsDataBound(window, Window.TitleProperty): original.Title ??= window.Title; window.Title = T(original.Title); break;
-            case TextBlock text when !BindingOperations.IsDataBound(text, TextBlock.TextProperty): original.Text ??= text.Text; text.Text = T(original.Text); break;
+            case TextBlock text when !BindingOperations.IsDataBound(text, TextBlock.TextProperty):
+                original.Text ??= text.Text;
+                text.Text = TranslateStableText(original.Text, text.Text);
+                break;
             case DataGridColumn dataColumn when dataColumn.Header is string dataHeader && !BindingOperations.IsDataBound(dataColumn, DataGridColumn.HeaderProperty): original.Header ??= dataHeader; dataColumn.Header = T(original.Header); break;
             case GridViewColumn gridColumn when gridColumn.Header is string gridHeader && !BindingOperations.IsDataBound(gridColumn, GridViewColumn.HeaderProperty): original.Header ??= gridHeader; gridColumn.Header = T(original.Header); break;
             case HeaderedItemsControl items when items.Header is string itemsHeader && !BindingOperations.IsDataBound(items, HeaderedItemsControl.HeaderProperty): original.Header ??= itemsHeader; items.Header = T(original.Header); break;
@@ -134,6 +137,17 @@ public static class Loc
         if (item is ItemsControl itemControl) foreach (object child in itemControl.Items) if (child is DependencyObject dependency) Visit(dependency, visited);
         if (item is DataGrid dataGrid) foreach (var column in dataGrid.Columns) Visit(column, visited);
         if (item is ListView { View: GridView gridView }) foreach (var column in gridView.Columns) Visit(column, visited);
+    }
+
+    private static string TranslateStableText(string original, string current)
+    {
+        // Labels are translated from their first-seen value. Computed text (for
+        // example the dashboard statistics) is rendered again for each culture
+        // and must not be replaced with a cached, whole multiline value.
+        bool isKnownLabelState = string.Equals(current, original, StringComparison.Ordinal)
+            || (Ru.TryGetValue(original, out string? russian) && string.Equals(current, russian, StringComparison.Ordinal))
+            || (En.TryGetValue(original, out string? english) && string.Equals(current, english, StringComparison.Ordinal));
+        return isKnownLabelState ? T(original) : current;
     }
 
     private static void ApplyCulture()
