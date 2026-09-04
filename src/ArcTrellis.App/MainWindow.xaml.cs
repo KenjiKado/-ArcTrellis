@@ -17,6 +17,7 @@ namespace ArcTrellis.App;
 
 public partial class MainWindow : Window
 {
+    private const string NumericInputTag = "Numeric";
     private readonly ProjectService _projects = new();
     private readonly TemplateService _templates = new();
     private readonly ExportService _exports = new();
@@ -38,6 +39,8 @@ public partial class MainWindow : Window
         Vm.ProjectReplaced += Vm_ProjectReplaced;
         _autosaveTimer.Tick += AutosaveTimer_Tick;
         WorkspaceTabs.SelectionChanged += WorkspaceTabs_SelectionChanged;
+        AddHandler(TextCompositionManager.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
+        AddHandler(DataObject.PastingEvent, new DataObjectPastingEventHandler(NumericTextBox_Pasting));
         AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(AnyTextChanged));
         AddHandler(ComboBox.SelectionChangedEvent, new SelectionChangedEventHandler(AnySelectionChanged));
     }
@@ -69,7 +72,42 @@ public partial class MainWindow : Window
         if (!ReferenceEquals(e.OriginalSource, WorkspaceTabs)) return;
         Dispatcher.BeginInvoke(new Action(ApplyLocalization), DispatcherPriority.Loaded);
     }
-    private void AnyTextChanged(object sender, TextChangedEventArgs e) { if (_loaded && e.OriginalSource is TextBox box && box.IsKeyboardFocusWithin) { Vm.MarkDirty(); Title = Vm.WindowTitle; RefreshStats(); } }
+    private void AnyTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_loaded || e.OriginalSource is not TextBox box || !box.IsKeyboardFocusWithin) return;
+        if (IsNumericInput(box) && NormalizeNumericInput(box)) return;
+        Vm.MarkDirty();
+        Title = Vm.WindowTitle;
+        RefreshStats();
+    }
+
+    private void NumericTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        if (e.OriginalSource is not TextBox box || !IsNumericInput(box)) return;
+        SelectZeroForReplacement(box);
+        e.Handled = !IsValidNumericCandidate(ReplaceSelection(box, e.Text));
+    }
+
+    private void NumericTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
+    {
+        if (e.OriginalSource is not TextBox box || !IsNumericInput(box)) return;
+        if (!e.DataObject.GetDataPresent(DataFormats.UnicodeText)) { e.CancelCommand(); return; }
+        SelectZeroForReplacement(box);
+        string pasted = e.DataObject.GetData(DataFormats.UnicodeText)?.ToString() ?? string.Empty;
+        if (!IsValidNumericCandidate(ReplaceSelection(box, pasted))) e.CancelCommand();
+    }
+
+    private static bool IsNumericInput(TextBox box) => Equals(box.Tag, NumericInputTag);
+    private static bool IsValidNumericCandidate(string value) => int.TryParse(value, out int number) && number >= 0;
+    private static string ReplaceSelection(TextBox box, string value) => box.Text.Remove(box.SelectionStart, box.SelectionLength).Insert(box.SelectionStart, value);
+    private static void SelectZeroForReplacement(TextBox box) { if (box.Text == "0" && box.SelectionLength == 0) box.SelectAll(); }
+    private static bool NormalizeNumericInput(TextBox box)
+    {
+        if (!string.IsNullOrEmpty(box.Text)) return false;
+        box.Text = "0";
+        box.CaretIndex = 1;
+        return true;
+    }
     private void AnySelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_loaded) return;
@@ -295,11 +333,11 @@ public partial class MainWindow : Window
 
     private void AddBook_Click(object sender, RoutedEventArgs e) { Vm.AddBook(); RefreshAll(); }
     private void DeleteBook_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("book and all of its scenes")) { Vm.DeleteBook(); RefreshAll(); } }
-    private void AddChapter_Click(object sender, RoutedEventArgs e) { Vm.AddChapter(); RefreshAll(); }
+    private void AddChapter_Click(object sender, RoutedEventArgs e) { Vm.AddChapter(); if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 2; RefreshAll(); }
     private void DeleteChapter_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("chapter and all of its scenes")) { Vm.DeleteChapter(); RefreshAll(); } }
     private void ChapterUp_Click(object sender, RoutedEventArgs e) { Vm.MoveChapter(-1); RefreshAll(); }
     private void ChapterDown_Click(object sender, RoutedEventArgs e) { Vm.MoveChapter(1); RefreshAll(); }
-    private void AddPlotline_Click(object sender, RoutedEventArgs e) { Vm.AddPlotline(); RefreshAll(); }
+    private void AddPlotline_Click(object sender, RoutedEventArgs e) { Vm.AddPlotline(); if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 1; RefreshAll(); }
     private void DeletePlotline_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("plotline (its scenes will move to another plotline)")) { Vm.DeletePlotline(); RefreshAll(); } }
     private void AddScene_Click(object sender, RoutedEventArgs e) { Vm.AddScene(); WorkspaceTabs.SelectedIndex = 3; RefreshAll(); }
     private void DeleteScene_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("scene")) { Vm.DeleteScene(); RefreshAll(); } }
@@ -314,7 +352,6 @@ public partial class MainWindow : Window
     private void Search_Click(object sender, RoutedEventArgs e) => Vm.RunSearch();
     private void Undo_Click(object sender, RoutedEventArgs e) { Vm.Undo(); RefreshAll(); }
     private void Redo_Click(object sender, RoutedEventArgs e) { Vm.Redo(); RefreshAll(); }
-    private void Refresh_Click(object sender, RoutedEventArgs e) => RefreshAll();
     private void ZoomIn_Click(object sender, RoutedEventArgs e) { _timelineCardWidth = Math.Min(380, _timelineCardWidth + 30); BuildTimeline(); }
     private void ZoomOut_Click(object sender, RoutedEventArgs e) { _timelineCardWidth = Math.Max(130, _timelineCardWidth - 30); BuildTimeline(); }
 
@@ -379,6 +416,13 @@ public partial class MainWindow : Window
             if (visibleText.Any(x => x.Contains("ArcTrellis.Core.Models", StringComparison.Ordinal))) failures.Add("A model class name is visible instead of its display member");
             if (MainMenu.ActualHeight < 10 || (MainMenu.Items[0] as MenuItem)?.ActualWidth < 20) failures.Add("Top menu is not visible");
 
+            AddPlotline_Click(new MenuItem(), new RoutedEventArgs());
+            if (WorkspaceTabs.SelectedIndex != 1) failures.Add("Add Plotline menu action did not open Timeline");
+            AddChapter_Click(new MenuItem(), new RoutedEventArgs());
+            if (WorkspaceTabs.SelectedIndex != 2) failures.Add("Add Chapter menu action did not open Outline");
+            AddScene_Click(new MenuItem(), new RoutedEventArgs());
+            if (WorkspaceTabs.SelectedIndex != 3) failures.Add("Add Scene menu action did not open Scenes");
+
             SetTheme(false, false);
             var lightMenu = (SolidColorBrush)Application.Current.Resources[SystemColors.MenuBrushKey];
             var lightMenuText = (SolidColorBrush)Application.Current.Resources[SystemColors.MenuTextBrushKey];
@@ -391,6 +435,12 @@ public partial class MainWindow : Window
             if (probeInput.Padding != new Thickness(3, 4, 3, 4) || probeInput.MinHeight < 30) failures.Add("Single-line text input spacing is incorrect");
             var probeEditor = renderedInputs.First(x => x.AcceptsReturn);
             if (probeEditor.Padding != new Thickness(3, 4, 3, 4) || probeEditor.VerticalContentAlignment != VerticalAlignment.Top) failures.Add("Multiline text editor spacing is incorrect");
+            var numericInputs = renderedInputs.Where(IsNumericInput).ToList();
+            if (numericInputs.Count != 2 || numericInputs.Any(Validation.GetHasError)) failures.Add("Dashboard numeric inputs are not configured correctly");
+            if (IsValidNumericCandidate("12a")) failures.Add("Numeric input accepts letters");
+            var emptyNumericProbe = new TextBox { Tag = NumericInputTag, Text = string.Empty };
+            NormalizeNumericInput(emptyNumericProbe);
+            if (emptyNumericProbe.Text != "0" || new NonNegativeIntegerConverter().ConvertBack(string.Empty, typeof(int), null!, System.Globalization.CultureInfo.InvariantCulture) is not 0) failures.Add("Empty numeric input did not default to zero");
 
             SetTheme(true, false);
             FileMenuItem.IsSubmenuOpen = true;
@@ -510,7 +560,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.4\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.5\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -521,7 +571,6 @@ public partial class MainWindow : Window
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.N) { New_Click(sender, e); e.Handled = true; }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Z) { Undo_Click(sender, e); e.Handled = true; }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Y) { Redo_Click(sender, e); e.Handled = true; }
-        else if (e.Key == Key.F5) { RefreshAll(); e.Handled = true; }
     }
 
     private async void Window_Closing(object? sender, CancelEventArgs e)

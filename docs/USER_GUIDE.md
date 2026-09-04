@@ -65,7 +65,6 @@ Exports include:
 - `Ctrl+O` — open project
 - `Ctrl+S` — save
 - `Ctrl+Z` / `Ctrl+Y` — undo / redo structural changes
-- `F5` — refresh the timeline and statistics
 
 ## Local file locations
 

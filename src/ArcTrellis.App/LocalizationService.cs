@@ -18,7 +18,7 @@ public static class Loc
         ["Markdown (.md)…"] = "Markdown (.md)…", ["Timeline CSV (.csv)…"] = "Хронология CSV (.csv)…", ["Scrivener project folder…"] = "Папка проекта Scrivener…",
         ["Print Timeline…"] = "Печать хронологии…", ["Exit"] = "Выход", ["Edit"] = "Правка", ["Undo"] = "Отменить", ["Redo"] = "Повторить",
         ["Add Chapter"] = "Добавить главу", ["Add Plotline"] = "Добавить сюжетную линию", ["Add Scene"] = "Добавить сцену",
-        ["View"] = "Вид", ["Light theme"] = "Светлая тема", ["Dark theme"] = "Тёмная тема", ["Refresh timeline"] = "Обновить хронологию",
+        ["View"] = "Вид", ["Light theme"] = "Светлая тема", ["Dark theme"] = "Тёмная тема",
         ["Language"] = "Язык", ["English"] = "English", ["Russian"] = "Русский", ["Help"] = "Справка", ["User Guide"] = "Руководство пользователя", ["About ArcTrellis"] = "О программе ArcTrellis",
         ["＋ Scene"] = "＋ Сцена", ["Save"] = "Сохранить", ["Story planning studio"] = "Студия планирования историй",
         ["Dashboard"] = "Обзор", ["Timeline"] = "Хронология", ["Outline"] = "План", ["Scenes"] = "Сцены", ["Characters"] = "Персонажи",
@@ -175,4 +175,12 @@ public sealed class StatusTextConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value is string status ? Loc.T(status) : value;
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
+}
+
+public sealed class NonNegativeIntegerConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => value?.ToString() ?? "0";
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        => int.TryParse(value?.ToString(), out int number) && number >= 0 ? number : 0;
 }
