@@ -383,11 +383,13 @@ public partial class MainWindow : Window
             var lightMenu = (SolidColorBrush)Application.Current.Resources[SystemColors.MenuBrushKey];
             var lightMenuText = (SolidColorBrush)Application.Current.Resources[SystemColors.MenuTextBrushKey];
             if (lightMenu.Color == lightMenuText.Color) failures.Add("Light menu text has no contrast");
-            var probeInput = new TextBox();
-            probeInput.ApplyTemplate();
+            WorkspaceTabs.SelectedIndex = 0;
+            ApplyLocalization();
+            UpdateLayout();
+            var renderedInputs = FindVisualChildren<TextBox>(this).ToList();
+            var probeInput = renderedInputs.First(x => !x.AcceptsReturn);
             if (probeInput.Padding != new Thickness(3, 4, 3, 4) || probeInput.MinHeight < 30) failures.Add("Single-line text input spacing is incorrect");
-            var probeEditor = new TextBox { AcceptsReturn = true };
-            probeEditor.ApplyTemplate();
+            var probeEditor = renderedInputs.First(x => x.AcceptsReturn);
             if (probeEditor.Padding != new Thickness(3, 4, 3, 4) || probeEditor.VerticalContentAlignment != VerticalAlignment.Top) failures.Add("Multiline text editor spacing is incorrect");
 
             SetTheme(true, false);
