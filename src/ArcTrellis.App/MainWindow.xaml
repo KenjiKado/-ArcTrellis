@@ -12,44 +12,44 @@
   </Window.Resources>
   <DockPanel>
     <Menu x:Name="MainMenu" DockPanel.Dock="Top">
-      <MenuItem Header="_File">
-        <MenuItem Header="_New from Template…" InputGestureText="Ctrl+N" Click="New_Click"/>
-        <MenuItem Header="_Open…" InputGestureText="Ctrl+O" Click="Open_Click"/>
+      <MenuItem x:Name="FileMenuItem" Header="File" Style="{StaticResource TopMenuItemStyle}">
+        <MenuItem Header="New from Template…" InputGestureText="Ctrl+N" Click="New_Click"/>
+        <MenuItem Header="Open…" InputGestureText="Ctrl+O" Click="Open_Click"/>
         <Separator/>
-        <MenuItem Header="_Save" InputGestureText="Ctrl+S" Click="Save_Click"/>
-        <MenuItem Header="Save _As…" InputGestureText="Ctrl+Shift+S" Click="SaveAs_Click"/>
-        <MenuItem Header="Save as reusable _Template…" Click="SaveTemplate_Click"/>
+        <MenuItem Header="Save" InputGestureText="Ctrl+S" Click="Save_Click"/>
+        <MenuItem Header="Save As…" InputGestureText="Ctrl+Shift+S" Click="SaveAs_Click"/>
+        <MenuItem Header="Save as reusable Template…" Click="SaveTemplate_Click"/>
         <Separator/>
-        <MenuItem Header="Import _Markdown…" Click="ImportMarkdown_Click"/>
-        <MenuItem Header="_Export">
+        <MenuItem Header="Import Markdown…" Click="ImportMarkdown_Click"/>
+        <MenuItem Header="Export">
           <MenuItem Header="Microsoft Word (.docx)…" Click="ExportDocx_Click"/>
           <MenuItem Header="Markdown (.md)…" Click="ExportMarkdown_Click"/>
           <MenuItem Header="Timeline CSV (.csv)…" Click="ExportCsv_Click"/>
           <MenuItem Header="Scrivener project folder…" Click="ExportScrivener_Click"/>
         </MenuItem>
         <Separator/>
-        <MenuItem Header="_Print Timeline…" Click="Print_Click"/>
-        <MenuItem Header="E_xit" Click="Exit_Click"/>
+        <MenuItem Header="Print Timeline…" Click="Print_Click"/>
+        <MenuItem Header="Exit" Click="Exit_Click"/>
       </MenuItem>
-      <MenuItem Header="_Edit">
-        <MenuItem Header="_Undo" InputGestureText="Ctrl+Z" Click="Undo_Click"/>
-        <MenuItem Header="_Redo" InputGestureText="Ctrl+Y" Click="Redo_Click"/>
+      <MenuItem Header="Edit" Style="{StaticResource TopMenuItemStyle}">
+        <MenuItem Header="Undo" InputGestureText="Ctrl+Z" Click="Undo_Click"/>
+        <MenuItem Header="Redo" InputGestureText="Ctrl+Y" Click="Redo_Click"/>
         <Separator/>
-        <MenuItem Header="Add _Chapter" InputGestureText="Ctrl+Shift+C" Click="AddChapter_Click"/>
-        <MenuItem Header="Add _Plotline" Click="AddPlotline_Click"/>
-        <MenuItem Header="Add _Scene" InputGestureText="Ctrl+Shift+S" Click="AddScene_Click"/>
+        <MenuItem Header="Add Chapter" InputGestureText="Ctrl+Shift+C" Click="AddChapter_Click"/>
+        <MenuItem Header="Add Plotline" Click="AddPlotline_Click"/>
+        <MenuItem Header="Add Scene" InputGestureText="Ctrl+Shift+S" Click="AddScene_Click"/>
       </MenuItem>
-      <MenuItem Header="_View">
+      <MenuItem Header="View" Style="{StaticResource TopMenuItemStyle}">
         <MenuItem x:Name="LightThemeItem" Header="Light theme" IsCheckable="True" Click="LightTheme_Click"/>
         <MenuItem x:Name="DarkThemeItem" Header="Dark theme" IsCheckable="True" Click="DarkTheme_Click"/>
         <Separator/>
         <MenuItem Header="Refresh timeline" InputGestureText="F5" Click="Refresh_Click"/>
       </MenuItem>
-      <MenuItem Header="_Language">
+      <MenuItem Header="Language" Style="{StaticResource TopMenuItemStyle}">
         <MenuItem x:Name="EnglishLanguageItem" Header="English" IsCheckable="True" Click="EnglishLanguage_Click"/>
         <MenuItem x:Name="RussianLanguageItem" Header="Russian" IsCheckable="True" Click="RussianLanguage_Click"/>
       </MenuItem>
-      <MenuItem Header="_Help">
+      <MenuItem Header="Help" Style="{StaticResource TopMenuItemStyle}">
         <MenuItem Header="User Guide" Click="Guide_Click"/>
         <MenuItem Header="About ArcTrellis" Click="About_Click"/>
       </MenuItem>

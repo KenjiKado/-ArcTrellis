@@ -12,14 +12,14 @@ public static class Loc
 {
     private static readonly Dictionary<string, string> Ru = new(StringComparer.Ordinal)
     {
-        ["_File"] = "_Файл", ["_New from Template…"] = "_Создать из шаблона…", ["_Open…"] = "_Открыть…",
-        ["_Save"] = "_Сохранить", ["Save _As…"] = "Сохранить _как…", ["Save as reusable _Template…"] = "Сохранить как _шаблон…",
-        ["Import _Markdown…"] = "Импортировать _Markdown…", ["_Export"] = "_Экспорт", ["Microsoft Word (.docx)…"] = "Microsoft Word (.docx)…",
+        ["File"] = "Файл", ["New from Template…"] = "Создать из шаблона…", ["Open…"] = "Открыть…",
+        ["Save As…"] = "Сохранить как…", ["Save as reusable Template…"] = "Сохранить как шаблон…",
+        ["Import Markdown…"] = "Импортировать Markdown…", ["Export"] = "Экспорт", ["Microsoft Word (.docx)…"] = "Microsoft Word (.docx)…",
         ["Markdown (.md)…"] = "Markdown (.md)…", ["Timeline CSV (.csv)…"] = "Хронология CSV (.csv)…", ["Scrivener project folder…"] = "Папка проекта Scrivener…",
-        ["_Print Timeline…"] = "_Печать хронологии…", ["E_xit"] = "В_ыход", ["_Edit"] = "_Правка", ["_Undo"] = "_Отменить", ["_Redo"] = "_Повторить",
-        ["Add _Chapter"] = "Добавить _главу", ["Add _Plotline"] = "Добавить _сюжетную линию", ["Add _Scene"] = "Добавить _сцену",
-        ["_View"] = "_Вид", ["Light theme"] = "Светлая тема", ["Dark theme"] = "Тёмная тема", ["Refresh timeline"] = "Обновить хронологию",
-        ["_Language"] = "_Язык", ["English"] = "English", ["Russian"] = "Русский", ["_Help"] = "_Справка", ["User Guide"] = "Руководство пользователя", ["About ArcTrellis"] = "О программе ArcTrellis",
+        ["Print Timeline…"] = "Печать хронологии…", ["Exit"] = "Выход", ["Edit"] = "Правка", ["Undo"] = "Отменить", ["Redo"] = "Повторить",
+        ["Add Chapter"] = "Добавить главу", ["Add Plotline"] = "Добавить сюжетную линию", ["Add Scene"] = "Добавить сцену",
+        ["View"] = "Вид", ["Light theme"] = "Светлая тема", ["Dark theme"] = "Тёмная тема", ["Refresh timeline"] = "Обновить хронологию",
+        ["Language"] = "Язык", ["English"] = "English", ["Russian"] = "Русский", ["Help"] = "Справка", ["User Guide"] = "Руководство пользователя", ["About ArcTrellis"] = "О программе ArcTrellis",
         ["＋ Scene"] = "＋ Сцена", ["Save"] = "Сохранить", ["Story planning studio"] = "Студия планирования историй",
         ["Dashboard"] = "Обзор", ["Timeline"] = "Хронология", ["Outline"] = "План", ["Scenes"] = "Сцены", ["Characters"] = "Персонажи",
         ["Places"] = "Места", ["Notes"] = "Заметки", ["Relationships"] = "Связи", ["Search"] = "Поиск", ["Series View"] = "Серия",
@@ -113,15 +113,15 @@ public static class Loc
         var original = Originals.GetValue(item, _ => new OriginalText());
         switch (item)
         {
-            case Window window when !BindingOperations.IsDataBound(window, Window.TitleProperty): original.Title ??= window.Title; window.Title = IsRussian ? T(original.Title) : original.Title; break;
-            case TextBlock text when !BindingOperations.IsDataBound(text, TextBlock.TextProperty): original.Text ??= text.Text; text.Text = IsRussian ? T(original.Text) : original.Text; break;
-            case DataGridColumn dataColumn when dataColumn.Header is string dataHeader && !BindingOperations.IsDataBound(dataColumn, DataGridColumn.HeaderProperty): original.Header ??= dataHeader; dataColumn.Header = IsRussian ? T(original.Header) : original.Header; break;
-            case GridViewColumn gridColumn when gridColumn.Header is string gridHeader && !BindingOperations.IsDataBound(gridColumn, GridViewColumn.HeaderProperty): original.Header ??= gridHeader; gridColumn.Header = IsRussian ? T(original.Header) : original.Header; break;
-            case HeaderedItemsControl items when items.Header is string itemsHeader && !BindingOperations.IsDataBound(items, HeaderedItemsControl.HeaderProperty): original.Header ??= itemsHeader; items.Header = IsRussian ? T(original.Header) : original.Header; break;
-            case HeaderedContentControl headered when headered.Header is string contentHeader && !BindingOperations.IsDataBound(headered, HeaderedContentControl.HeaderProperty): original.Header ??= contentHeader; headered.Header = IsRussian ? T(original.Header) : original.Header; break;
-            case ContentControl content when content.Content is string value && !BindingOperations.IsDataBound(content, ContentControl.ContentProperty): original.Content ??= value; content.Content = IsRussian ? T(original.Content) : original.Content; break;
+            case Window window when !BindingOperations.IsDataBound(window, Window.TitleProperty): original.Title ??= window.Title; window.Title = T(original.Title); break;
+            case TextBlock text when !BindingOperations.IsDataBound(text, TextBlock.TextProperty): original.Text ??= text.Text; text.Text = T(original.Text); break;
+            case DataGridColumn dataColumn when dataColumn.Header is string dataHeader && !BindingOperations.IsDataBound(dataColumn, DataGridColumn.HeaderProperty): original.Header ??= dataHeader; dataColumn.Header = T(original.Header); break;
+            case GridViewColumn gridColumn when gridColumn.Header is string gridHeader && !BindingOperations.IsDataBound(gridColumn, GridViewColumn.HeaderProperty): original.Header ??= gridHeader; gridColumn.Header = T(original.Header); break;
+            case HeaderedItemsControl items when items.Header is string itemsHeader && !BindingOperations.IsDataBound(items, HeaderedItemsControl.HeaderProperty): original.Header ??= itemsHeader; items.Header = T(original.Header); break;
+            case HeaderedContentControl headered when headered.Header is string contentHeader && !BindingOperations.IsDataBound(headered, HeaderedContentControl.HeaderProperty): original.Header ??= contentHeader; headered.Header = T(original.Header); break;
+            case ContentControl content when content.Content is string value && !BindingOperations.IsDataBound(content, ContentControl.ContentProperty): original.Content ??= value; content.Content = T(original.Content); break;
         }
-        if (item is FrameworkElement element && element.ToolTip is string tip) { original.ToolTip ??= tip; element.ToolTip = IsRussian ? T(original.ToolTip) : original.ToolTip; }
+        if (item is FrameworkElement element && element.ToolTip is string tip) { original.ToolTip ??= tip; element.ToolTip = T(original.ToolTip); }
         int count = 0;
         try { count = VisualTreeHelper.GetChildrenCount(item); } catch { }
         for (int i = 0; i < count; i++) Visit(VisualTreeHelper.GetChild(item, i), visited);

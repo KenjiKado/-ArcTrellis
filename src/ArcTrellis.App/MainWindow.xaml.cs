@@ -350,8 +350,13 @@ public partial class MainWindow : Window
         {
             var failures = new List<string>();
             ChangeLanguage("en-US");
+            WorkspaceTabs.SelectedIndex = 3;
+            ApplyLocalization();
             UpdateLayout();
             if ((WorkspaceTabs.Items[0] as TabItem)?.Header?.ToString() != "Dashboard") failures.Add("English tab localization failed");
+            if (FileMenuItem.Header?.ToString() != "File" || LightThemeItem.Header?.ToString() != "Light theme") failures.Add("English menu localization failed");
+            var englishText = CollectVisibleText(this).ToList();
+            if (!englishText.Contains("Scene card") || !englishText.Contains("Status")) failures.Add("English deferred content localization failed");
 
             ChangeLanguage("ru-RU");
             WorkspaceTabs.SelectedIndex = 1;
@@ -374,6 +379,16 @@ public partial class MainWindow : Window
             if (probeInput.Padding.Top > 1 || probeInput.Padding.Left > 5) failures.Add("Text input padding is too large");
 
             SetTheme(true, false);
+            FileMenuItem.IsSubmenuOpen = true;
+            UpdateLayout();
+            if (FileMenuItem.Template.FindName("PART_Popup", FileMenuItem) is System.Windows.Controls.Primitives.Popup { Child: Border popupContent })
+            {
+                popupContent.UpdateLayout();
+                SaveVisualPng(popupContent, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-file-menu.png"));
+                if (popupContent.Background is SolidColorBrush popupBackground && popupBackground.Color.R > 64) failures.Add("Dark submenu background is too light");
+            }
+            else failures.Add("Dark submenu popup was not created");
+            FileMenuItem.IsSubmenuOpen = false;
             var previewOptions = new[] { new TemplateInfo("Blank project", "One book, one chapter, and a main plotline.", "Blank", "") };
             var preview = new NewProjectWindow(previewOptions) { Owner = this };
             preview.Show();
@@ -466,7 +481,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.2\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.3\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

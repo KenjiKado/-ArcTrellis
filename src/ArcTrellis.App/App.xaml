@@ -73,9 +73,9 @@
       <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
       <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="Padding" Value="5,1"/>
-      <Setter Property="Margin" Value="0,1"/>
-      <Setter Property="MinHeight" Value="26"/>
+      <Setter Property="Padding" Value="4,0"/>
+      <Setter Property="Margin" Value="0"/>
+      <Setter Property="MinHeight" Value="24"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -90,6 +90,9 @@
           </ControlTemplate>
         </Setter.Value>
       </Setter>
+      <Style.Triggers>
+        <Trigger Property="AcceptsReturn" Value="True"><Setter Property="VerticalContentAlignment" Value="Top"/></Trigger>
+      </Style.Triggers>
     </Style>
 
     <Style TargetType="ComboBoxItem">
@@ -190,15 +193,66 @@
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
       <Setter Property="Padding" Value="4,2"/>
     </Style>
-    <Style TargetType="MenuItem">
+    <Style x:Key="SubmenuItemStyle" TargetType="MenuItem">
+      <Setter Property="Background" Value="{DynamicResource ElevatedBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <Setter Property="Padding" Value="7,5"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="MenuItem">
+            <Grid Background="{DynamicResource ElevatedBrush}">
+              <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="3" Padding="{TemplateBinding Padding}">
+                <Grid MinWidth="220"><Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="14"/></Grid.ColumnDefinitions>
+                  <TextBlock x:Name="CheckMark" Text="✓" Visibility="Collapsed" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold"/>
+                  <ContentPresenter Grid.Column="1" Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}" ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Foreground="{DynamicResource MutedBrush}" Margin="20,0,8,0" VerticalAlignment="Center"/>
+                  <Path x:Name="Arrow" Grid.Column="3" Data="M 0 0 L 4 4 L 0 8 Z" Fill="{DynamicResource MutedBrush}" Width="4" Height="8" HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed"/>
+                </Grid>
+              </Border>
+              <Popup x:Name="PART_Popup" Placement="Right" HorizontalOffset="-2" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True" Focusable="False">
+                <Border Background="{DynamicResource ElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="4" MinWidth="250">
+                  <ScrollViewer CanContentScroll="True"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/></ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HoverBrush}"/></Trigger>
+              <Trigger Property="IsSubmenuOpen" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SelectedBrush}"/></Trigger>
+              <Trigger Property="IsChecked" Value="True"><Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/></Trigger>
+              <Trigger Property="HasItems" Value="True"><Setter TargetName="Arrow" Property="Visibility" Value="Visible"/></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Chrome" Property="Opacity" Value="0.45"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="TopMenuItemStyle" TargetType="MenuItem">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-      <Setter Property="Padding" Value="8,4"/>
-      <Style.Triggers>
-        <Trigger Property="IsHighlighted" Value="True"><Setter Property="Background" Value="{DynamicResource HoverBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/></Trigger>
-        <Trigger Property="IsSubmenuOpen" Value="True"><Setter Property="Background" Value="{DynamicResource SelectedBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/></Trigger>
-      </Style.Triggers>
+      <Setter Property="Padding" Value="10,5"/>
+      <Setter Property="ItemContainerStyle" Value="{StaticResource SubmenuItemStyle}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="MenuItem">
+            <Grid>
+              <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="3" Padding="{TemplateBinding Padding}">
+                <ContentPresenter Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}" ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
+              </Border>
+              <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True" Focusable="False">
+                <Border Background="{DynamicResource ElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="4" MinWidth="250">
+                  <ScrollViewer CanContentScroll="True"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/></ScrollViewer>
+                </Border>
+              </Popup>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HoverBrush}"/></Trigger>
+              <Trigger Property="IsSubmenuOpen" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource SelectedBrush}"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
+    <Style TargetType="MenuItem" BasedOn="{StaticResource SubmenuItemStyle}"/>
     <Style TargetType="StatusBar"><Setter Property="Background" Value="{DynamicResource HeaderBrush}"/><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/></Style>
     <Style TargetType="StatusBarItem"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/><Setter Property="Padding" Value="7,3"/></Style>
     <Style TargetType="Separator"><Setter Property="Margin" Value="8,4"/><Setter Property="Height" Value="1"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Separator"><Border Height="1" Background="{DynamicResource BorderBrush}"/></ControlTemplate></Setter.Value></Setter></Style>
