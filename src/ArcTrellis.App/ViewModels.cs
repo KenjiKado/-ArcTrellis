@@ -119,7 +119,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (SelectedPlotline is null || Project.Plotlines.Count <= 1) return;
         Snapshot();
         var fallback = Project.Plotlines.First(x => x != SelectedPlotline);
-        foreach (var scene in Project.Scenes.Where(s => s.PlotlineId == SelectedPlotline.Id)) s.PlotlineId = fallback.Id;
+        foreach (var scene in Project.Scenes.Where(s => s.PlotlineId == SelectedPlotline.Id)) scene.PlotlineId = fallback.Id;
         Project.Plotlines.Remove(SelectedPlotline); Renumber(Project.Plotlines); SelectedPlotline = fallback; Dirty("Plotline deleted");
     }
 
