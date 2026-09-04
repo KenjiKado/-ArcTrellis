@@ -27,3 +27,4 @@ jobs:
           path: |
             artifacts/installer/*.exe
             artifacts/installer/*.sha256
+            artifacts/installer/*.png

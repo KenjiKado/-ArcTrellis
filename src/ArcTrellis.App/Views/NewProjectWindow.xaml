@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="New project — ArcTrellis" Width="780" Height="570" MinWidth="650" MinHeight="450"
-        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
-  <Grid Margin="20">
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="{DynamicResource PageBrush}" Foreground="{DynamicResource TextBrush}">
+  <Grid Margin="20" Background="{DynamicResource PageBrush}">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel><TextBlock Text="Start a story project" FontSize="26" FontWeight="SemiBold"/><TextBlock Text="Choose a working example or begin with a blank timeline. Everything can be edited later." Foreground="{DynamicResource MutedBrush}" Margin="0,6,0,16"/></StackPanel>
     <ListBox x:Name="TemplateList" Grid.Row="1" SelectedIndex="0" BorderThickness="0" Background="Transparent">

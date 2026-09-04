@@ -2,13 +2,12 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using System.Windows.Interop;
 using ArcTrellis.App.Views;
 using ArcTrellis.Core.Models;
 using ArcTrellis.Core.Services;
@@ -364,7 +363,27 @@ public partial class MainWindow : Window
             var visibleText = CollectVisibleText(this).ToList();
             if (!visibleText.Contains("Книга:")) failures.Add("Deferred tab content was not translated");
             if (visibleText.Any(x => x.Contains("ArcTrellis.Core.Models", StringComparison.Ordinal))) failures.Add("A model class name is visible instead of its display member");
+            if (MainMenu.ActualHeight < 10 || (MainMenu.Items[0] as MenuItem)?.ActualWidth < 20) failures.Add("Top menu is not visible");
+
+            SetTheme(false, false);
+            var lightMenu = (SolidColorBrush)Application.Current.Resources[SystemColors.MenuBrushKey];
+            var lightMenuText = (SolidColorBrush)Application.Current.Resources[SystemColors.MenuTextBrushKey];
+            if (lightMenu.Color == lightMenuText.Color) failures.Add("Light menu text has no contrast");
+            var probeInput = new TextBox();
+            probeInput.ApplyTemplate();
+            if (probeInput.Padding.Top > 1 || probeInput.Padding.Left > 5) failures.Add("Text input padding is too large");
+
+            SetTheme(true, false);
+            var previewOptions = new[] { new TemplateInfo("Blank project", "One book, one chapter, and a main plotline.", "Blank", "") };
+            var preview = new NewProjectWindow(previewOptions) { Owner = this };
+            preview.Show();
+            preview.UpdateLayout();
+            if (preview.Background is not SolidColorBrush previewBackground || previewBackground.Color.R > 64) failures.Add("Dark theme did not reach the template window");
+            SaveVisualPng(preview, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-template-window.png"));
+            preview.Close();
             if (((SolidColorBrush)Application.Current.Resources["InputBrush"]).Color == Colors.White) failures.Add("Dark input palette was not applied");
+            UpdateLayout();
+            SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-main-window.png"));
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
             File.WriteAllText(reportPath, failures.Count == 0 ? "PASS" : "FAIL: " + string.Join("; ", failures));
         }
@@ -382,6 +401,18 @@ public partial class MainWindow : Window
         for (int i = 0; i < count; i++)
             foreach (string value in CollectVisibleText(VisualTreeHelper.GetChild(root, i))) yield return value;
     }
+
+    private static void SaveVisualPng(FrameworkElement visual, string path)
+    {
+        int width = Math.Max(1, (int)Math.Ceiling(visual.ActualWidth));
+        int height = Math.Max(1, (int)Math.Ceiling(visual.ActualHeight));
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(path);
+        encoder.Save(stream);
+    }
     private void ApplyLocalization()
     {
         EnglishLanguageItem.IsChecked = !Loc.IsRussian;
@@ -395,6 +426,15 @@ public partial class MainWindow : Window
             ? new Dictionary<string, string> { ["AccentBrush"] = "#7895FF", ["AccentHoverBrush"] = "#8AA3FF", ["AccentPressedBrush"] = "#5A76E8", ["PageBrush"] = "#111722", ["PanelBrush"] = "#192130", ["ElevatedBrush"] = "#222C3D", ["InputBrush"] = "#121925", ["TextBrush"] = "#F2F5FA", ["MutedBrush"] = "#AAB5C6", ["BorderBrush"] = "#354154", ["HoverBrush"] = "#273247", ["SelectedBrush"] = "#304263", ["HeaderBrush"] = "#0E141E", ["DangerBrush"] = "#FF7188" }
             : new Dictionary<string, string> { ["AccentBrush"] = "#5B7CFA", ["AccentHoverBrush"] = "#6D89FA", ["AccentPressedBrush"] = "#4264DF", ["PageBrush"] = "#F4F6FA", ["PanelBrush"] = "#FFFFFF", ["ElevatedBrush"] = "#FFFFFF", ["InputBrush"] = "#FFFFFF", ["TextBrush"] = "#202638", ["MutedBrush"] = "#667085", ["BorderBrush"] = "#D8DEEA", ["HoverBrush"] = "#EEF2FF", ["SelectedBrush"] = "#E2E9FF", ["HeaderBrush"] = "#FFFFFF", ["DangerBrush"] = "#D84B63" };
         foreach (var (key, color) in palette) Application.Current.Resources[key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+        SolidColorBrush ThemeBrush(string key) => new(((SolidColorBrush)Application.Current.Resources[key]).Color);
+        Application.Current.Resources[SystemColors.MenuBrushKey] = ThemeBrush("ElevatedBrush");
+        Application.Current.Resources[SystemColors.MenuTextBrushKey] = ThemeBrush("TextBrush");
+        Application.Current.Resources[SystemColors.HighlightBrushKey] = ThemeBrush("SelectedBrush");
+        Application.Current.Resources[SystemColors.HighlightTextBrushKey] = ThemeBrush("TextBrush");
+        Application.Current.Resources[SystemColors.ControlBrushKey] = ThemeBrush("ElevatedBrush");
+        Application.Current.Resources[SystemColors.ControlTextBrushKey] = ThemeBrush("TextBrush");
+        Application.Current.Resources[SystemColors.WindowBrushKey] = ThemeBrush("PageBrush");
+        Application.Current.Resources[SystemColors.WindowTextBrushKey] = ThemeBrush("TextBrush");
         LightThemeItem.IsChecked = !dark;
         DarkThemeItem.IsChecked = dark;
         ApplyWindowChromeTheme();
@@ -413,15 +453,8 @@ public partial class MainWindow : Window
 
     private void ApplyWindowChromeTheme()
     {
-        IntPtr handle = new WindowInteropHelper(this).Handle;
-        if (handle == IntPtr.Zero) return;
-        int enabled = _isDark ? 1 : 0;
-        if (DwmSetWindowAttribute(handle, 20, ref enabled, sizeof(int)) != 0)
-            _ = DwmSetWindowAttribute(handle, 19, ref enabled, sizeof(int));
+        ThemeChrome.Apply(this, _isDark);
     }
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int valueSize);
 
     private void Print_Click(object sender, RoutedEventArgs e)
     {
@@ -433,7 +466,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.1\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.2\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

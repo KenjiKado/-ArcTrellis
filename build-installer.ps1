@@ -42,7 +42,7 @@ try {
     & $iscc "/DAppPublishDir=$publish" ".\installer\ArcTrellis.iss"
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
 
-    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.1-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.2-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $setup) { throw "Installer output was not found." }
     $hash = Get-FileHash $setup.FullName -Algorithm SHA256
     Set-Content -Path ($setup.FullName + ".sha256") -Value ("{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $setup.Name)
@@ -54,7 +54,7 @@ try {
     if ($installResult.ExitCode -ne 0) { throw "Silent installer test failed with exit code $($installResult.ExitCode)." }
     $installedExe = Join-Path $installTest "ArcTrellis.exe"
     if (-not (Test-Path $installedExe)) { throw "The installer completed but ArcTrellis.exe was not installed." }
-    $uiSmokeReport = Join-Path $env:RUNNER_TEMP "ArcTrellis-UI-Smoke.txt"
+    $uiSmokeReport = Join-Path $installerOutput "ArcTrellis-UI-Smoke.txt"
     if (Test-Path $uiSmokeReport) { Remove-Item -Force $uiSmokeReport }
     $appProcess = Start-Process $installedExe -ArgumentList "--language=ru-RU", "--ui-smoke=$uiSmokeReport" -PassThru
     for ($attempt = 0; $attempt -lt 20 -and -not (Test-Path $uiSmokeReport); $attempt++) { Start-Sleep -Seconds 1 }

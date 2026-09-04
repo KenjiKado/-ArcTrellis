@@ -11,8 +11,8 @@
     </DataTemplate>
   </Window.Resources>
   <DockPanel>
-    <Menu DockPanel.Dock="Top">
-      <MenuItem Header="_File" Style="{StaticResource TopMenuItemStyle}">
+    <Menu x:Name="MainMenu" DockPanel.Dock="Top">
+      <MenuItem Header="_File">
         <MenuItem Header="_New from Template…" InputGestureText="Ctrl+N" Click="New_Click"/>
         <MenuItem Header="_Open…" InputGestureText="Ctrl+O" Click="Open_Click"/>
         <Separator/>
@@ -31,7 +31,7 @@
         <MenuItem Header="_Print Timeline…" Click="Print_Click"/>
         <MenuItem Header="E_xit" Click="Exit_Click"/>
       </MenuItem>
-      <MenuItem Header="_Edit" Style="{StaticResource TopMenuItemStyle}">
+      <MenuItem Header="_Edit">
         <MenuItem Header="_Undo" InputGestureText="Ctrl+Z" Click="Undo_Click"/>
         <MenuItem Header="_Redo" InputGestureText="Ctrl+Y" Click="Redo_Click"/>
         <Separator/>
@@ -39,17 +39,17 @@
         <MenuItem Header="Add _Plotline" Click="AddPlotline_Click"/>
         <MenuItem Header="Add _Scene" InputGestureText="Ctrl+Shift+S" Click="AddScene_Click"/>
       </MenuItem>
-      <MenuItem Header="_View" Style="{StaticResource TopMenuItemStyle}">
+      <MenuItem Header="_View">
         <MenuItem x:Name="LightThemeItem" Header="Light theme" IsCheckable="True" Click="LightTheme_Click"/>
         <MenuItem x:Name="DarkThemeItem" Header="Dark theme" IsCheckable="True" Click="DarkTheme_Click"/>
         <Separator/>
         <MenuItem Header="Refresh timeline" InputGestureText="F5" Click="Refresh_Click"/>
       </MenuItem>
-      <MenuItem Header="_Language" Style="{StaticResource TopMenuItemStyle}">
+      <MenuItem Header="_Language">
         <MenuItem x:Name="EnglishLanguageItem" Header="English" IsCheckable="True" Click="EnglishLanguage_Click"/>
         <MenuItem x:Name="RussianLanguageItem" Header="Russian" IsCheckable="True" Click="RussianLanguage_Click"/>
       </MenuItem>
-      <MenuItem Header="_Help" Style="{StaticResource TopMenuItemStyle}">
+      <MenuItem Header="_Help">
         <MenuItem Header="User Guide" Click="Guide_Click"/>
         <MenuItem Header="About ArcTrellis" Click="About_Click"/>
       </MenuItem>
