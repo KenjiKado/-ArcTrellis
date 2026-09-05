@@ -42,7 +42,7 @@ try {
     & $iscc "/DAppPublishDir=$publish" ".\installer\ArcTrellis.iss"
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
 
-    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.5-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.6-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $setup) { throw "Installer output was not found." }
     $hash = Get-FileHash $setup.FullName -Algorithm SHA256
     Set-Content -Path ($setup.FullName + ".sha256") -Value ("{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $setup.Name)
@@ -50,10 +50,17 @@ try {
     # Exercise the actual installer and installed executable on the Windows runner.
     $installTest = Join-Path $env:RUNNER_TEMP "ArcTrellis-Install-Test"
     if (Test-Path $installTest) { Remove-Item -Recurse -Force $installTest }
-    $installResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LANG=russian", "/DIR=$installTest" -Wait -PassThru
+    $desktopShortcut = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)) "ArcTrellis.lnk"
+    $desktopShortcutExistedBefore = Test-Path $desktopShortcut
+    $installResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LANG=russian", "/DIR=$installTest", "/TASKS=desktopicon" -Wait -PassThru
     if ($installResult.ExitCode -ne 0) { throw "Silent installer test failed with exit code $($installResult.ExitCode)." }
     $installedExe = Join-Path $installTest "ArcTrellis.exe"
     if (-not (Test-Path $installedExe)) { throw "The installer completed but ArcTrellis.exe was not installed." }
+    if (-not (Test-Path $desktopShortcut)) { throw "The desktop shortcut task was selected but ArcTrellis.lnk was not created." }
+    $shortcutTarget = (New-Object -ComObject WScript.Shell).CreateShortcut($desktopShortcut).TargetPath
+    if (-not (Test-Path $shortcutTarget) -or ([IO.Path]::GetFullPath($shortcutTarget) -ne [IO.Path]::GetFullPath($installedExe))) {
+        throw "The desktop shortcut does not target the installed ArcTrellis executable."
+    }
     $uiSmokeReport = Join-Path $installerOutput "ArcTrellis-UI-Smoke.txt"
     if (Test-Path $uiSmokeReport) { Remove-Item -Force $uiSmokeReport }
     $appProcess = Start-Process $installedExe -ArgumentList "--language=ru-RU", "--ui-smoke=$uiSmokeReport" -PassThru
@@ -68,7 +75,8 @@ try {
         $uninstallResult = Start-Process $uninstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
         if ($uninstallResult.ExitCode -ne 0) { throw "Silent uninstall test failed with exit code $($uninstallResult.ExitCode)." }
     }
-    Write-Host "Install, launch, and uninstall smoke test passed."
+    if (-not $desktopShortcutExistedBefore -and (Test-Path $desktopShortcut)) { throw "Uninstall did not remove the ArcTrellis desktop shortcut." }
+    Write-Host "Install, desktop shortcut, launch, and uninstall smoke test passed."
     Write-Host "Installer ready: $($setup.FullName)"
     Write-Host "SHA-256: $($hash.Hash)"
 }

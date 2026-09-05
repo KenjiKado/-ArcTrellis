@@ -2,7 +2,7 @@
   #define AppPublishDir "..\artifacts\publish\win-x64"
 #endif
 #define AppName "ArcTrellis"
-#define AppVersion "1.1.5"
+#define AppVersion "1.1.6"
 #define AppPublisher "ArcTrellis"
 #define AppExeName "ArcTrellis.exe"
 
@@ -51,7 +51,7 @@ Source: "{#AppPublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubd
 
 [Icons]
 Name: "{group}\ArcTrellis"; Filename: "{app}\{#AppExeName}"
-Name: "{autodesktop}\ArcTrellis"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{userdesktop}\ArcTrellis.lnk"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Registry]
 Root: HKA; Subkey: "Software\Classes\.arctrellis"; ValueType: string; ValueName: ""; ValueData: "ArcTrellis.Project"; Flags: uninsdeletevalue
