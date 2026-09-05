@@ -68,12 +68,21 @@ var legacyProject = new StoryProject
     ]
 };
 var migratedLegacy = projectService.Deserialize(projectService.Serialize(legacyProject));
-Check(migratedLegacy.FormatVersion == 2 && migratedLegacy.Plotlines.Count == 2, "legacy shared plotlines migrate to one independent copy per book");
+Check(migratedLegacy.FormatVersion == 3 && migratedLegacy.Plotlines.Count == 2, "legacy shared plotlines migrate to one independent copy per book");
 Check(migratedLegacy.Scenes.All(scene => migratedLegacy.Plotlines.Any(plotline => plotline.Id == scene.PlotlineId && plotline.BookId == scene.BookId)), "legacy scenes retain their plotline in the correct book");
 var migratedFirstPlotline = migratedLegacy.Plotlines.Single(plotline => plotline.BookId == migratedLegacy.Books[0].Id);
 var migratedSecondPlotline = migratedLegacy.Plotlines.Single(plotline => plotline.BookId == migratedLegacy.Books[1].Id);
 migratedSecondPlotline.Name = "Second book only";
 Check(migratedFirstPlotline.Name == "Shared before migration", "renaming a migrated plotline does not rename another book's copy");
+
+var progressProject = templates.CreateBlank();
+progressProject.FormatVersion = 2;
+progressProject.CurrentWordCount = 1234;
+var progressMigrated = projectService.Deserialize(projectService.Serialize(progressProject));
+Check(progressMigrated.Books[0].CurrentWordCount == 1234, "legacy single-book word total is retained");
+progressMigrated.Books.Add(new Book { CurrentWordCount = 500, WordCountGoal = 2000 });
+var progressReloaded = projectService.Deserialize(projectService.Serialize(progressMigrated));
+Check(progressReloaded.Books[0].CurrentWordCount == 1234 && progressReloaded.Books[1].CurrentWordCount == 500 && progressReloaded.Books[1].WordCountGoal == 2000, "independent book progress survives save and reopen");
 
 string temp = Path.Combine(Path.GetTempPath(), "ArcTrellis-Smoke-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(temp);

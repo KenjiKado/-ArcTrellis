@@ -85,6 +85,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Project.Books.Add(book); Project.Plotlines.Add(plotline); SelectedBook = book; Dirty("Book added");
     }
 
+    public void EditBook(Book book, string title, string subtitle)
+    {
+        if (!Project.Books.Contains(book)) return;
+        Snapshot();
+        book.Title = title;
+        book.Subtitle = subtitle;
+        Dirty("Book updated");
+    }
+
     public void DeleteBook()
     {
         if (SelectedBook is null || Project.Books.Count <= 1) return;

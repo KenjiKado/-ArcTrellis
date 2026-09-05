@@ -13,7 +13,7 @@ public sealed class StoryProject : ObservableObject
     private int _currentWordCount;
     private DateTime _modifiedUtc = DateTime.UtcNow;
 
-    public int FormatVersion { get; set; } = 2;
+    public int FormatVersion { get; set; } = 3;
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Title { get => _title; set => Set(ref _title, value); }
     public string Author { get => _author; set => Set(ref _author, value); }
@@ -41,6 +41,8 @@ public sealed class Book : ObservableObject
     private string _summary = "";
     private int _order;
     private int _wordCountGoal = 80000;
+    private int _currentWordCount;
+    public int CurrentWordCount { get => _currentWordCount; set => Set(ref _currentWordCount, Math.Max(0, value)); }
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Title { get => _title; set => Set(ref _title, value); }
     public string Subtitle { get => _subtitle; set => Set(ref _subtitle, value); }

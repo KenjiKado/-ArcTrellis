@@ -38,6 +38,11 @@ public partial class MainWindow : Window
         SetTheme(LoadDarkTheme(), false);
         SourceInitialized += (_, _) => ApplyWindowChromeTheme();
         Vm.ProjectReplaced += Vm_ProjectReplaced;
+        Vm.PropertyChanged += (_, args) =>
+        {
+            if (_loaded && args.PropertyName == nameof(MainViewModel.SelectedBook))
+                Dispatcher.BeginInvoke(new Action(() => { RefreshStats(); BuildTimeline(); }));
+        };
         _autosaveTimer.Tick += AutosaveTimer_Tick;
         WorkspaceTabs.SelectionChanged += WorkspaceTabs_SelectionChanged;
         AddHandler(TextCompositionManager.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
@@ -133,9 +138,11 @@ public partial class MainWindow : Window
         int scenes = Vm.Project.Scenes.Count;
         int drafted = Vm.Project.Scenes.Count(s => s.Status is "Drafted" or "Revised" or "Final");
         StatsText.Text = string.Join("\n", Loc.F("{0} book(s)", books), Loc.F("{0} chapter(s)", chapters), Loc.F("{0} scene card(s)", scenes), Loc.F("{0} plotline(s)", Vm.Project.Plotlines.Count), Loc.F("{0} character(s)", Vm.Project.Characters.Count), Loc.F("{0} place(s)", Vm.Project.Places.Count), Loc.F("{0} scenes drafted", drafted));
-        double progress = Vm.Project.WordCountGoal <= 0 ? 0 : Math.Min(100, Vm.Project.CurrentWordCount * 100d / Vm.Project.WordCountGoal);
+        int currentWords = Vm.SelectedBook?.CurrentWordCount ?? 0;
+        int goal = Vm.SelectedBook?.WordCountGoal ?? 0;
+        double progress = goal <= 0 ? 0 : Math.Min(100, currentWords * 100d / goal);
         ProgressBar.Value = progress;
-        ProgressText.Text = Loc.F("{0:N0} / {1:N0} words ({2:0}%)", Vm.Project.CurrentWordCount, Vm.Project.WordCountGoal, progress);
+        ProgressText.Text = Loc.F("{0:N0} / {1:N0} words ({2:0}%)", currentWords, goal, progress);
     }
 
     private void BuildTimeline()
@@ -349,6 +356,17 @@ public partial class MainWindow : Window
         catch (Exception ex) { MessageBox.Show(ex.Message, Loc.T("Export failed"), MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
+    private void EditBook_Click(object sender, RoutedEventArgs e)
+    {
+        if (Vm.SelectedBook is not { } book) return;
+        var editor = new EditBookWindow(book) { Owner = this };
+        if (editor.ShowDialog() == true)
+        {
+            Vm.EditBook(book, editor.BookTitle, editor.BookSubtitle);
+            RefreshAll();
+        }
+    }
+
     private void AddBook_Click(object sender, RoutedEventArgs e) { Vm.AddBook(); RefreshAll(); }
     private void DeleteBook_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("book and all of its scenes")) { Vm.DeleteBook(); RefreshAll(); } }
     private void AddChapter_Click(object sender, RoutedEventArgs e) { Vm.AddChapter(); if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 2; RefreshAll(); }
@@ -476,6 +494,23 @@ public partial class MainWindow : Window
             selectedFromTimeline.Name = livePlotlineName;
             UpdateLayout();
             if (!FindVisualChildren<TextBlock>(TimelineGrid).Any(text => text.Text == livePlotlineName)) failures.Add("Timeline plotline name did not update live");
+
+            firstBook.CurrentWordCount = 100;
+            firstBook.WordCountGoal = 1000;
+            secondBook.CurrentWordCount = 450;
+            secondBook.WordCountGoal = 900;
+            Vm.SelectedBook = firstBook;
+            RefreshStats();
+            if (ProgressBar.Value != 10) failures.Add("First book progress is incorrect");
+            Vm.SelectedBook = secondBook;
+            RefreshStats();
+            if (ProgressBar.Value != 50 || firstBook.CurrentWordCount != 100) failures.Add("Book progress is not independent");
+            var originalBookTitle = secondBook.Title;
+            var cancelEditor = new EditBookWindow(secondBook);
+            cancelEditor.TitleInput.Text = "Discard this title";
+            if (secondBook.Title != originalBookTitle) failures.Add("Book dialog edits changed the book before Save");
+            Vm.EditBook(secondBook, "Edited Book", "Edited subtitle");
+            if (secondBook.Title != "Edited Book" || secondBook.Subtitle != "Edited subtitle") failures.Add("Book editing did not save title and subtitle");
 
             SetTheme(false, false);
             var lightMenu = (SolidColorBrush)Application.Current.Resources[SystemColors.MenuBrushKey];
@@ -632,7 +667,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.9\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.10\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

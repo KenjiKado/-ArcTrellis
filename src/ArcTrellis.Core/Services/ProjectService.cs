@@ -139,7 +139,15 @@ public sealed class ProjectService
             e.BookIds ??= [];
             e.Fields ??= [];
         }
-        p.FormatVersion = 2;
+        if (p.FormatVersion < 3)
+        {
+            // A series total cannot be assigned to individual books without guessing.
+            // Preserve it in the legacy project field; use scene totals for multi-book projects.
+            foreach (Book book in p.Books)
+                book.CurrentWordCount = p.Books.Count == 1 ? p.CurrentWordCount
+                    : (int)Math.Min(int.MaxValue, p.Scenes.Where(scene => scene.BookId == book.Id).Sum(scene => (long)scene.WordCount));
+        }
+        p.FormatVersion = 3;
     }
 
     private static void MigrateLegacyPlotlines(StoryProject project, HashSet<Guid> validBookIds)
