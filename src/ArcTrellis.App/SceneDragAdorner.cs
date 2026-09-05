@@ -19,8 +19,30 @@ internal sealed class SceneDragAdorner : Adorner
         IsHitTestVisible = false;
         _size = card.RenderSize;
         _grabOffset = grabOffset;
-        var bitmap = new RenderTargetBitmap(Math.Max(1, (int)Math.Ceiling(_size.Width)), Math.Max(1, (int)Math.Ceiling(_size.Height)), 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(card); bitmap.Freeze(); _image = bitmap;
+        _image = CaptureCard(card);
+    }
+
+    internal static BitmapSource CaptureCard(FrameworkElement card)
+    {
+        // Render at a new origin: rendering the arranged card directly includes its
+        // position in the stack, which clips cards below the first out of the bitmap.
+        var bounds = new Rect(card.RenderSize);
+        var brush = new VisualBrush(card)
+        {
+            ViewboxUnits = BrushMappingMode.Absolute, Viewbox = bounds,
+            ViewportUnits = BrushMappingMode.Absolute, Viewport = bounds,
+            Stretch = Stretch.Fill
+        };
+        var visual = new DrawingVisual();
+        using (var drawing = visual.RenderOpen()) drawing.DrawRectangle(brush, null, bounds);
+        var dpi = VisualTreeHelper.GetDpi(card);
+        var bitmap = new RenderTargetBitmap(
+            Math.Max(1, (int)Math.Ceiling(bounds.Width * dpi.DpiScaleX)),
+            Math.Max(1, (int)Math.Ceiling(bounds.Height * dpi.DpiScaleY)),
+            dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        bitmap.Freeze();
+        return bitmap;
     }
 
     public void FollowCursor()

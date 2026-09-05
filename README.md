@@ -18,7 +18,7 @@ ArcTrellis is a native, local-first visual story planner for 64-bit Windows 10 a
 
 ## Install for end users
 
-Run `ArcTrellis-Setup-1.1.12-win-x64.exe`. The installer does not need administrator rights by default. It creates an optional desktop shortcut, registers `.arctrellis` files, and includes an uninstaller in Windows Settings. Both the installer and app support English and Russian; the app remembers the selected language.
+Run `ArcTrellis-Setup-1.1.13-win-x64.exe`. The installer does not need administrator rights by default. It creates an optional desktop shortcut, registers `.arctrellis` files, and includes an uninstaller in Windows Settings. Both the installer and app support English and Russian; the app remembers the selected language.
 
 ## Build the release on Windows
 

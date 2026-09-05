@@ -724,9 +724,43 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-timeline.png"));
+            // Identical cards at different stack offsets must produce equally complete previews.
+            var originalPreviewScene = Vm.BookScenes.First();
+            Vm.SelectedChapter = Vm.SelectedBook!.Chapters.First(chapter => chapter.Id == originalPreviewScene.ChapterId);
+            Vm.SelectedPlotline = Vm.BookPlotlines.First(plotline => plotline.Id == originalPreviewScene.PlotlineId);
+            originalPreviewScene.Title = "Drag preview text";
+            originalPreviewScene.Summary = "Visible at every stack position";
+            for (int i = 0; i < 2; i++)
+            {
+                Vm.AddScene();
+                Vm.SelectedScene!.Title = originalPreviewScene.Title;
+                Vm.SelectedScene.Summary = originalPreviewScene.Summary;
+                Vm.SelectedScene.Status = originalPreviewScene.Status;
+            }
+            BuildTimeline();
+            UpdateLayout();
+            var previewCards = FindVisualChildren<Border>(TimelineGrid)
+                .Where(border => border.Tag is Scene scene && scene.ChapterId == originalPreviewScene.ChapterId && scene.PlotlineId == originalPreviewScene.PlotlineId).ToList();
+            int referenceTextPixels = 0;
+            for (int i = 0; i < previewCards.Count; i++)
+            {
+                var bitmap = SceneDragAdorner.CaptureCard(previewCards[i]);
+                byte[] pixels = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4];
+                bitmap.CopyPixels(pixels, bitmap.PixelWidth * 4, 0);
+                int textPixels = 0;
+                for (int pixel = 0; pixel < pixels.Length; pixel += 4)
+                    if (pixels[pixel] > 170 && pixels[pixel + 1] > 170 && pixels[pixel + 2] > 170) textPixels++;
+                if (i == 0) referenceTextPixels = textPixels;
+                if (textPixels < 30 || textPixels < referenceTextPixels * 0.8) failures.Add($"Drag preview lost text at stack position {i + 1}");
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                using var imageFile = File.Create(Path.Combine(Path.GetDirectoryName(reportPath)!, $"ArcTrellis-drag-card-{i + 1}.png"));
+                encoder.Save(imageFile);
+            }
+            if (previewCards.Count < 3) failures.Add("Multi-card drag preview regression fixture is incomplete");
             var dragSurface = (UIElement)Content;
             var dragLayer = AdornerLayer.GetAdornerLayer(dragSurface);
-            var previewCard = FindVisualChildren<Border>(TimelineGrid).FirstOrDefault(border => border.Tag is Scene);
+            var previewCard = previewCards.Skip(1).FirstOrDefault();
             if (dragLayer is null || previewCard is null) failures.Add("Timeline drag preview layer is unavailable");
             else
             {
@@ -840,7 +874,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.12\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.13\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
