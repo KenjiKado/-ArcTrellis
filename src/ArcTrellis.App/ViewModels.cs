@@ -76,10 +76,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         IsDirty = false;
     }
 
-    public void AddBook()
+    public void AddBook(string? title = null, string subtitle = "")
     {
         Snapshot();
-        var book = new Book { Title = Loc.F("Book {0}", Project.Books.Count + 1), Order = Project.Books.Count };
+        var book = new Book { Title = title ?? Loc.F("Book {0}", Project.Books.Count + 1), Subtitle = subtitle, Order = Project.Books.Count };
         book.Chapters.Add(new Chapter { Title = Loc.F("Chapter {0}", 1), Section = Loc.T("Act I") });
         var plotline = new Plotline { BookId = book.Id, Name = Loc.T("Main Plot"), Order = 0, Color = "#5B7CFA" };
         Project.Books.Add(book); Project.Plotlines.Add(plotline); SelectedBook = book; Dirty("Book added");

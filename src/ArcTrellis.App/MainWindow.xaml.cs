@@ -30,6 +30,8 @@ public partial class MainWindow : Window
     private bool _closingAfterSave;
     private double _timelineCardWidth = 220;
     private bool _isDark;
+    private Border? _pressedSceneCard;
+    private Point _scenePressPosition;
 
     public MainWindow()
     {
@@ -202,21 +204,51 @@ public partial class MainWindow : Window
         var card = new Border { Tag = scene, Child = panel, Background = new SolidColorBrush(Color.FromArgb(24, BrushColor(plot.Color).R, BrushColor(plot.Color).G, BrushColor(plot.Color).B)), BorderBrush = BrushFrom(plot.Color), BorderThickness = new Thickness(3, 0, 0, 0), CornerRadius = new CornerRadius(5), Margin = new Thickness(2, 3, 2, 3), Padding = new Thickness(9), Cursor = Cursors.Hand };
         card.PreviewMouseMove += SceneCard_MouseMove;
         card.MouseLeftButtonDown += SceneCard_MouseLeftButtonDown;
+        card.MouseLeftButtonUp += SceneCard_MouseLeftButtonUp;
+        card.LostMouseCapture += (_, _) => { if (ReferenceEquals(_pressedSceneCard, card)) _pressedSceneCard = null; };
         return card;
     }
 
     private void SceneCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not Border { Tag: Scene scene }) return;
+        if (sender is not Border { Tag: Scene } card) return;
+        _pressedSceneCard = card;
+        _scenePressPosition = e.GetPosition(this);
+        card.CaptureMouse();
+        e.Handled = true;
+    }
+
+    private void OpenTimelineScene(Scene scene)
+    {
+        var book = Vm.Project.Books.FirstOrDefault(b => b.Id == scene.BookId);
+        if (book is null || !Vm.Project.Scenes.Contains(scene)) return;
+        Vm.SelectedBook = book;
+        Vm.SelectedChapter = book.Chapters.FirstOrDefault(c => c.Id == scene.ChapterId);
+        Vm.SelectedPlotline = Vm.BookPlotlines.FirstOrDefault(p => p.Id == scene.PlotlineId);
         Vm.SelectedScene = scene;
-        if (e.ClickCount == 2) WorkspaceTabs.SelectedIndex = 3;
+        WorkspaceTabs.SelectedIndex = 3;
+    }
+
+    private void SceneCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Border { Tag: Scene scene } card || !ReferenceEquals(card, _pressedSceneCard)) return;
+        _pressedSceneCard = null;
+        bool releasedOnCard = new Rect(card.RenderSize).Contains(e.GetPosition(card));
+        card.ReleaseMouseCapture();
+        if (releasedOnCard) OpenTimelineScene(scene);
         e.Handled = true;
     }
 
     private void SceneCard_MouseMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton == MouseButtonState.Pressed && sender is Border { Tag: Scene scene })
-            DragDrop.DoDragDrop((DependencyObject)sender, new DataObject("ArcTrellis.Scene", scene.Id.ToString()), DragDropEffects.Move);
+        if (e.LeftButton != MouseButtonState.Pressed || sender is not Border { Tag: Scene scene } card || !ReferenceEquals(card, _pressedSceneCard)) return;
+        Point position = e.GetPosition(this);
+        if (Math.Abs(position.X - _scenePressPosition.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(position.Y - _scenePressPosition.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        _pressedSceneCard = null;
+        card.ReleaseMouseCapture();
+        DragDrop.DoDragDrop(card, new DataObject("ArcTrellis.Scene", scene.Id.ToString()), DragDropEffects.Move);
+        e.Handled = true;
     }
 
     private void TimelineCell_Drop(object sender, DragEventArgs e)
@@ -367,7 +399,24 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AddBook_Click(object sender, RoutedEventArgs e) { Vm.AddBook(); RefreshAll(); }
+    private void AddBook_Click(object sender, RoutedEventArgs e)
+    {
+        var draft = new Book { Title = Loc.F("Book {0}", Vm.Project.Books.Count + 1) };
+        var editor = new EditBookWindow(draft, adding: true) { Owner = this };
+        if (editor.ShowDialog() != true) return;
+        Vm.AddBook(editor.BookTitle, editor.BookSubtitle);
+        RefreshAll();
+    }
+
+    private void ChoosePlotlineColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (Vm.SelectedPlotline is not { } plotline) return;
+        var picker = new ColorPickerWindow(BrushColor(plotline.Color)) { Owner = this };
+        if (picker.ShowDialog() != true) return;
+        plotline.Color = picker.SelectedColor;
+        Vm.MarkDirty();
+        RefreshAll();
+    }
     private void DeleteBook_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("book and all of its scenes")) { Vm.DeleteBook(); RefreshAll(); } }
     private void AddChapter_Click(object sender, RoutedEventArgs e) { Vm.AddChapter(); if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 2; RefreshAll(); }
     private void DeleteChapter_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("chapter and all of its scenes")) { Vm.DeleteChapter(); RefreshAll(); } }
@@ -462,6 +511,10 @@ public partial class MainWindow : Window
 
             Book firstBook = Vm.SelectedBook!;
             Scene firstScene = Vm.SelectedScene!;
+            WorkspaceTabs.SelectedIndex = 1;
+            OpenTimelineScene(firstScene);
+            if (WorkspaceTabs.SelectedIndex != 3 || !ReferenceEquals(Vm.SelectedScene, firstScene))
+                failures.Add("Timeline scene click did not open the matching scene editor");
             int firstBookPlotlineCount = Vm.BookPlotlines.Count();
             Plotline firstBookMainPlotline = Vm.BookPlotlines.First();
             string firstBookMainPlotlineName = firstBookMainPlotline.Name;
@@ -505,6 +558,23 @@ public partial class MainWindow : Window
             Vm.SelectedBook = secondBook;
             RefreshStats();
             if (ProgressBar.Value != 50 || firstBook.CurrentWordCount != 100) failures.Add("Book progress is not independent");
+            var pickerProbe = new ColorPickerWindow(Color.FromRgb(91, 124, 250));
+            if (pickerProbe.SelectedColor != "#5B7CFA") failures.Add("Color picker did not load existing color");
+            var addProbe = new EditBookWindow(new Book { Title = "Book 3" }, adding: true);
+            if (addProbe.BookTitle != "Book 3" || addProbe.BookSubtitle != "") failures.Add("Add book dialog defaults are incorrect");
+            var subtitleProbe = new EditBookWindow(new Book { Title = "Book One", Subtitle = "Establish the central promise" });
+            if (subtitleProbe.BookSubtitle != "Establish the central promise") failures.Add("Edit book dialog did not load subtitle");
+            subtitleProbe.Owner = this;
+            subtitleProbe.Show(); subtitleProbe.UpdateLayout();
+            SaveVisualPng(subtitleProbe, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-edit-book.png"));
+            subtitleProbe.Close();
+            pickerProbe.Owner = this;
+            pickerProbe.Show(); pickerProbe.UpdateLayout();
+            var firstSwatch = FindVisualChildren<Button>(pickerProbe).First(button => button.ToolTip?.ToString() == "#D9577A");
+            firstSwatch.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if (pickerProbe.SelectedColor != "#D9577A") failures.Add("Color swatch selection failed");
+            SaveVisualPng(pickerProbe, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-color-picker.png"));
+            pickerProbe.Close();
             var originalBookTitle = secondBook.Title;
             var cancelEditor = new EditBookWindow(secondBook);
             cancelEditor.TitleInput.Text = "Discard this title";
@@ -667,7 +737,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.10\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.11\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

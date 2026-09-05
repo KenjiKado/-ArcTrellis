@@ -25,6 +25,7 @@ public static class Loc
         ["Places"] = "Места", ["Notes"] = "Заметки", ["Relationships"] = "Связи", ["Search"] = "Поиск", ["Series View"] = "Серия",
         ["Series overview"] = "Обзор серии", ["Title"] = "Название", ["Author"] = "Автор", ["Genre"] = "Жанр", ["Premise / series description"] = "Замысел / описание серии",
         ["Books in this series"] = "Книги серии", ["Add book"] = "Добавить книгу", ["Delete book"] = "Удалить книгу", ["Writing progress"] = "Прогресс написания",
+        ["Choose color"] = "Выбрать цвет", ["Red"] = "Красный", ["Green"] = "Зелёный", ["Blue"] = "Синий",
         ["Edit book"] = "Редактировать книгу", ["Subtitle"] = "Подзаголовок", ["Book goal"] = "Цель книги", ["Book updated"] = "Книга обновлена",
         ["Current words"] = "Написано слов", ["Series goal"] = "Цель серии", ["At a glance"] = "Сводка", ["Local-first"] = "Только локально",
         ["Your project stays in the file you choose. ArcTrellis creates rotating local backups and an autosave recovery copy. No account or network connection is used."] = "Проект хранится в выбранном вами файле. ArcTrellis создаёт локальные резервные копии и файл автовосстановления. Учётная запись и подключение к сети не используются.",

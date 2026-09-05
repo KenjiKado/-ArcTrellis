@@ -68,7 +68,7 @@ var legacyProject = new StoryProject
     ]
 };
 var migratedLegacy = projectService.Deserialize(projectService.Serialize(legacyProject));
-Check(migratedLegacy.FormatVersion == 3 && migratedLegacy.Plotlines.Count == 2, "legacy shared plotlines migrate to one independent copy per book");
+Check(migratedLegacy.FormatVersion == 4 && migratedLegacy.Plotlines.Count == 2, "legacy shared plotlines migrate to one independent copy per book");
 Check(migratedLegacy.Scenes.All(scene => migratedLegacy.Plotlines.Any(plotline => plotline.Id == scene.PlotlineId && plotline.BookId == scene.BookId)), "legacy scenes retain their plotline in the correct book");
 var migratedFirstPlotline = migratedLegacy.Plotlines.Single(plotline => plotline.BookId == migratedLegacy.Books[0].Id);
 var migratedSecondPlotline = migratedLegacy.Plotlines.Single(plotline => plotline.BookId == migratedLegacy.Books[1].Id);
@@ -83,6 +83,15 @@ Check(progressMigrated.Books[0].CurrentWordCount == 1234, "legacy single-book wo
 progressMigrated.Books.Add(new Book { CurrentWordCount = 500, WordCountGoal = 2000 });
 var progressReloaded = projectService.Deserialize(projectService.Serialize(progressMigrated));
 Check(progressReloaded.Books[0].CurrentWordCount == 1234 && progressReloaded.Books[1].CurrentWordCount == 500 && progressReloaded.Books[1].WordCountGoal == 2000, "independent book progress survives save and reopen");
+
+var legacySubtitle = templates.CreateBlank();
+legacySubtitle.FormatVersion = 3;
+legacySubtitle.Books[0].Summary = "Establish the central promise";
+var subtitleMigrated = projectService.Deserialize(projectService.Serialize(legacySubtitle));
+Check(subtitleMigrated.Books[0].Subtitle == "Establish the central promise", "legacy displayed book description populates subtitle");
+Check(subtitleMigrated.Books[0].Summary == "Establish the central promise", "subtitle migration preserves original summary");
+subtitleMigrated.Books[0].Subtitle = "";
+Check(projectService.Deserialize(projectService.Serialize(subtitleMigrated)).Books[0].Subtitle == "", "clearing a migrated subtitle persists");
 
 string temp = Path.Combine(Path.GetTempPath(), "ArcTrellis-Smoke-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(temp);

@@ -147,7 +147,10 @@ public sealed class ProjectService
                 book.CurrentWordCount = p.Books.Count == 1 ? p.CurrentWordCount
                     : (int)Math.Min(int.MaxValue, p.Scenes.Where(scene => scene.BookId == book.Id).Sum(scene => (long)scene.WordCount));
         }
-        p.FormatVersion = 3;
+        if (p.FormatVersion < 4)
+            foreach (Book book in p.Books)
+                if (string.IsNullOrEmpty(book.Subtitle)) book.Subtitle = book.Summary;
+        p.FormatVersion = 4;
     }
 
     private static void MigrateLegacyPlotlines(StoryProject project, HashSet<Guid> validBookIds)
