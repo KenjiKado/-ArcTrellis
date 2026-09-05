@@ -106,7 +106,6 @@ public sealed class ProjectService
             .GroupBy(x => x.Id)
             .ToDictionary(group => group.Key, group => group.First().BookId);
         var bookById = p.Books.GroupBy(book => book.Id).ToDictionary(group => group.Key, group => group.First());
-        var plotlineIds = p.Plotlines.Select(plotline => plotline.Id).ToHashSet();
         foreach (var s in p.Scenes)
         {
             if (chapterOwners.TryGetValue(s.ChapterId, out Guid ownerBookId)) s.BookId = ownerBookId;
@@ -116,11 +115,23 @@ public sealed class ProjectService
                 Chapter? fallbackChapter = fallbackBook?.Chapters.OrderBy(chapter => chapter.Order).FirstOrDefault();
                 if (fallbackBook is not null && fallbackChapter is not null) { s.BookId = fallbackBook.Id; s.ChapterId = fallbackChapter.Id; }
             }
-            if (!plotlineIds.Contains(s.PlotlineId) && p.Plotlines.OrderBy(plotline => plotline.Order).FirstOrDefault() is { } fallbackPlotline) s.PlotlineId = fallbackPlotline.Id;
             s.Tags ??= [];
             s.CharacterIds ??= [];
             s.PlaceIds ??= [];
             s.Fields ??= [];
+        }
+        MigrateLegacyPlotlines(p, bookById.Keys.ToHashSet());
+        foreach (Book book in p.Books)
+        {
+            if (p.Plotlines.Any(plotline => plotline.BookId == book.Id)) continue;
+            p.Plotlines.Add(new Plotline { BookId = book.Id, Name = "Main Plot", Order = 0, Color = "#5B7CFA" });
+        }
+        var plotlineById = p.Plotlines.GroupBy(plotline => plotline.Id).ToDictionary(group => group.Key, group => group.First());
+        foreach (Scene scene in p.Scenes)
+        {
+            if (plotlineById.TryGetValue(scene.PlotlineId, out Plotline? plotline) && plotline.BookId == scene.BookId) continue;
+            if (p.Plotlines.Where(candidate => candidate.BookId == scene.BookId).OrderBy(candidate => candidate.Order).FirstOrDefault() is { } fallbackPlotline)
+                scene.PlotlineId = fallbackPlotline.Id;
         }
         foreach (var e in p.Characters.Concat(p.Places).Concat(p.Notes))
         {
@@ -128,5 +139,46 @@ public sealed class ProjectService
             e.BookIds ??= [];
             e.Fields ??= [];
         }
+        p.FormatVersion = 2;
+    }
+
+    private static void MigrateLegacyPlotlines(StoryProject project, HashSet<Guid> validBookIds)
+    {
+        var books = project.Books.OrderBy(book => book.Order).ToList();
+        var legacyPlotlines = project.Plotlines.Where(plotline => !validBookIds.Contains(plotline.BookId)).ToList();
+        if (books.Count == 0 || legacyPlotlines.Count == 0) return;
+
+        var replacements = new Dictionary<(Guid BookId, Guid PlotlineId), Guid>();
+        foreach (Plotline legacy in legacyPlotlines)
+        {
+            Guid legacyId = legacy.Id;
+            for (int index = 0; index < books.Count; index++)
+            {
+                Book book = books[index];
+                Plotline scoped;
+                if (index == 0)
+                {
+                    legacy.BookId = book.Id;
+                    scoped = legacy;
+                }
+                else
+                {
+                    scoped = new Plotline
+                    {
+                        BookId = book.Id,
+                        Name = legacy.Name,
+                        Description = legacy.Description,
+                        Color = legacy.Color,
+                        Order = legacy.Order
+                    };
+                    project.Plotlines.Add(scoped);
+                }
+                replacements[(book.Id, legacyId)] = scoped.Id;
+            }
+        }
+
+        foreach (Scene scene in project.Scenes)
+            if (replacements.TryGetValue((scene.BookId, scene.PlotlineId), out Guid replacementId))
+                scene.PlotlineId = replacementId;
     }
 }

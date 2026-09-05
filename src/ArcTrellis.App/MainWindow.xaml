@@ -44,7 +44,7 @@
         <MenuItem x:Name="LightThemeItem" Header="Light theme" IsCheckable="True" Click="LightTheme_Click"/>
         <MenuItem x:Name="DarkThemeItem" Header="Dark theme" IsCheckable="True" Click="DarkTheme_Click"/>
       </MenuItem>
-      <MenuItem Header="Language" Style="{StaticResource TopMenuItemStyle}">
+      <MenuItem x:Name="LanguageMenuItem" Header="Language" Style="{StaticResource TopMenuItemStyle}">
         <MenuItem x:Name="EnglishLanguageItem" Header="English" IsCheckable="True" Click="EnglishLanguage_Click"/>
         <MenuItem x:Name="RussianLanguageItem" Header="Russian" IsCheckable="True" Click="RussianLanguage_Click"/>
       </MenuItem>
@@ -115,7 +115,7 @@
         <TabItem Header="Timeline">
           <DockPanel>
             <Border DockPanel.Dock="Top" Background="{DynamicResource PanelBrush}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-              <WrapPanel><TextBlock Text="Book:" VerticalAlignment="Center"/><ComboBox x:Name="TimelineBookCombo" ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" DisplayMemberPath="Title" Width="190" Margin="8,0"/><TextBlock Text="Plotline:" VerticalAlignment="Center" Margin="10,0,0,0"/><ComboBox x:Name="TimelinePlotlineCombo" ItemsSource="{Binding Project.Plotlines}" SelectedItem="{Binding SelectedPlotline}" DisplayMemberPath="Name" Width="150" Margin="8,0"/><TextBox Text="{Binding SelectedPlotline.Name, UpdateSourceTrigger=PropertyChanged}" Width="150" ToolTip="Rename selected plotline"/><TextBox Text="{Binding SelectedPlotline.Color, UpdateSourceTrigger=PropertyChanged}" Width="80" ToolTip="Color in #RRGGBB format"/><Button Content="＋ Plotline" Click="AddPlotline_Click"/><Button Content="Delete plotline" Click="DeletePlotline_Click"/><Button Content="＋ Chapter" Click="AddChapter_Click"/><Button Content="Zoom −" Click="ZoomOut_Click"/><Button Content="Zoom +" Click="ZoomIn_Click"/></WrapPanel>
+              <WrapPanel><TextBlock Text="Book:" VerticalAlignment="Center"/><ComboBox x:Name="TimelineBookCombo" ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" DisplayMemberPath="Title" Width="190" Margin="8,0"/><TextBlock Text="Plotline:" VerticalAlignment="Center" Margin="10,0,0,0"/><ComboBox x:Name="TimelinePlotlineCombo" ItemsSource="{Binding BookPlotlines}" SelectedItem="{Binding SelectedPlotline}" DisplayMemberPath="Name" Width="150" Margin="8,0"/><TextBox Text="{Binding SelectedPlotline.Name, UpdateSourceTrigger=PropertyChanged}" Width="150" ToolTip="Rename selected plotline"/><TextBox Text="{Binding SelectedPlotline.Color, UpdateSourceTrigger=PropertyChanged}" Width="80" ToolTip="Color in #RRGGBB format"/><Button Content="＋ Plotline" Click="AddPlotline_Click"/><Button Content="Delete plotline" Click="DeletePlotline_Click"/><Button Content="＋ Chapter" Click="AddChapter_Click"/><Button Content="Zoom −" Click="ZoomOut_Click"/><Button Content="Zoom +" Click="ZoomIn_Click"/></WrapPanel>
             </Border>
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="{DynamicResource PageBrush}"><Grid x:Name="TimelineGrid" Margin="10"/></ScrollViewer>
           </DockPanel>

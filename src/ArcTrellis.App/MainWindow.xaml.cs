@@ -144,7 +144,7 @@ public partial class MainWindow : Window
         var book = Vm.SelectedBook;
         if (book is null) return;
         var chapters = book.Chapters.OrderBy(c => c.Order).ToList();
-        var plotlines = Vm.Project.Plotlines.OrderBy(p => p.Order).ToList();
+        var plotlines = Vm.BookPlotlines.ToList();
         TimelineGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });
         foreach (var _ in chapters) TimelineGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(_timelineCardWidth) });
         TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -224,7 +224,7 @@ public partial class MainWindow : Window
     private void TimelineCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not Border { Tag: ValueTuple<Guid, Guid> target }) return;
-        if (Vm.Project.Plotlines.FirstOrDefault(p => p.Id == target.Item2) is { } plotline)
+        if (Vm.BookPlotlines.FirstOrDefault(p => p.Id == target.Item2) is { } plotline)
             SelectTimelinePlotline(plotline);
         if (e.ClickCount != 2) return;
         Vm.SelectedChapter = Vm.SelectedBook?.Chapters.FirstOrDefault(c => c.Id == target.Item1);
@@ -444,8 +444,17 @@ public partial class MainWindow : Window
 
             Book firstBook = Vm.SelectedBook!;
             Scene firstScene = Vm.SelectedScene!;
+            int firstBookPlotlineCount = Vm.BookPlotlines.Count();
+            Plotline firstBookMainPlotline = Vm.BookPlotlines.First();
+            string firstBookMainPlotlineName = firstBookMainPlotline.Name;
             Vm.AddBook();
             Book secondBook = Vm.SelectedBook!;
+            if (Vm.BookPlotlines.Count() != 1 || Vm.BookPlotlines.Any(plotline => plotline.BookId != secondBook.Id)) failures.Add("A new book did not receive its own independent plotline");
+            Plotline secondBookMainPlotline = Vm.BookPlotlines.First();
+            secondBookMainPlotline.Name = "Second Book Main Plot";
+            if (firstBookMainPlotline.Name != firstBookMainPlotlineName) failures.Add("Renaming a plotline changed another book's plotline");
+            Vm.AddPlotline();
+            if (Vm.Project.Plotlines.Count(plotline => plotline.BookId == firstBook.Id) != firstBookPlotlineCount || Vm.BookPlotlines.Count() != 2) failures.Add("Adding a plotline affected more than the selected book");
             Vm.AddChapter();
             Chapter secondChapter = Vm.SelectedChapter!;
             Vm.AddScene();
@@ -453,11 +462,12 @@ public partial class MainWindow : Window
             if (secondScene.BookId != secondBook.Id || secondScene.ChapterId != secondChapter.Id) failures.Add("A scene was assigned across book/chapter boundaries");
             Vm.SelectedBook = firstBook;
             if (!Vm.BookScenes.Contains(firstScene)) failures.Add("First-book scene disappeared after switching books");
+            if (Vm.SelectedPlotline?.BookId != firstBook.Id || Vm.BookPlotlines.Any(plotline => plotline.BookId != firstBook.Id)) failures.Add("First-book plotline selection was not isolated");
             Vm.SelectedBook = secondBook;
             BuildTimeline();
             UpdateLayout();
             if (!Vm.BookScenes.Contains(secondScene) || !Vm.Project.Scenes.Contains(secondScene) || !FindVisualChildren<Border>(TimelineGrid).Any(border => ReferenceEquals(border.Tag, secondScene))) failures.Add("Second-book scene disappeared from the timeline after switching books");
-            Plotline selectedFromTimeline = Vm.Project.Plotlines.OrderBy(x => x.Order).Last();
+            Plotline selectedFromTimeline = Vm.BookPlotlines.Last();
             SelectTimelinePlotline(selectedFromTimeline);
             UpdateLayout();
             if (!ReferenceEquals(Vm.SelectedPlotline, selectedFromTimeline) || !ReferenceEquals(TimelinePlotlineCombo.SelectedItem, selectedFromTimeline)) failures.Add("Timeline plotline selection did not update the top selector");
@@ -501,6 +511,17 @@ public partial class MainWindow : Window
             }
             else failures.Add("Dark submenu popup was not created");
             FileMenuItem.IsSubmenuOpen = false;
+            LanguageMenuItem.IsSubmenuOpen = true;
+            UpdateLayout();
+            if (LanguageMenuItem.Template.FindName("PART_Popup", LanguageMenuItem) is System.Windows.Controls.Primitives.Popup { Child: Border languagePopup })
+            {
+                languagePopup.UpdateLayout();
+                Point expectedLanguageOrigin = LanguageMenuItem.PointToScreen(new Point(0, LanguageMenuItem.ActualHeight));
+                Point actualLanguageOrigin = languagePopup.PointToScreen(new Point(0, 0));
+                if (Math.Abs(expectedLanguageOrigin.X - actualLanguageOrigin.X) > 12 || Math.Abs(expectedLanguageOrigin.Y - actualLanguageOrigin.Y) > 12) failures.Add("Language submenu is not left-aligned beneath its parent");
+            }
+            else failures.Add("Language submenu popup was not created");
+            LanguageMenuItem.IsSubmenuOpen = false;
             var previewOptions = new[] { new TemplateInfo("Blank project", "One book, one chapter, and a main plotline.", "Blank", "") };
             var preview = new NewProjectWindow(previewOptions) { Owner = this };
             preview.Show();
@@ -611,7 +632,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.8\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.9\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

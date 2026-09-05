@@ -52,8 +52,7 @@ public sealed class TemplateService
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(template.FilePath));
         var projectElement = doc.RootElement.GetProperty("project");
-        var project = JsonSerializer.Deserialize<StoryProject>(projectElement.GetRawText(), Options)
-            ?? throw new InvalidDataException("Template contains no project.");
+        var project = new ProjectService().Deserialize(projectElement.GetRawText());
         RegenerateIds(project);
         project.CreatedUtc = project.ModifiedUtc = DateTime.UtcNow;
         return project;
@@ -64,7 +63,7 @@ public sealed class TemplateService
         var book = new Book { Title = "Book One", Order = 0 };
         var chapter = new Chapter { Title = "Chapter 1", Order = 0 };
         book.Chapters.Add(chapter);
-        var plotline = new Plotline { Name = "Main Plot", Order = 0, Color = "#5B7CFA" };
+        var plotline = new Plotline { BookId = book.Id, Name = "Main Plot", Order = 0, Color = "#5B7CFA" };
         return new StoryProject
         {
             Title = "Untitled Series",
@@ -85,7 +84,11 @@ public sealed class TemplateService
             b.Id = bookMap[b.Id];
             foreach (var ch in b.Chapters) ch.Id = chapterMap[ch.Id];
         }
-        foreach (var p in project.Plotlines) p.Id = plotMap[p.Id];
+        foreach (var p in project.Plotlines)
+        {
+            p.BookId = bookMap[p.BookId];
+            p.Id = plotMap[p.Id];
+        }
         foreach (var e in project.Characters.Concat(project.Places).Concat(project.Notes))
         {
             var old = e.Id;

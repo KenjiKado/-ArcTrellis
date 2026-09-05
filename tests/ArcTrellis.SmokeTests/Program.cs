@@ -26,8 +26,9 @@ foreach (var template in list)
     Check(project.Books.SelectMany(x => x.Chapters).Any(), $"{template.Name}: contains a chapter");
     var books = project.Books.Select(x => x.Id).ToHashSet();
     var chapters = project.Books.SelectMany(x => x.Chapters).Select(x => x.Id).ToHashSet();
-    var plots = project.Plotlines.Select(x => x.Id).ToHashSet();
-    Check(project.Scenes.All(x => books.Contains(x.BookId) && chapters.Contains(x.ChapterId) && plots.Contains(x.PlotlineId)), $"{template.Name}: scene references are valid");
+    var plots = project.Plotlines.ToDictionary(x => x.Id);
+    Check(project.Plotlines.All(x => books.Contains(x.BookId)) && project.Books.All(book => project.Plotlines.Any(plotline => plotline.BookId == book.Id)), $"{template.Name}: every plotline belongs to a book");
+    Check(project.Scenes.All(x => books.Contains(x.BookId) && chapters.Contains(x.ChapterId) && plots.TryGetValue(x.PlotlineId, out Plotline? plotline) && plotline.BookId == x.BookId), $"{template.Name}: scene references are valid and book-scoped");
 }
 
 var example = templates.CreateFromTemplate(list.First(x => x.Name.Contains("Glass Horizon")));
@@ -44,11 +45,35 @@ var repairedScene = new Scene
     Title = "Reference repair",
     BookId = firstSeriesBook.Id,
     ChapterId = secondSeriesBook.Chapters.First().Id,
-    PlotlineId = series.Plotlines.First().Id
+    PlotlineId = series.Plotlines.First(plotline => plotline.BookId == secondSeriesBook.Id).Id
 };
 series.Scenes.Add(repairedScene);
 var repairedSeries = projectService.Deserialize(projectService.Serialize(series));
 Check(repairedSeries.Scenes.Count == 1 && repairedSeries.Scenes[0].BookId == secondSeriesBook.Id, "scene book ownership is repaired from its chapter without data loss");
+
+var legacyFirstBook = new Book { Title = "Legacy One", Order = 0 };
+legacyFirstBook.Chapters.Add(new Chapter { Title = "One", Order = 0 });
+var legacySecondBook = new Book { Title = "Legacy Two", Order = 1 };
+legacySecondBook.Chapters.Add(new Chapter { Title = "Two", Order = 0 });
+var sharedLegacyPlotline = new Plotline { Name = "Shared before migration", Order = 0 };
+var legacyProject = new StoryProject
+{
+    FormatVersion = 1,
+    Books = [legacyFirstBook, legacySecondBook],
+    Plotlines = [sharedLegacyPlotline],
+    Scenes =
+    [
+        new Scene { Title = "First legacy scene", BookId = legacyFirstBook.Id, ChapterId = legacyFirstBook.Chapters[0].Id, PlotlineId = sharedLegacyPlotline.Id },
+        new Scene { Title = "Second legacy scene", BookId = legacySecondBook.Id, ChapterId = legacySecondBook.Chapters[0].Id, PlotlineId = sharedLegacyPlotline.Id }
+    ]
+};
+var migratedLegacy = projectService.Deserialize(projectService.Serialize(legacyProject));
+Check(migratedLegacy.FormatVersion == 2 && migratedLegacy.Plotlines.Count == 2, "legacy shared plotlines migrate to one independent copy per book");
+Check(migratedLegacy.Scenes.All(scene => migratedLegacy.Plotlines.Any(plotline => plotline.Id == scene.PlotlineId && plotline.BookId == scene.BookId)), "legacy scenes retain their plotline in the correct book");
+var migratedFirstPlotline = migratedLegacy.Plotlines.Single(plotline => plotline.BookId == migratedLegacy.Books[0].Id);
+var migratedSecondPlotline = migratedLegacy.Plotlines.Single(plotline => plotline.BookId == migratedLegacy.Books[1].Id);
+migratedSecondPlotline.Name = "Second book only";
+Check(migratedFirstPlotline.Name == "Shared before migration", "renaming a migrated plotline does not rename another book's copy");
 
 string temp = Path.Combine(Path.GetTempPath(), "ArcTrellis-Smoke-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(temp);

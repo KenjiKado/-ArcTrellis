@@ -44,9 +44,12 @@ public sealed class ImportService
         }
         Flush();
         if (project.Books.Count == 0) AddDefaultBook(project);
-        var main = new Plotline { Name = "Main Plot", Order = 0 };
-        project.Plotlines.Add(main);
-        foreach (var item in project.Scenes) item.PlotlineId = main.Id;
+        foreach (Book importedBook in project.Books)
+        {
+            var main = new Plotline { BookId = importedBook.Id, Name = "Main Plot", Order = 0 };
+            project.Plotlines.Add(main);
+            foreach (var item in project.Scenes.Where(scene => scene.BookId == importedBook.Id)) item.PlotlineId = main.Id;
+        }
         return project;
     }
 

@@ -13,7 +13,7 @@ public sealed class StoryProject : ObservableObject
     private int _currentWordCount;
     private DateTime _modifiedUtc = DateTime.UtcNow;
 
-    public int FormatVersion { get; set; } = 1;
+    public int FormatVersion { get; set; } = 2;
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Title { get => _title; set => Set(ref _title, value); }
     public string Author { get => _author; set => Set(ref _author, value); }
@@ -72,6 +72,7 @@ public sealed class Plotline : ObservableObject
     private string _color = "#5B7CFA";
     private int _order;
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid BookId { get; set; }
     public string Name { get => _name; set => Set(ref _name, value); }
     public string Description { get => _description; set => Set(ref _description, value); }
     public string Color { get => _color; set => Set(ref _color, value); }

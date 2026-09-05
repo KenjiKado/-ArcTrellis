@@ -42,6 +42,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (!Set(ref _selectedBook, value)) return;
             SelectedChapter = value?.Chapters.OrderBy(x => x.Order).FirstOrDefault();
+            Raise(nameof(BookPlotlines));
+            SelectedPlotline = value is null ? null : Project.Plotlines.Where(plotline => plotline.BookId == value.Id).OrderBy(plotline => plotline.Order).FirstOrDefault();
             SelectedScene = value is null ? null : Project.Scenes.Where(s => s.BookId == value.Id).OrderBy(s => s.Order).FirstOrDefault();
             Raise(nameof(BookScenes));
         }
@@ -58,11 +60,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool IsDirty { get => _isDirty; set { if (Set(ref _isDirty, value)) Raise(nameof(WindowTitle)); } }
     public string Status { get => _status; set => Set(ref _status, value); }
     public string WindowTitle => $"{Project.Title}{(IsDirty ? " *" : "")} — ArcTrellis";
+    public IEnumerable<Plotline> BookPlotlines => SelectedBook is null ? [] : Project.Plotlines.Where(plotline => plotline.BookId == SelectedBook.Id).OrderBy(plotline => plotline.Order);
     public IEnumerable<Scene> BookScenes => SelectedBook is null ? [] : Project.Scenes.Where(s => s.BookId == SelectedBook.Id).OrderBy(s => s.Order);
     public IEnumerable<Scene> ChapterScenes => SelectedChapter is null ? [] : Project.Scenes.Where(s => s.ChapterId == SelectedChapter.Id).OrderBy(s => s.Order);
     public ObservableCollection<SearchResult> SearchResults { get; } = [];
     public IReadOnlyList<SceneStatusOption> SceneStatuses => [new("Planned", Loc.T("Planned")), new("Drafted", Loc.T("Drafted")), new("Revised", Loc.T("Revised")), new("Final", Loc.T("Final")), new("Cut", Loc.T("Cut"))];
-    public void RefreshLocalization() { Raise(nameof(SceneStatuses)); Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Status = Loc.T("Ready"); }
+    public void RefreshLocalization() { Raise(nameof(SceneStatuses)); Raise(nameof(BookPlotlines)); Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Status = Loc.T("Ready"); }
 
     public void ReplaceProject(StoryProject project, string? path = null)
     {
@@ -78,7 +81,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Snapshot();
         var book = new Book { Title = Loc.F("Book {0}", Project.Books.Count + 1), Order = Project.Books.Count };
         book.Chapters.Add(new Chapter { Title = Loc.F("Chapter {0}", 1), Section = Loc.T("Act I") });
-        Project.Books.Add(book); SelectedBook = book; Dirty("Book added");
+        var plotline = new Plotline { BookId = book.Id, Name = Loc.T("Main Plot"), Order = 0, Color = "#5B7CFA" };
+        Project.Books.Add(book); Project.Plotlines.Add(plotline); SelectedBook = book; Dirty("Book added");
     }
 
     public void DeleteBook()
@@ -87,6 +91,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Snapshot();
         var ids = SelectedBook.Chapters.Select(c => c.Id).ToHashSet();
         foreach (var scene in Project.Scenes.Where(s => ids.Contains(s.ChapterId)).ToList()) Project.Scenes.Remove(scene);
+        foreach (var plotline in Project.Plotlines.Where(plotline => plotline.BookId == SelectedBook.Id).ToList()) Project.Plotlines.Remove(plotline);
         Project.Books.Remove(SelectedBook); Renumber(Project.Books);
         SelectedBook = Project.Books.OrderBy(x => x.Order).FirstOrDefault(); Dirty("Book deleted");
     }
@@ -119,29 +124,36 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void AddPlotline()
     {
+        if (SelectedBook is null) return;
         Snapshot();
         string[] colors = ["#5B7CFA", "#D9577A", "#2E9D78", "#E39B35", "#8A63D2", "#3B9AB2"];
-        var plot = new Plotline { Name = Loc.F("Plotline {0}", Project.Plotlines.Count + 1), Order = Project.Plotlines.Count, Color = colors[Project.Plotlines.Count % colors.Length] };
-        Project.Plotlines.Add(plot); SelectedPlotline = plot; Dirty("Plotline added");
+        var plotlines = BookPlotlines.ToList();
+        var plot = new Plotline { BookId = SelectedBook.Id, Name = Loc.F("Plotline {0}", plotlines.Count + 1), Order = plotlines.Count, Color = colors[plotlines.Count % colors.Length] };
+        Project.Plotlines.Add(plot); Raise(nameof(BookPlotlines)); SelectedPlotline = plot; Dirty("Plotline added");
     }
 
     public void DeletePlotline()
     {
-        if (SelectedPlotline is null || Project.Plotlines.Count <= 1) return;
+        var plotlines = BookPlotlines.ToList();
+        if (SelectedPlotline is null || plotlines.Count <= 1 || !plotlines.Contains(SelectedPlotline)) return;
         Snapshot();
-        var fallback = Project.Plotlines.First(x => x != SelectedPlotline);
+        var fallback = plotlines.First(x => x != SelectedPlotline);
         foreach (var scene in Project.Scenes.Where(s => s.PlotlineId == SelectedPlotline.Id)) scene.PlotlineId = fallback.Id;
-        Project.Plotlines.Remove(SelectedPlotline); Renumber(Project.Plotlines); SelectedPlotline = fallback; Dirty("Plotline deleted");
+        Project.Plotlines.Remove(SelectedPlotline); Renumber(plotlines.Where(plotline => plotline != SelectedPlotline)); Raise(nameof(BookPlotlines)); SelectedPlotline = fallback; Dirty("Plotline deleted");
     }
 
     public void AddScene(Guid? chapterId = null, Guid? plotlineId = null)
     {
-        if (SelectedBook is null || (SelectedChapter is null && chapterId is null) || Project.Plotlines.Count == 0) return;
+        if (SelectedBook is null || (SelectedChapter is null && chapterId is null)) return;
         Chapter? chapter = SelectedBook.Chapters.FirstOrDefault(x => x.Id == (chapterId ?? SelectedChapter!.Id));
-        if (chapter is null) return;
+        var plotlines = BookPlotlines.ToList();
+        Plotline? plotline = plotlineId.HasValue
+            ? plotlines.FirstOrDefault(candidate => candidate.Id == plotlineId.Value)
+            : (SelectedPlotline is not null && SelectedPlotline.BookId == SelectedBook.Id ? SelectedPlotline : plotlines.FirstOrDefault());
+        if (chapter is null || plotline is null) return;
         Snapshot();
         var scene = new Scene { Title = Loc.F("Scene {0}", Project.Scenes.Count + 1), BookId = SelectedBook.Id, ChapterId = chapter.Id,
-            PlotlineId = plotlineId ?? SelectedPlotline?.Id ?? Project.Plotlines.OrderBy(x => x.Order).First().Id,
+            PlotlineId = plotline.Id,
             Order = Project.Scenes.Count };
         Project.Scenes.Add(scene); SelectedScene = scene; Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene added");
     }
@@ -156,7 +168,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void MoveScene(Scene scene, Guid chapterId, Guid plotlineId)
     {
         var targetBook = Project.Books.FirstOrDefault(book => book.Chapters.Any(chapter => chapter.Id == chapterId));
-        if (targetBook is null || Project.Plotlines.All(plotline => plotline.Id != plotlineId)) return;
+        if (targetBook is null || Project.Plotlines.All(plotline => plotline.Id != plotlineId || plotline.BookId != targetBook.Id)) return;
         Snapshot(); scene.BookId = targetBook.Id; scene.ChapterId = chapterId; scene.PlotlineId = plotlineId;
         Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene moved");
     }
@@ -212,7 +224,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         _selectedBook = Project.Books.OrderBy(x => x.Order).FirstOrDefault();
         _selectedChapter = _selectedBook?.Chapters.OrderBy(x => x.Order).FirstOrDefault();
-        _selectedPlotline = Project.Plotlines.OrderBy(x => x.Order).FirstOrDefault();
+        _selectedPlotline = _selectedBook is null ? null : Project.Plotlines.Where(plotline => plotline.BookId == _selectedBook.Id).OrderBy(plotline => plotline.Order).FirstOrDefault();
         _selectedScene = BookScenes.FirstOrDefault();
         _selectedCharacter = Project.Characters.FirstOrDefault();
         _selectedPlace = Project.Places.FirstOrDefault();
@@ -241,6 +253,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void Raise([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     private void RaiseAll()
     {
-        foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedChapter), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedCharacter), nameof(SelectedPlace), nameof(SelectedNote), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
+        foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedChapter), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedCharacter), nameof(SelectedPlace), nameof(SelectedNote), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
     }
 }

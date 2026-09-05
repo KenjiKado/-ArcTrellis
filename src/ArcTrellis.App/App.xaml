@@ -1,6 +1,7 @@
 <Application x:Class="ArcTrellis.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:ArcTrellis.App"
              StartupUri="MainWindow.xaml">
   <Application.Resources>
     <!-- SetTheme replaces this complete palette. DynamicResource keeps every control in sync. -->
@@ -238,11 +239,11 @@
               <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="3" Padding="{TemplateBinding Padding}">
                 <ContentPresenter Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}" ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
               </Border>
-              <Popup x:Name="PART_Popup" Placement="Bottom" PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}" HorizontalOffset="0" VerticalOffset="0" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True" Focusable="False">
+              <local:LeftAlignedMenuPopup x:Name="PART_Popup" PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}" HorizontalOffset="0" VerticalOffset="0" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True" Focusable="False">
                 <Border Background="{DynamicResource ElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="4" MinWidth="250">
                   <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/></ScrollViewer>
                 </Border>
-              </Popup>
+              </local:LeftAlignedMenuPopup>
             </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HoverBrush}"/></Trigger>
