@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -160,7 +161,10 @@ public partial class MainWindow : Window
         for (int r = 0; r < plotlines.Count; r++)
         {
             var plot = plotlines[r];
-            var label = new Border { BorderThickness = new Thickness(5, 0, 0, 0), BorderBrush = BrushFrom(plot.Color), Padding = new Thickness(8), Child = new TextBlock { Text = plot.Name, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap } };
+            var plotName = new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+            plotName.SetBinding(TextBlock.TextProperty, new Binding(nameof(Plotline.Name)) { Source = plot });
+            var label = new Border { Tag = plot, Cursor = Cursors.Hand, BorderThickness = new Thickness(5, 0, 0, 0), BorderBrush = BrushFrom(plot.Color), Padding = new Thickness(8), Child = plotName };
+            label.MouseLeftButtonDown += PlotlineLabel_MouseLeftButtonDown;
             AddTimelineCell(label, r + 1, 0, false);
             for (int c = 0; c < chapters.Count; c++)
             {
@@ -219,10 +223,24 @@ public partial class MainWindow : Window
 
     private void TimelineCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount != 2 || sender is not Border { Tag: ValueTuple<Guid, Guid> target }) return;
+        if (sender is not Border { Tag: ValueTuple<Guid, Guid> target }) return;
+        if (Vm.Project.Plotlines.FirstOrDefault(p => p.Id == target.Item2) is { } plotline)
+            SelectTimelinePlotline(plotline);
+        if (e.ClickCount != 2) return;
         Vm.SelectedChapter = Vm.SelectedBook?.Chapters.FirstOrDefault(c => c.Id == target.Item1);
-        Vm.SelectedPlotline = Vm.Project.Plotlines.FirstOrDefault(p => p.Id == target.Item2);
         Vm.AddScene(target.Item1, target.Item2); BuildTimeline();
+    }
+
+    private void PlotlineLabel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Border { Tag: Plotline plotline }) return;
+        SelectTimelinePlotline(plotline);
+        e.Handled = true;
+    }
+
+    private void SelectTimelinePlotline(Plotline plotline)
+    {
+        Vm.SelectedPlotline = plotline;
     }
 
     private void RefreshRelations()
@@ -439,6 +457,15 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             if (!Vm.BookScenes.Contains(secondScene) || !Vm.Project.Scenes.Contains(secondScene) || !FindVisualChildren<Border>(TimelineGrid).Any(border => ReferenceEquals(border.Tag, secondScene))) failures.Add("Second-book scene disappeared from the timeline after switching books");
+            Plotline selectedFromTimeline = Vm.Project.Plotlines.OrderBy(x => x.Order).Last();
+            SelectTimelinePlotline(selectedFromTimeline);
+            UpdateLayout();
+            if (!ReferenceEquals(Vm.SelectedPlotline, selectedFromTimeline) || !ReferenceEquals(TimelinePlotlineCombo.SelectedItem, selectedFromTimeline)) failures.Add("Timeline plotline selection did not update the top selector");
+            if (!FindVisualChildren<Border>(TimelineGrid).Any(border => ReferenceEquals(border.Tag, selectedFromTimeline))) failures.Add("Timeline plotline label is not clickable");
+            string livePlotlineName = "Live Rename Test";
+            selectedFromTimeline.Name = livePlotlineName;
+            UpdateLayout();
+            if (!FindVisualChildren<TextBlock>(TimelineGrid).Any(text => text.Text == livePlotlineName)) failures.Add("Timeline plotline name did not update live");
 
             SetTheme(false, false);
             var lightMenu = (SolidColorBrush)Application.Current.Resources[SystemColors.MenuBrushKey];
@@ -468,6 +495,9 @@ public partial class MainWindow : Window
                 SaveVisualPng(popupContent, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-file-menu.png"));
                 if (popupContent.Background is SolidColorBrush popupBackground && popupBackground.Color.R > 64) failures.Add("Dark submenu background is too light");
                 if (FindVisualChildren<ScrollViewer>(popupContent).Any(x => x.ComputedVerticalScrollBarVisibility == Visibility.Visible)) failures.Add("Dark submenu shows an unnecessary scrollbar");
+                Point expectedPopupOrigin = FileMenuItem.PointToScreen(new Point(0, FileMenuItem.ActualHeight));
+                Point actualPopupOrigin = popupContent.PointToScreen(new Point(0, 0));
+                if (Math.Abs(expectedPopupOrigin.X - actualPopupOrigin.X) > 12 || Math.Abs(expectedPopupOrigin.Y - actualPopupOrigin.Y) > 12) failures.Add("Top submenu is not aligned beneath its parent");
             }
             else failures.Add("Dark submenu popup was not created");
             FileMenuItem.IsSubmenuOpen = false;
@@ -479,6 +509,10 @@ public partial class MainWindow : Window
             SaveVisualPng(preview, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-template-window.png"));
             preview.Close();
             if (((SolidColorBrush)Application.Current.Resources["InputBrush"]).Color == Colors.White) failures.Add("Dark input palette was not applied");
+            WorkspaceTabs.SelectedIndex = 1;
+            BuildTimeline();
+            UpdateLayout();
+            SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-timeline.png"));
             WorkspaceTabs.SelectedIndex = 0;
             ChangeLanguage("ru-RU");
             UpdateLayout();
@@ -577,7 +611,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.7\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.8\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

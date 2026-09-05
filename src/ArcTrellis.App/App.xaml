@@ -209,7 +209,7 @@
                   <Path x:Name="Arrow" Grid.Column="3" Data="M 0 0 L 4 4 L 0 8 Z" Fill="{DynamicResource MutedBrush}" Width="4" Height="8" HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed"/>
                 </Grid>
               </Border>
-              <Popup x:Name="PART_Popup" Placement="Right" HorizontalOffset="-2" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True" Focusable="False">
+              <Popup x:Name="PART_Popup" Placement="Right" PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}" HorizontalOffset="-2" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True" Focusable="False">
                 <Border Background="{DynamicResource ElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="4" MinWidth="250">
                   <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/></ScrollViewer>
                 </Border>
@@ -238,7 +238,7 @@
               <Border x:Name="Chrome" Background="{TemplateBinding Background}" CornerRadius="3" Padding="{TemplateBinding Padding}">
                 <ContentPresenter Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}" ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
               </Border>
-              <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True" Focusable="False">
+              <Popup x:Name="PART_Popup" Placement="Bottom" PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}" HorizontalOffset="0" VerticalOffset="0" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" AllowsTransparency="True" Focusable="False">
                 <Border Background="{DynamicResource ElevatedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="4" MinWidth="250">
                   <ScrollViewer CanContentScroll="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/></ScrollViewer>
                 </Border>
