@@ -36,6 +36,20 @@ var roundTrip = projectService.Deserialize(serialized);
 Check(roundTrip.Title == example.Title && roundTrip.Scenes.Count == example.Scenes.Count, "project JSON round-trip preserves content");
 Check(SearchService.Search(roundTrip, "compass").Count >= 2, "full-project search finds matching story data");
 
+var series = templates.CreateFromTemplate(list.First(x => x.Name.Contains("Three-book series")));
+var firstSeriesBook = series.Books.OrderBy(x => x.Order).First();
+var secondSeriesBook = series.Books.OrderBy(x => x.Order).Skip(1).First();
+var repairedScene = new Scene
+{
+    Title = "Reference repair",
+    BookId = firstSeriesBook.Id,
+    ChapterId = secondSeriesBook.Chapters.First().Id,
+    PlotlineId = series.Plotlines.First().Id
+};
+series.Scenes.Add(repairedScene);
+var repairedSeries = projectService.Deserialize(projectService.Serialize(series));
+Check(repairedSeries.Scenes.Count == 1 && repairedSeries.Scenes[0].BookId == secondSeriesBook.Id, "scene book ownership is repaired from its chapter without data loss");
+
 string temp = Path.Combine(Path.GetTempPath(), "ArcTrellis-Smoke-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(temp);
 try

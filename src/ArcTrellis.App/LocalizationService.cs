@@ -93,8 +93,9 @@ public static class Loc
         try { Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!); File.WriteAllText(SettingsPath, Language); } catch { }
     }
 
-    public static string T(string text)
+    public static string T(string? text)
     {
+        if (string.IsNullOrEmpty(text)) return text ?? string.Empty;
         if (IsRussian) return Ru.TryGetValue(text, out var translated) ? translated : text;
         return En.TryGetValue(text, out var english) ? english : text;
     }
@@ -139,8 +140,10 @@ public static class Loc
         if (item is ListView { View: GridView gridView }) foreach (var column in gridView.Columns) Visit(column, visited);
     }
 
-    private static string TranslateStableText(string original, string current)
+    private static string TranslateStableText(string? original, string? current)
     {
+        if (string.IsNullOrEmpty(original)) return current ?? string.Empty;
+        current ??= string.Empty;
         // Labels are translated from their first-seen value. Computed text (for
         // example the dashboard statistics) is rendered again for each culture
         // and must not be replaced with a cached, whole multiline value.

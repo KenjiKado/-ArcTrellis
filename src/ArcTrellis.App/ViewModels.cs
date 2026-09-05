@@ -35,7 +35,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? ProjectReplaced;
     public StoryProject Project { get => _project; private set { _project = value; Raise(); Raise(nameof(WindowTitle)); ProjectReplaced?.Invoke(this, EventArgs.Empty); } }
-    public Book? SelectedBook { get => _selectedBook; set { if (Set(ref _selectedBook, value)) { SelectedChapter = value?.Chapters.OrderBy(x => x.Order).FirstOrDefault(); Raise(nameof(BookScenes)); } } }
+    public Book? SelectedBook
+    {
+        get => _selectedBook;
+        set
+        {
+            if (!Set(ref _selectedBook, value)) return;
+            SelectedChapter = value?.Chapters.OrderBy(x => x.Order).FirstOrDefault();
+            SelectedScene = value is null ? null : Project.Scenes.Where(s => s.BookId == value.Id).OrderBy(s => s.Order).FirstOrDefault();
+            Raise(nameof(BookScenes));
+        }
+    }
     public Chapter? SelectedChapter { get => _selectedChapter; set { if (Set(ref _selectedChapter, value)) Raise(nameof(ChapterScenes)); } }
     public Plotline? SelectedPlotline { get => _selectedPlotline; set => Set(ref _selectedPlotline, value); }
     public Scene? SelectedScene { get => _selectedScene; set => Set(ref _selectedScene, value); }
@@ -127,9 +137,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void AddScene(Guid? chapterId = null, Guid? plotlineId = null)
     {
         if (SelectedBook is null || (SelectedChapter is null && chapterId is null) || Project.Plotlines.Count == 0) return;
+        Chapter? chapter = SelectedBook.Chapters.FirstOrDefault(x => x.Id == (chapterId ?? SelectedChapter!.Id));
+        if (chapter is null) return;
         Snapshot();
-        Guid cid = chapterId ?? SelectedChapter!.Id;
-        var scene = new Scene { Title = Loc.F("Scene {0}", Project.Scenes.Count + 1), BookId = SelectedBook.Id, ChapterId = cid,
+        var scene = new Scene { Title = Loc.F("Scene {0}", Project.Scenes.Count + 1), BookId = SelectedBook.Id, ChapterId = chapter.Id,
             PlotlineId = plotlineId ?? SelectedPlotline?.Id ?? Project.Plotlines.OrderBy(x => x.Order).First().Id,
             Order = Project.Scenes.Count };
         Project.Scenes.Add(scene); SelectedScene = scene; Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene added");
@@ -144,7 +155,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void MoveScene(Scene scene, Guid chapterId, Guid plotlineId)
     {
-        Snapshot(); scene.ChapterId = chapterId; scene.PlotlineId = plotlineId;
+        var targetBook = Project.Books.FirstOrDefault(book => book.Chapters.Any(chapter => chapter.Id == chapterId));
+        if (targetBook is null || Project.Plotlines.All(plotline => plotline.Id != plotlineId)) return;
+        Snapshot(); scene.BookId = targetBook.Id; scene.ChapterId = chapterId; scene.PlotlineId = plotlineId;
         Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene moved");
     }
 

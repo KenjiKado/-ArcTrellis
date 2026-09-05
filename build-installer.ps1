@@ -42,7 +42,7 @@ try {
     & $iscc "/DAppPublishDir=$publish" ".\installer\ArcTrellis.iss"
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
 
-    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.6-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.7-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $setup) { throw "Installer output was not found." }
     $hash = Get-FileHash $setup.FullName -Algorithm SHA256
     Set-Content -Path ($setup.FullName + ".sha256") -Value ("{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $setup.Name)
@@ -70,13 +70,22 @@ try {
     $uiSmokeResult = Get-Content $uiSmokeReport -Raw
     if (-not $uiSmokeResult.StartsWith("PASS")) { throw "Installed UI smoke test failed: $uiSmokeResult" }
     Stop-Process -Id $appProcess.Id -Force
+    $reopenSmokeReport = Join-Path $installerOutput "ArcTrellis-Reopen-UI-Smoke.txt"
+    if (Test-Path $reopenSmokeReport) { Remove-Item -Force $reopenSmokeReport }
+    $reopenProcess = Start-Process $installedExe -ArgumentList "--ui-smoke=$reopenSmokeReport" -PassThru
+    for ($attempt = 0; $attempt -lt 20 -and -not (Test-Path $reopenSmokeReport); $attempt++) { Start-Sleep -Seconds 1 }
+    if ($reopenProcess.HasExited) { throw "The installed application exited during its persisted-language reopen test (code $($reopenProcess.ExitCode))." }
+    if (-not (Test-Path $reopenSmokeReport)) { throw "The installed application did not complete its persisted-language reopen test." }
+    $reopenSmokeResult = Get-Content $reopenSmokeReport -Raw
+    if (-not $reopenSmokeResult.StartsWith("PASS")) { throw "Installed reopen UI smoke test failed: $reopenSmokeResult" }
+    Stop-Process -Id $reopenProcess.Id -Force
     $uninstaller = Join-Path $installTest "unins000.exe"
     if (Test-Path $uninstaller) {
         $uninstallResult = Start-Process $uninstaller -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
         if ($uninstallResult.ExitCode -ne 0) { throw "Silent uninstall test failed with exit code $($uninstallResult.ExitCode)." }
     }
     if (-not $desktopShortcutExistedBefore -and (Test-Path $desktopShortcut)) { throw "Uninstall did not remove the ArcTrellis desktop shortcut." }
-    Write-Host "Install, desktop shortcut, launch, and uninstall smoke test passed."
+    Write-Host "Install, desktop shortcut, launch, persisted-language reopen, and uninstall smoke test passed."
     Write-Host "Installer ready: $($setup.FullName)"
     Write-Host "SHA-256: $($hash.Hash)"
 }

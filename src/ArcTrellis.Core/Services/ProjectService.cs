@@ -101,8 +101,22 @@ public sealed class ProjectService
         p.Tags ??= [];
         p.Categories ??= [];
         foreach (var b in p.Books) b.Chapters ??= [];
+        var chapterOwners = p.Books
+            .SelectMany(book => book.Chapters.Select(chapter => (chapter.Id, BookId: book.Id)))
+            .GroupBy(x => x.Id)
+            .ToDictionary(group => group.Key, group => group.First().BookId);
+        var bookById = p.Books.GroupBy(book => book.Id).ToDictionary(group => group.Key, group => group.First());
+        var plotlineIds = p.Plotlines.Select(plotline => plotline.Id).ToHashSet();
         foreach (var s in p.Scenes)
         {
+            if (chapterOwners.TryGetValue(s.ChapterId, out Guid ownerBookId)) s.BookId = ownerBookId;
+            else
+            {
+                Book? fallbackBook = bookById.GetValueOrDefault(s.BookId) ?? p.Books.FirstOrDefault(book => book.Chapters.Count > 0);
+                Chapter? fallbackChapter = fallbackBook?.Chapters.OrderBy(chapter => chapter.Order).FirstOrDefault();
+                if (fallbackBook is not null && fallbackChapter is not null) { s.BookId = fallbackBook.Id; s.ChapterId = fallbackChapter.Id; }
+            }
+            if (!plotlineIds.Contains(s.PlotlineId) && p.Plotlines.OrderBy(plotline => plotline.Order).FirstOrDefault() is { } fallbackPlotline) s.PlotlineId = fallbackPlotline.Id;
             s.Tags ??= [];
             s.CharacterIds ??= [];
             s.PlaceIds ??= [];

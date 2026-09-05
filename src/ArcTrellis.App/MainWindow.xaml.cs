@@ -415,6 +415,7 @@ public partial class MainWindow : Window
             if (!visibleText.Contains("Книга:")) failures.Add("Deferred tab content was not translated");
             if (visibleText.Any(x => x.Contains("ArcTrellis.Core.Models", StringComparison.Ordinal))) failures.Add("A model class name is visible instead of its display member");
             if (MainMenu.ActualHeight < 10 || (MainMenu.Items[0] as MenuItem)?.ActualWidth < 20) failures.Add("Top menu is not visible");
+            if (Loc.T(null) != string.Empty) failures.Add("Null localization values are not handled safely");
 
             AddPlotline_Click(new MenuItem(), new RoutedEventArgs());
             if (WorkspaceTabs.SelectedIndex != 1) failures.Add("Add Plotline menu action did not open Timeline");
@@ -422,6 +423,22 @@ public partial class MainWindow : Window
             if (WorkspaceTabs.SelectedIndex != 2) failures.Add("Add Chapter menu action did not open Outline");
             AddScene_Click(new MenuItem(), new RoutedEventArgs());
             if (WorkspaceTabs.SelectedIndex != 3) failures.Add("Add Scene menu action did not open Scenes");
+
+            Book firstBook = Vm.SelectedBook!;
+            Scene firstScene = Vm.SelectedScene!;
+            Vm.AddBook();
+            Book secondBook = Vm.SelectedBook!;
+            Vm.AddChapter();
+            Chapter secondChapter = Vm.SelectedChapter!;
+            Vm.AddScene();
+            Scene secondScene = Vm.SelectedScene!;
+            if (secondScene.BookId != secondBook.Id || secondScene.ChapterId != secondChapter.Id) failures.Add("A scene was assigned across book/chapter boundaries");
+            Vm.SelectedBook = firstBook;
+            if (!Vm.BookScenes.Contains(firstScene)) failures.Add("First-book scene disappeared after switching books");
+            Vm.SelectedBook = secondBook;
+            BuildTimeline();
+            UpdateLayout();
+            if (!Vm.BookScenes.Contains(secondScene) || !Vm.Project.Scenes.Contains(secondScene) || !FindVisualChildren<Border>(TimelineGrid).Any(border => ReferenceEquals(border.Tag, secondScene))) failures.Add("Second-book scene disappeared from the timeline after switching books");
 
             SetTheme(false, false);
             var lightMenu = (SolidColorBrush)Application.Current.Resources[SystemColors.MenuBrushKey];
@@ -560,7 +577,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.6\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.7\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
