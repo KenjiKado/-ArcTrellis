@@ -174,11 +174,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene deleted");
     }
 
-    public void MoveScene(Scene scene, Guid chapterId, Guid plotlineId)
+    public void MoveScene(Scene scene, Guid chapterId, Guid plotlineId, int? insertionIndex = null)
     {
         var targetBook = Project.Books.FirstOrDefault(book => book.Chapters.Any(chapter => chapter.Id == chapterId));
-        if (targetBook is null || Project.Plotlines.All(plotline => plotline.Id != plotlineId || plotline.BookId != targetBook.Id)) return;
-        Snapshot(); scene.BookId = targetBook.Id; scene.ChapterId = chapterId; scene.PlotlineId = plotlineId;
+        if (!Project.Scenes.Contains(scene) || targetBook is null || Project.Plotlines.All(plotline => plotline.Id != plotlineId || plotline.BookId != targetBook.Id)) return;
+        var previous = Project.Scenes.OrderBy(item => item.Order).ToList();
+        var ordered = previous.Where(item => item != scene).ToList();
+        var peers = ordered.Where(item => item.BookId == targetBook.Id && item.ChapterId == chapterId && item.PlotlineId == plotlineId).ToList();
+        int slot = Math.Clamp(insertionIndex ?? peers.Count, 0, peers.Count);
+        int index = slot < peers.Count ? ordered.IndexOf(peers[slot])
+            : peers.Count > 0 ? ordered.IndexOf(peers[^1]) + 1 : ordered.Count;
+        ordered.Insert(index, scene);
+        if (scene.BookId == targetBook.Id && scene.ChapterId == chapterId && scene.PlotlineId == plotlineId && previous.SequenceEqual(ordered)) return;
+        Snapshot();
+        scene.BookId = targetBook.Id; scene.ChapterId = chapterId; scene.PlotlineId = plotlineId;
+        for (int i = 0; i < ordered.Count; i++) ordered[i].Order = i;
         Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene moved");
     }
 

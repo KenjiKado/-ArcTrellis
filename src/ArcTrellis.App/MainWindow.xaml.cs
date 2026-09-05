@@ -5,6 +5,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -30,6 +31,9 @@ public partial class MainWindow : Window
     private bool _closingAfterSave;
     private double _timelineCardWidth = 220;
     private bool _isDark;
+    private SceneDragAdorner? _sceneDragAdorner;
+    private Guid? _draggedSceneId;
+    private Point _sceneGrabOffset;
     private Border? _pressedSceneCard;
     private Point _scenePressPosition;
 
@@ -184,6 +188,8 @@ public partial class MainWindow : Window
                 var border = AddTimelineCell(stack, r + 1, c + 1, true);
                 border.Tag = (chapters[c].Id, plot.Id);
                 border.Drop += TimelineCell_Drop;
+                border.DragOver += TimelineCell_DragOver;
+                border.DragLeave += (_, _) => _sceneDragAdorner?.ShowInsertion(null);
                 border.MouseLeftButtonDown += TimelineCell_MouseLeftButtonDown;
             }
         }
@@ -203,6 +209,7 @@ public partial class MainWindow : Window
         panel.Children.Add(new TextBlock { Text = Loc.T(scene.Status), FontSize = 11, Foreground = BrushFrom(plot.Color), Margin = new Thickness(0, 5, 0, 0) });
         var card = new Border { Tag = scene, Child = panel, Background = new SolidColorBrush(Color.FromArgb(24, BrushColor(plot.Color).R, BrushColor(plot.Color).G, BrushColor(plot.Color).B)), BorderBrush = BrushFrom(plot.Color), BorderThickness = new Thickness(3, 0, 0, 0), CornerRadius = new CornerRadius(5), Margin = new Thickness(2, 3, 2, 3), Padding = new Thickness(9), Cursor = Cursors.Hand };
         card.PreviewMouseMove += SceneCard_MouseMove;
+        card.GiveFeedback += (_, _) => _sceneDragAdorner?.FollowCursor();
         card.MouseLeftButtonDown += SceneCard_MouseLeftButtonDown;
         card.MouseLeftButtonUp += SceneCard_MouseLeftButtonUp;
         card.LostMouseCapture += (_, _) => { if (ReferenceEquals(_pressedSceneCard, card)) _pressedSceneCard = null; };
@@ -214,6 +221,7 @@ public partial class MainWindow : Window
         if (sender is not Border { Tag: Scene } card) return;
         _pressedSceneCard = card;
         _scenePressPosition = e.GetPosition(this);
+        _sceneGrabOffset = e.GetPosition(card);
         card.CaptureMouse();
         e.Handled = true;
     }
@@ -247,7 +255,28 @@ public partial class MainWindow : Window
             Math.Abs(position.Y - _scenePressPosition.Y) < SystemParameters.MinimumVerticalDragDistance) return;
         _pressedSceneCard = null;
         card.ReleaseMouseCapture();
-        DragDrop.DoDragDrop(card, new DataObject("ArcTrellis.Scene", scene.Id.ToString()), DragDropEffects.Move);
+        var surface = (UIElement)Content;
+        var layer = AdornerLayer.GetAdornerLayer(surface);
+        var timer = new DispatcherTimer(DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(16) };
+        timer.Tick += (_, _) => _sceneDragAdorner?.FollowCursor();
+        try
+        {
+            _draggedSceneId = scene.Id;
+            _sceneDragAdorner = new SceneDragAdorner(surface, card, _sceneGrabOffset);
+            layer?.Add(_sceneDragAdorner);
+            _sceneDragAdorner.FollowCursor();
+            card.Opacity = 0.3;
+            timer.Start();
+            DragDrop.DoDragDrop(card, new DataObject("ArcTrellis.Scene", scene.Id.ToString()), DragDropEffects.Move);
+        }
+        finally
+        {
+            timer.Stop();
+            card.Opacity = 1;
+            if (_sceneDragAdorner is not null) layer?.Remove(_sceneDragAdorner);
+            _sceneDragAdorner = null;
+            _draggedSceneId = null;
+        }
         e.Handled = true;
     }
 
@@ -257,7 +286,36 @@ public partial class MainWindow : Window
         if (!e.Data.GetDataPresent("ArcTrellis.Scene") || !Guid.TryParse(e.Data.GetData("ArcTrellis.Scene")?.ToString(), out var id)) return;
         var scene = Vm.Project.Scenes.FirstOrDefault(s => s.Id == id);
         if (scene is null) return;
-        Vm.MoveScene(scene, target.Item1, target.Item2); BuildTimeline();
+        Vm.MoveScene(scene, target.Item1, target.Item2, GetTimelineInsertion((Border)sender, e.GetPosition((Border)sender).Y, scene.Id).Index);
+        _sceneDragAdorner?.ShowInsertion(null);
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+        BuildTimeline();
+    }
+
+    private static (int Index, double Y) GetTimelineInsertion(Border border, double pointerY, Guid draggedId)
+    {
+        if (border.Child is not StackPanel stack) return (0, 8);
+        var cards = stack.Children.OfType<Border>().Where(card => card.Tag is Scene scene && scene.Id != draggedId).ToList();
+        for (int i = 0; i < cards.Count; i++)
+        {
+            double top = cards[i].TranslatePoint(new Point(0, 0), border).Y;
+            if (pointerY < top + cards[i].ActualHeight / 2) return (i, top - 2);
+        }
+        return (cards.Count, cards.Count == 0 ? 8 : cards[^1].TranslatePoint(new Point(0, cards[^1].ActualHeight), border).Y + 2);
+    }
+
+    private void TimelineCell_DragOver(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        e.Effects = DragDropEffects.None;
+        if (sender is not Border border || !e.Data.GetDataPresent("ArcTrellis.Scene") ||
+            !Guid.TryParse(e.Data.GetData("ArcTrellis.Scene")?.ToString(), out Guid id) || id != _draggedSceneId) return;
+        var slot = GetTimelineInsertion(border, e.GetPosition(border).Y, id);
+        Point start = border.TranslatePoint(new Point(6, slot.Y), (UIElement)Content);
+        _sceneDragAdorner?.ShowInsertion(new Rect(start, new Size(Math.Max(0, border.ActualWidth - 12), 0)));
+        _sceneDragAdorner?.FollowCursor();
+        e.Effects = DragDropEffects.Move;
     }
 
     private void TimelineCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -466,11 +524,38 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(new Action(() => { RefreshAll(); ApplyLocalization(); }), DispatcherPriority.Loaded);
     }
 
+    private static void VerifySceneReordering(List<string> failures)
+    {
+        var project = new TemplateService().CreateBlank();
+        var vm = new MainViewModel(project);
+        vm.AddScene(); var first = vm.SelectedScene!;
+        vm.AddScene(); var second = vm.SelectedScene!;
+        vm.AddScene(); var third = vm.SelectedScene!;
+        Guid chapter = first.ChapterId, plotline = first.PlotlineId;
+        vm.MoveScene(third, chapter, plotline, 0);
+        if (!vm.BookScenes.Select(scene => scene.Id).SequenceEqual(new[] { third.Id, first.Id, second.Id })) failures.Add("Dragging up did not reorder scenes");
+        vm.MoveScene(third, chapter, plotline, 2);
+        if (!vm.BookScenes.Select(scene => scene.Id).SequenceEqual(new[] { first.Id, second.Id, third.Id })) failures.Add("Dragging down did not reorder scenes");
+        vm.AddPlotline(); var otherPlotline = vm.SelectedPlotline!;
+        vm.MoveScene(second, chapter, otherPlotline.Id, 0);
+        vm.MoveScene(third, chapter, otherPlotline.Id, 0);
+        var peers = vm.BookScenes.Where(scene => scene.PlotlineId == otherPlotline.Id).Select(scene => scene.Id);
+        if (!peers.SequenceEqual(new[] { third.Id, second.Id })) failures.Add("Cross-cell insertion did not preserve requested order");
+        var service = new ProjectService();
+        var restored = service.Deserialize(service.Serialize(vm.Project));
+        if (!restored.Scenes.Where(scene => scene.PlotlineId == otherPlotline.Id).OrderBy(scene => scene.Order).Select(scene => scene.Id).SequenceEqual(new[] { third.Id, second.Id })) failures.Add("Scene order did not survive reopening");
+        vm.Undo();
+        if (vm.Project.Scenes.Single(scene => scene.Id == third.Id).PlotlineId != plotline) failures.Add("Undo did not restore the scene's original cell");
+        vm.Redo();
+        if (vm.Project.Scenes.Single(scene => scene.Id == third.Id).PlotlineId != otherPlotline.Id) failures.Add("Redo did not restore the scene move");
+    }
+
     private void RunUiSmoke(string reportPath)
     {
         try
         {
             var failures = new List<string>();
+            VerifySceneReordering(failures);
             ChangeLanguage("en-US");
             WorkspaceTabs.SelectedIndex = 3;
             ApplyLocalization();
@@ -639,6 +724,24 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-timeline.png"));
+            var dragSurface = (UIElement)Content;
+            var dragLayer = AdornerLayer.GetAdornerLayer(dragSurface);
+            var previewCard = FindVisualChildren<Border>(TimelineGrid).FirstOrDefault(border => border.Tag is Scene);
+            if (dragLayer is null || previewCard is null) failures.Add("Timeline drag preview layer is unavailable");
+            else
+            {
+                var dragPreview = new SceneDragAdorner(dragSurface, previewCard, new Point(10, 10));
+                dragLayer.Add(dragPreview);
+                Point previewOrigin = previewCard.TranslatePoint(new Point(70, 40), dragSurface);
+                dragPreview.MoveTo(previewOrigin);
+                dragPreview.ShowInsertion(new Rect(previewCard.TranslatePoint(new Point(0, previewCard.ActualHeight + 5), dragSurface), new Size(previewCard.ActualWidth, 0)));
+                previewCard.Opacity = 0.3;
+                UpdateLayout();
+                SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-drag-preview.png"));
+                previewCard.Opacity = 1;
+                dragLayer.Remove(dragPreview);
+            }
+
             WorkspaceTabs.SelectedIndex = 0;
             ChangeLanguage("ru-RU");
             UpdateLayout();
@@ -737,7 +840,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.11\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.12\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
