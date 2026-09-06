@@ -36,6 +36,10 @@ public sealed class StoryProject : ObservableObject
 
 public sealed class Book : ObservableObject
 {
+    private double _timelineLabelWidth = 180;
+    public double TimelineLabelWidth { get => _timelineLabelWidth; set => Set(ref _timelineLabelWidth, double.IsFinite(value) ? Math.Clamp(value, 0, 4000) : 0); }
+    private double _timelineHeaderHeight = 0;
+    public double TimelineHeaderHeight { get => _timelineHeaderHeight; set => Set(ref _timelineHeaderHeight, double.IsFinite(value) ? Math.Clamp(value, 0, 4000) : 0); }
     private string _title = "New Book";
     private string _subtitle = "";
     private string _summary = "";
@@ -54,6 +58,8 @@ public sealed class Book : ObservableObject
 
 public sealed class Chapter : ObservableObject
 {
+    private double _timelineWidth = 0;
+    public double TimelineWidth { get => _timelineWidth; set => Set(ref _timelineWidth, double.IsFinite(value) ? Math.Clamp(value, 0, 4000) : 0); }
     private string _title = "New Chapter";
     private string _summary = "";
     private int _order;
@@ -69,6 +75,8 @@ public sealed class Chapter : ObservableObject
 
 public sealed class Plotline : ObservableObject
 {
+    private double _timelineHeight = 0;
+    public double TimelineHeight { get => _timelineHeight; set => Set(ref _timelineHeight, double.IsFinite(value) ? Math.Clamp(value, 0, 4000) : 0); }
     private string _name = "Main Plot";
     private string _description = "";
     private string _color = "#5B7CFA";

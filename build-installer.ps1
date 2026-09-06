@@ -42,7 +42,7 @@ try {
     & $iscc "/DAppPublishDir=$publish" ".\installer\ArcTrellis.iss"
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
 
-    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.13-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.1.14-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $setup) { throw "Installer output was not found." }
     $hash = Get-FileHash $setup.FullName -Algorithm SHA256
     Set-Content -Path ($setup.FullName + ".sha256") -Value ("{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $setup.Name)
