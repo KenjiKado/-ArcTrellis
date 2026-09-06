@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -158,10 +159,10 @@ public partial class MainWindow : Window
         if (book is null) return;
         var chapters = book.Chapters.OrderBy(c => c.Order).ToList();
         var plotlines = Vm.BookPlotlines.ToList();
-        TimelineGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(180) });
-        foreach (var _ in chapters) TimelineGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(_timelineCardWidth) });
-        TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        foreach (var _ in plotlines) TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        TimelineGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(130, book.TimelineLabelWidth)) });
+        foreach (var chapter in chapters) TimelineGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(chapter.TimelineWidth >= 130 ? chapter.TimelineWidth : _timelineCardWidth) });
+        TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = book.TimelineHeaderHeight });
+        foreach (var plotline in plotlines) TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = plotline.TimelineHeight });
 
         AddTimelineCell(new TextBlock { Text = Loc.T("PLOTLINE / CHAPTER"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(8) }, 0, 0, false);
         for (int c = 0; c < chapters.Count; c++)
@@ -193,6 +194,90 @@ public partial class MainWindow : Window
                 border.MouseLeftButtonDown += TimelineCell_MouseLeftButtonDown;
             }
         }
+        AddTimelineResizeHandles(book, chapters, plotlines);
+    }
+
+    private void AddTimelineResizeHandles(Book book, List<Chapter> chapters, List<Plotline> plotlines)
+    {
+        for (int c = 0; c < TimelineGrid.ColumnDefinitions.Count; c++)
+        {
+            int index = c;
+            AddTimelineResizeHandle(true, c, value =>
+            {
+                if (index == 0) book.TimelineLabelWidth = value;
+                else chapters[index - 1].TimelineWidth = value;
+            });
+        }
+        for (int r = 0; r < TimelineGrid.RowDefinitions.Count; r++)
+        {
+            int index = r;
+            AddTimelineResizeHandle(false, r, value =>
+            {
+                if (index == 0) book.TimelineHeaderHeight = value;
+                else plotlines[index - 1].TimelineHeight = value;
+            });
+        }
+    }
+
+    private void AddTimelineResizeHandle(bool column, int index, Action<double> save)
+    {
+        var handle = new Thumb
+        {
+            Cursor = column ? Cursors.SizeWE : Cursors.SizeNS,
+            Background = Brushes.Transparent,
+            HorizontalAlignment = column ? HorizontalAlignment.Right : HorizontalAlignment.Stretch,
+            VerticalAlignment = column ? VerticalAlignment.Stretch : VerticalAlignment.Bottom,
+            Tag = column ? "TimelineColumnResize" : "TimelineRowResize",
+            Focusable = false
+        };
+        // An explicit template avoids the default raised button appearance.
+        var visual = new FrameworkElementFactory(typeof(Border));
+        visual.SetBinding(Border.BackgroundProperty, new Binding(nameof(Thumb.Background)) { Source = handle });
+        handle.Template = new ControlTemplate(typeof(Thumb)) { VisualTree = visual };
+        if (column)
+        {
+            handle.Width = 6;
+            Grid.SetColumn(handle, index);
+            Grid.SetRowSpan(handle, TimelineGrid.RowDefinitions.Count);
+        }
+        else
+        {
+            handle.Height = 6;
+            Grid.SetRow(handle, index);
+            Grid.SetColumnSpan(handle, TimelineGrid.ColumnDefinitions.Count);
+        }
+        Panel.SetZIndex(handle, 10);
+        double size = 0, original = 0;
+        handle.DragStarted += (_, e) =>
+        {
+            size = column ? TimelineGrid.ColumnDefinitions[index].ActualWidth : TimelineGrid.RowDefinitions[index].ActualHeight;
+            original = column ? TimelineGrid.ColumnDefinitions[index].Width.Value : TimelineGrid.RowDefinitions[index].MinHeight;
+            e.Handled = true;
+        };
+        handle.DragDelta += (_, e) =>
+        {
+            size = Math.Clamp(size + (column ? e.HorizontalChange : e.VerticalChange), column ? 130 : 40, 4000);
+            if (column) TimelineGrid.ColumnDefinitions[index].Width = new GridLength(size);
+            else TimelineGrid.RowDefinitions[index].MinHeight = size;
+            e.Handled = true;
+        };
+        handle.DragCompleted += (_, e) =>
+        {
+            if (e.Canceled)
+            {
+                if (column) TimelineGrid.ColumnDefinitions[index].Width = new GridLength(original);
+                else TimelineGrid.RowDefinitions[index].MinHeight = original;
+            }
+            else
+            {
+                save(size);
+                Vm.Project.ModifiedUtc = DateTime.UtcNow;
+                Vm.MarkDirty();
+            }
+            handle.Background = Brushes.Transparent;
+            e.Handled = true;
+        };
+        TimelineGrid.Children.Add(handle);
     }
 
     private Border AddTimelineCell(UIElement child, int row, int column, bool allowDrop)
@@ -576,6 +661,36 @@ public partial class MainWindow : Window
             editVm.Undo();
             if (editVm.Project.Plotlines.Single(p => p.Id == editPlot.Id).Description != "Original description") failures.Add("Undo did not restore plotline details");
 
+
+            // The selected scene must keep its stored code while option labels change.
+            Vm.AddScene();
+            var languageScene = Vm.SelectedScene!;
+            WorkspaceTabs.SelectedIndex = 3;
+            UpdateLayout();
+            foreach (string code in new[] { "Planned", "Drafted", "Revised", "Final", "Cut" })
+            {
+                languageScene.Status = code;
+                foreach (string language in new[] { "ru-RU", "en-US", "ru-RU" })
+                {
+                    ChangeLanguage(language);
+                    UpdateLayout();
+                    var statusBox = FindVisualChildren<ComboBox>(this).FirstOrDefault(box => box.SelectedValuePath == "Code");
+                    if (languageScene.Status != code || statusBox?.SelectedValue as string != code)
+                        failures.Add($"Language switch cleared scene status {code} in {language}");
+                    if (statusBox?.SelectedItem is not SceneStatusOption option || option.Label != Loc.T(code))
+                        failures.Add($"Status option did not translate: {code} in {language}");
+                    WorkspaceTabs.SelectedIndex = 1;
+                    BuildTimeline();
+                    UpdateLayout();
+                    var card = FindVisualChildren<Border>(TimelineGrid).FirstOrDefault(b => ReferenceEquals(b.Tag, languageScene));
+                    if (card is null || !FindVisualChildren<TextBlock>(card).Any(t => t.Text == Loc.T(code)))
+                        failures.Add($"Timeline lost localized scene status {code}");
+                    WorkspaceTabs.SelectedIndex = 3;
+                    UpdateLayout();
+                }
+            }
+            languageScene.Status = "Planned";
+
             ChangeLanguage("en-US");
             WorkspaceTabs.SelectedIndex = 3;
             ApplyLocalization();
@@ -744,6 +859,23 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-timeline.png"));
+            var widthGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineColumnResize") && Grid.GetColumn(t) == 1);
+            var heightGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineRowResize") && Grid.GetRow(t) == 1);
+            double oldWidth = TimelineGrid.ColumnDefinitions[1].ActualWidth;
+            double oldHeight = TimelineGrid.RowDefinitions[1].ActualHeight;
+            foreach (var grip in new[] { widthGrip, heightGrip })
+            {
+                grip.RaiseEvent(new DragStartedEventArgs(0, 0) { RoutedEvent = Thumb.DragStartedEvent });
+                grip.RaiseEvent(new DragDeltaEventArgs(60, 60) { RoutedEvent = Thumb.DragDeltaEvent });
+                grip.RaiseEvent(new DragCompletedEventArgs(60, 60, false) { RoutedEvent = Thumb.DragCompletedEvent });
+            }
+            BuildTimeline();
+            UpdateLayout();
+            if (Math.Abs(TimelineGrid.ColumnDefinitions[1].ActualWidth - oldWidth - 60) > 1) failures.Add("Chapter resize did not survive timeline rebuild");
+            if (TimelineGrid.RowDefinitions[1].ActualHeight < oldHeight + 59) failures.Add("Plotline resize did not survive timeline rebuild");
+            var savedLayout = System.Text.Json.JsonSerializer.Deserialize<StoryProject>(System.Text.Json.JsonSerializer.Serialize(Vm.Project))!;
+            if (savedLayout.Books.First(b => b.Id == Vm.SelectedBook!.Id).Chapters.First(c => c.Id == Vm.SelectedBook!.Chapters.OrderBy(c => c.Order).First().Id).TimelineWidth < oldWidth + 59) failures.Add("Column width did not persist in project JSON");
+            SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-resized-timeline.png"));
             // Identical cards at different stack offsets must produce equally complete previews.
             var originalPreviewScene = Vm.BookScenes.First();
             Vm.SelectedChapter = Vm.SelectedBook!.Chapters.First(chapter => chapter.Id == originalPreviewScene.ChapterId);
@@ -894,7 +1026,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.13\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.16\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
