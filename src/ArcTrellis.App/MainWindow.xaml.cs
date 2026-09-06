@@ -248,8 +248,6 @@ public partial class MainWindow : Window
         }
         Panel.SetZIndex(handle, 10);
         double size = 0, original = 0;
-        handle.MouseEnter += (_, _) => handle.Background = FindBrush("AccentBrush");
-        handle.MouseLeave += (_, _) => { if (!handle.IsDragging) handle.Background = Brushes.Transparent; };
         handle.DragStarted += (_, e) =>
         {
             size = column ? TimelineGrid.ColumnDefinitions[index].ActualWidth : TimelineGrid.RowDefinitions[index].ActualHeight;
@@ -639,6 +637,35 @@ public partial class MainWindow : Window
         {
             var failures = new List<string>();
             VerifySceneReordering(failures);
+            // The selected scene must keep its stored code while option labels change.
+            Vm.AddScene();
+            var languageScene = Vm.SelectedScene!;
+            WorkspaceTabs.SelectedIndex = 3;
+            UpdateLayout();
+            foreach (string code in new[] { "Planned", "Drafted", "Revised", "Final", "Cut" })
+            {
+                languageScene.Status = code;
+                foreach (string language in new[] { "ru-RU", "en-US", "ru-RU" })
+                {
+                    ChangeLanguage(language);
+                    UpdateLayout();
+                    var statusBox = FindVisualChildren<ComboBox>(this).FirstOrDefault(box => box.SelectedValuePath == "Code");
+                    if (languageScene.Status != code || statusBox?.SelectedValue as string != code)
+                        failures.Add($"Language switch cleared scene status {code} in {language}");
+                    if (statusBox?.SelectedItem is not SceneStatusOption option || option.Label != Loc.T(code))
+                        failures.Add($"Status option did not translate: {code} in {language}");
+                    WorkspaceTabs.SelectedIndex = 1;
+                    BuildTimeline();
+                    UpdateLayout();
+                    var card = FindVisualChildren<Border>(TimelineGrid).FirstOrDefault(b => ReferenceEquals(b.Tag, languageScene));
+                    if (card is null || !FindVisualChildren<TextBlock>(card).Any(t => t.Text == Loc.T(code)))
+                        failures.Add($"Timeline lost localized scene status {code}");
+                    WorkspaceTabs.SelectedIndex = 3;
+                    UpdateLayout();
+                }
+            }
+            languageScene.Status = "Planned";
+
             ChangeLanguage("en-US");
             WorkspaceTabs.SelectedIndex = 3;
             ApplyLocalization();
@@ -974,7 +1001,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.14\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.15\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
