@@ -178,6 +178,22 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Project.Scenes.Add(scene); SelectedScene = scene; Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene added");
     }
 
+    public Scene? DuplicateScene(Scene original)
+    {
+        if (!Project.Scenes.Contains(original)) return null;
+        var copy = System.Text.Json.JsonSerializer.Deserialize<Scene>(System.Text.Json.JsonSerializer.Serialize(original))!;
+        copy.Id = Guid.NewGuid();
+        copy.Title = Loc.F("{0} (duplicate)", original.Title);
+        Snapshot();
+        var ordered = Project.Scenes.OrderBy(scene => scene.Order).ToList();
+        ordered.Insert(ordered.IndexOf(original) + 1, copy);
+        for (int i = 0; i < ordered.Count; i++) ordered[i].Order = i;
+        Project.Scenes.Add(copy);
+        SelectedScene = copy;
+        Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene duplicated");
+        return copy;
+    }
+
     public void DeleteScene()
     {
         if (SelectedScene is null) return;

@@ -12,6 +12,8 @@ public partial class EditBookWindow : Window
     public EditBookWindow(Book book, bool adding = false)
     {
         InitializeComponent();
+        TitleInput.TextChanged += (_, _) => UpdateSaveEnabled();
+        UpdateSaveEnabled();
         Title = Loc.T(adding ? "Add book" : "Edit book");
         TitleInput.Text = book.Title;
         SubtitleInput.Text = book.Subtitle;
@@ -23,5 +25,9 @@ public partial class EditBookWindow : Window
         Loaded += (_, _) => { Loc.Apply(this); TitleInput.Focus(); TitleInput.SelectAll(); };
     }
 
-    private void Save_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+    private void UpdateSaveEnabled() => SaveButton.IsEnabled = !string.IsNullOrWhiteSpace(TitleInput.Text);
+    private void Save_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(TitleInput.Text)) DialogResult = true;
+    }
 }

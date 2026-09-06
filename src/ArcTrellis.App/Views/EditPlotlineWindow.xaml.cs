@@ -13,6 +13,8 @@ public partial class EditPlotlineWindow : Window
     public EditPlotlineWindow(Plotline plotline)
     {
         InitializeComponent();
+        TitleInput.TextChanged += (_, _) => UpdateSaveEnabled();
+        UpdateSaveEnabled();
         Title = Loc.T("Edit plotline");
         TitleInput.Text = plotline.Name;
         DescriptionInput.Text = plotline.Description;
@@ -39,5 +41,9 @@ public partial class EditPlotlineWindow : Window
         PlotlineColor = picker.SelectedColor;
         UpdatePreview();
     }
-    private void Save_Click(object sender, RoutedEventArgs e) => DialogResult = true;
+    private void UpdateSaveEnabled() => SaveButton.IsEnabled = !string.IsNullOrWhiteSpace(TitleInput.Text);
+    private void Save_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(TitleInput.Text)) DialogResult = true;
+    }
 }

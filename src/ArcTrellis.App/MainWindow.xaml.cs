@@ -192,7 +192,8 @@ public partial class MainWindow : Window
             plotText.Children.Add(description);
             var label = new Border { Tag = plot, Cursor = Cursors.Hand, BorderThickness = new Thickness(5, 0, 0, 0), BorderBrush = BrushFrom(plot.Color), Padding = new Thickness(8), Child = plotText };
             label.MouseLeftButtonDown += PlotlineLabel_MouseLeftButtonDown;
-            AddTimelineCell(label, r + 1, 0, false);
+            var plotCell = AddTimelineCell(label, r + 1, 0, false);
+            plotCell.ContextMenu = CreatePlotlineMenu(plot);
             for (int c = 0; c < chapters.Count; c++)
             {
                 var stack = new StackPanel { MinHeight = 105 };
@@ -302,6 +303,7 @@ public partial class MainWindow : Window
     private Border CreateSceneCard(Scene scene, Plotline plot)
     {
         var card = SceneCardVisual.Create(scene, BrushColor(plot.Color));
+        card.ContextMenu = CreateSceneMenu(scene);
         card.PreviewMouseMove += SceneCard_MouseMove;
         card.GiveFeedback += (_, _) => _sceneDragAdorner?.FollowCursor();
         card.MouseLeftButtonDown += SceneCard_MouseLeftButtonDown;
@@ -427,11 +429,65 @@ public partial class MainWindow : Window
         if (sender is not Border { Tag: Plotline plotline }) return;
         SelectTimelinePlotline(plotline);
         e.Handled = true;
-        if (e.ClickCount != 2) return;
+        if (e.ClickCount == 2) EditTimelinePlotline(plotline);
+    }
+
+    private void EditTimelinePlotline(Plotline plotline)
+    {
+        SelectTimelinePlotline(plotline);
         var editor = new EditPlotlineWindow(plotline) { Owner = this };
         if (editor.ShowDialog() != true) return;
         Vm.EditPlotline(plotline, editor.PlotlineTitle, editor.PlotlineDescription, editor.PlotlineColor);
         RefreshAll();
+    }
+
+    private static ContextMenu TimelineContextMenu()
+    {
+        var menu = new ContextMenu();
+        menu.SetResourceReference(Control.BackgroundProperty, "ElevatedBrush");
+        menu.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+        var frame = new FrameworkElementFactory(typeof(Border));
+        frame.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
+        frame.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        frame.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+        frame.SetValue(Border.PaddingProperty, new Thickness(3));
+        frame.AppendChild(new FrameworkElementFactory(typeof(ItemsPresenter)));
+        menu.Template = new ControlTemplate(typeof(ContextMenu)) { VisualTree = frame };
+        return menu;
+    }
+
+    private static MenuItem TimelineMenuItem(string text, Action action)
+    {
+        var item = new MenuItem { Header = Loc.T(text) };
+        item.Click += (_, e) => { e.Handled = true; action(); };
+        return item;
+    }
+
+    private ContextMenu CreatePlotlineMenu(Plotline plotline)
+    {
+        var menu = TimelineContextMenu();
+        menu.Items.Add(TimelineMenuItem("Edit plotline", () => EditTimelinePlotline(plotline)));
+        var delete = TimelineMenuItem("Delete plotline", () =>
+        {
+            SelectTimelinePlotline(plotline);
+            DeletePlotline_Click(this, new RoutedEventArgs());
+        });
+        menu.Items.Add(delete);
+        menu.Opened += (_, _) => delete.IsEnabled = Vm.BookPlotlines.Count() > 1;
+        return menu;
+    }
+
+    private ContextMenu CreateSceneMenu(Scene scene)
+    {
+        var menu = TimelineContextMenu();
+        menu.Items.Add(TimelineMenuItem("Edit scene", () => OpenTimelineScene(scene)));
+        menu.Items.Add(TimelineMenuItem("Duplicate scene", () => { Vm.DuplicateScene(scene); RefreshAll(); }));
+        menu.Items.Add(TimelineMenuItem("Delete scene", () =>
+        {
+            Vm.SelectedScene = scene;
+            DeleteScene_Click(this, new RoutedEventArgs());
+        }));
+        return menu;
     }
 
     private void SelectTimelinePlotline(Plotline plotline)
@@ -646,6 +702,27 @@ public partial class MainWindow : Window
         {
             var failures = new List<string>();
             VerifySceneReordering(failures);
+            var duplicateVm = new MainViewModel(new TemplateService().CreateBlank());
+            duplicateVm.AddScene();
+            var sourceScene = duplicateVm.SelectedScene!;
+            sourceScene.Summary = "Summary"; sourceScene.Content = "Draft"; sourceScene.Status = "Revised";
+            sourceScene.Tags.Add("tag"); sourceScene.CharacterIds.Add(Guid.NewGuid());
+            var duplicate = duplicateVm.DuplicateScene(sourceScene)!;
+            if (duplicate.Id == sourceScene.Id || duplicate.Title != Loc.F("{0} (duplicate)", sourceScene.Title) || duplicate.Summary != sourceScene.Summary || duplicate.Content != sourceScene.Content || duplicate.Status != sourceScene.Status || duplicate.ChapterId != sourceScene.ChapterId || duplicate.PlotlineId != sourceScene.PlotlineId || duplicate.Order != sourceScene.Order + 1 || !duplicate.CharacterIds.SequenceEqual(sourceScene.CharacterIds)) failures.Add("Scene duplication lost data or placement");
+            duplicate.Tags.Add("independent");
+            if (sourceScene.Tags.Contains("independent")) failures.Add("Duplicate scene shares mutable data");
+            duplicateVm.Undo();
+            if (duplicateVm.Project.Scenes.Count != 1) failures.Add("Undo failed for duplicate scene");
+            foreach (Window titleEditor in new Window[] { new EditBookWindow(new Book()), new EditPlotlineWindow(new Plotline()) })
+            {
+                var input = (TextBox)titleEditor.FindName("TitleInput");
+                var save = (Button)titleEditor.FindName("SaveButton");
+                foreach (string blank in new[] { "", "   " }) { input.Text = blank; if (save.IsEnabled) failures.Add("Save enabled for blank title"); }
+                input.Text = "Valid title";
+                if (!save.IsEnabled) failures.Add("Save did not enable for valid title");
+                titleEditor.Close();
+            }
+
             var editProject = new TemplateService().CreateBlank();
             var editVm = new MainViewModel(editProject);
             var editPlot = editVm.SelectedPlotline!;
@@ -864,6 +941,16 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-timeline.png"));
+            var menuCard = FindVisualChildren<Border>(TimelineGrid).First(b => b.Tag is Scene);
+            var sceneMenu = menuCard.ContextMenu!;
+            if (sceneMenu.Items.Count != 3) failures.Add("Scene context menu actions missing");
+            sceneMenu.PlacementTarget = menuCard;
+            sceneMenu.IsOpen = true;
+            UpdateLayout(); sceneMenu.UpdateLayout();
+            SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scene-menu-host.png"));
+            SaveVisualPng(sceneMenu, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scene-context-menu.png"));
+            sceneMenu.IsOpen = false;
+
             var widthGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineColumnResize") && Grid.GetColumn(t) == 1);
             var heightGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineRowResize") && Grid.GetRow(t) == 1);
             double oldWidth = TimelineGrid.ColumnDefinitions[1].ActualWidth;
@@ -1031,7 +1118,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.17\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.18\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

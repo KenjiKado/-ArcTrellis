@@ -26,6 +26,7 @@ public static class Loc
         ["Series overview"] = "Обзор серии", ["Title"] = "Название", ["Author"] = "Автор", ["Genre"] = "Жанр", ["Premise / series description"] = "Замысел / описание серии",
         ["Books in this series"] = "Книги серии", ["Add book"] = "Добавить книгу", ["Delete book"] = "Удалить книгу", ["Writing progress"] = "Прогресс написания",
         ["Choose color"] = "Выбрать цвет", ["Red"] = "Красный", ["Green"] = "Зелёный", ["Blue"] = "Синий",
+        ["Edit scene"] = "Редактировать сцену", ["Duplicate scene"] = "Дублировать сцену", ["Delete scene"] = "Удалить сцену", ["Scene duplicated"] = "Сцена продублирована", ["{0} (duplicate)"] = "{0} (копия)",
         ["Edit plotline"] = "Редактировать сюжетную линию", ["Plotline updated"] = "Сюжетная линия обновлена", ["Color"] = "Цвет",
         ["Edit book"] = "Редактировать книгу", ["Subtitle"] = "Подзаголовок", ["Book goal"] = "Цель книги", ["Book updated"] = "Книга обновлена",
         ["Current words"] = "Написано слов", ["Series goal"] = "Цель серии", ["At a glance"] = "Сводка", ["Local-first"] = "Только локально",
