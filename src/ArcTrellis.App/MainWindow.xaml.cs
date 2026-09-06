@@ -177,7 +177,20 @@ public partial class MainWindow : Window
             var plot = plotlines[r];
             var plotName = new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
             plotName.SetBinding(TextBlock.TextProperty, new Binding(nameof(Plotline.Name)) { Source = plot });
-            var label = new Border { Tag = plot, Cursor = Cursors.Hand, BorderThickness = new Thickness(5, 0, 0, 0), BorderBrush = BrushFrom(plot.Color), Padding = new Thickness(8), Child = plotName };
+            var plotText = new StackPanel();
+            plotText.Children.Add(plotName);
+            var description = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = FindBrush("MutedBrush"), Margin = new Thickness(0, 6, 0, 0) };
+            description.SetBinding(TextBlock.TextProperty, new Binding(nameof(Plotline.Description)) { Source = plot });
+            var descriptionStyle = new Style(typeof(TextBlock));
+            foreach (object? empty in new object?[] { null, "" })
+            {
+                var trigger = new DataTrigger { Binding = new Binding(nameof(Plotline.Description)) { Source = plot }, Value = empty };
+                trigger.Setters.Add(new Setter(VisibilityProperty, Visibility.Collapsed));
+                descriptionStyle.Triggers.Add(trigger);
+            }
+            description.Style = descriptionStyle;
+            plotText.Children.Add(description);
+            var label = new Border { Tag = plot, Cursor = Cursors.Hand, BorderThickness = new Thickness(5, 0, 0, 0), BorderBrush = BrushFrom(plot.Color), Padding = new Thickness(8), Child = plotText };
             label.MouseLeftButtonDown += PlotlineLabel_MouseLeftButtonDown;
             AddTimelineCell(label, r + 1, 0, false);
             for (int c = 0; c < chapters.Count; c++)
@@ -552,15 +565,6 @@ public partial class MainWindow : Window
         RefreshAll();
     }
 
-    private void ChoosePlotlineColor_Click(object sender, RoutedEventArgs e)
-    {
-        if (Vm.SelectedPlotline is not { } plotline) return;
-        var picker = new ColorPickerWindow(BrushColor(plotline.Color)) { Owner = this };
-        if (picker.ShowDialog() != true) return;
-        plotline.Color = picker.SelectedColor;
-        Vm.MarkDirty();
-        RefreshAll();
-    }
     private void DeleteBook_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("book and all of its scenes")) { Vm.DeleteBook(); RefreshAll(); } }
     private void AddChapter_Click(object sender, RoutedEventArgs e) { Vm.AddChapter(); if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 2; RefreshAll(); }
     private void DeleteChapter_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("chapter and all of its scenes")) { Vm.DeleteChapter(); RefreshAll(); } }
@@ -713,7 +717,6 @@ public partial class MainWindow : Window
             WorkspaceTabs.SelectedIndex = 1;
             ApplyLocalization();
             TimelineBookCombo.ApplyTemplate();
-            TimelinePlotlineCombo.ApplyTemplate();
             UpdateLayout();
             if ((WorkspaceTabs.Items[0] as TabItem)?.Header?.ToString() != "Обзор") failures.Add("Russian tab localization failed");
             var visibleText = CollectVisibleText(this).ToList();
@@ -761,12 +764,14 @@ public partial class MainWindow : Window
             Plotline selectedFromTimeline = Vm.BookPlotlines.Last();
             SelectTimelinePlotline(selectedFromTimeline);
             UpdateLayout();
-            if (!ReferenceEquals(Vm.SelectedPlotline, selectedFromTimeline) || !ReferenceEquals(TimelinePlotlineCombo.SelectedItem, selectedFromTimeline)) failures.Add("Timeline plotline selection did not update the top selector");
+            if (!ReferenceEquals(Vm.SelectedPlotline, selectedFromTimeline)) failures.Add("Timeline plotline label did not select its plotline");
             if (!FindVisualChildren<Border>(TimelineGrid).Any(border => ReferenceEquals(border.Tag, selectedFromTimeline))) failures.Add("Timeline plotline label is not clickable");
             string livePlotlineName = "Live Rename Test";
             selectedFromTimeline.Name = livePlotlineName;
+            selectedFromTimeline.Description = "A story conflict that changes the world.";
             UpdateLayout();
             if (!FindVisualChildren<TextBlock>(TimelineGrid).Any(text => text.Text == livePlotlineName)) failures.Add("Timeline plotline name did not update live");
+            if (!FindVisualChildren<TextBlock>(TimelineGrid).Any(text => text.Text == selectedFromTimeline.Description && text.Visibility == Visibility.Visible)) failures.Add("Timeline plotline description did not update live");
 
             firstBook.CurrentWordCount = 100;
             firstBook.WordCountGoal = 1000;
@@ -1026,7 +1031,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.16\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.17\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
