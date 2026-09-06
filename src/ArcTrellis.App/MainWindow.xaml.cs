@@ -227,7 +227,8 @@ public partial class MainWindow : Window
         }
         foreach (var column in TimelineGrid.ColumnDefinitions)
             column.Width = new GridLength(column.Width.Value * _timelineZoom);
-        for (int i = 0; i < heights.Length; i++) TimelineGrid.RowDefinitions[i].MinHeight = heights[i] * _timelineZoom;
+        for (int i = 0; i < heights.Length; i++) TimelineGrid.RowDefinitions[i].MinHeight = heights[i] * (i == 0 ? 1 : _timelineZoom);
+        TimelineGrid.RowDefinitions[0].Height = new GridLength(heights[0]);
     }
 
     private void AddTimelineResizeHandles(Book book, List<Chapter> chapters, List<Plotline> plotlines)
@@ -289,9 +290,13 @@ public partial class MainWindow : Window
         };
         handle.DragDelta += (_, e) =>
         {
-            size = Math.Clamp(size + (column ? e.HorizontalChange : e.VerticalChange), (column ? 130 : 40) * _timelineZoom, 4000 * _timelineZoom);
+            size = Math.Clamp(size + (column ? e.HorizontalChange : e.VerticalChange), (column ? 130 : 40) * (column || index > 0 ? _timelineZoom : 1), 4000 * (column || index > 0 ? _timelineZoom : 1));
             if (column) TimelineGrid.ColumnDefinitions[index].Width = new GridLength(size);
-            else TimelineGrid.RowDefinitions[index].MinHeight = size;
+            else
+            {
+                TimelineGrid.RowDefinitions[index].MinHeight = size;
+                if (index == 0) TimelineGrid.RowDefinitions[index].Height = new GridLength(size);
+            }
             e.Handled = true;
         };
         handle.DragCompleted += (_, e) =>
@@ -299,11 +304,15 @@ public partial class MainWindow : Window
             if (e.Canceled)
             {
                 if (column) TimelineGrid.ColumnDefinitions[index].Width = new GridLength(original);
-                else TimelineGrid.RowDefinitions[index].MinHeight = original;
+                else
+                {
+                    TimelineGrid.RowDefinitions[index].MinHeight = original;
+                    if (index == 0) TimelineGrid.RowDefinitions[index].Height = new GridLength(original);
+                }
             }
             else
             {
-                save(size / _timelineZoom);
+                save(size / (column || index > 0 ? _timelineZoom : 1));
                 Vm.Project.ModifiedUtc = DateTime.UtcNow;
                 Vm.MarkDirty();
             }
@@ -733,12 +742,23 @@ public partial class MainWindow : Window
             var failures = new List<string>();
             VerifySceneReordering(failures);
             var brightnessProbe = new ColorPickerWindow(Color.FromRgb(200, 100, 50));
+            if (brightnessProbe.SelectedColor != "#C86432" || Math.Abs(brightnessProbe.Brightness - 200d / 255 * 100) > 0.01) failures.Add("Picker did not recover brightness from saved color");
             brightnessProbe.Brightness = 0;
             if (brightnessProbe.SelectedColor != "#000000") failures.Add("Zero brightness is not black");
             brightnessProbe.Brightness = 100;
-            if (brightnessProbe.SelectedColor != "#C86432") failures.Add("Full brightness did not restore the RGB color");
+            if (brightnessProbe.SelectedColor != "#FF8040") failures.Add("Full brightness did not restore the RGB color");
             brightnessProbe.Brightness = 50;
-            if (brightnessProbe.SelectedColor != "#643219" || brightnessProbe.BaseColor != Color.FromRgb(200, 100, 50)) failures.Add("Brightness changed RGB sliders or incorrect half-brightness output");
+            if (brightnessProbe.SelectedColor != "#804020" || brightnessProbe.BaseColor != Color.FromRgb(255, 128, 64)) failures.Add("Brightness changed RGB sliders or incorrect half-brightness output");
+            var reopenedColor = (Color)ColorConverter.ConvertFromString(brightnessProbe.SelectedColor);
+            var reopenedPicker = new ColorPickerWindow(reopenedColor);
+            if (reopenedPicker.SelectedColor != brightnessProbe.SelectedColor || Math.Abs(reopenedPicker.Brightness - 128d / 255 * 100) > 0.01) failures.Add("Brightness reset or color changed on reopening picker");
+            reopenedPicker.Close();
+            foreach (Color edge in new[] { Colors.Black, Colors.White, Color.FromRgb(1, 2, 3) })
+            {
+                var edgePicker = new ColorPickerWindow(edge);
+                if (edgePicker.SelectedColor != $"#{edge.R:X2}{edge.G:X2}{edge.B:X2}") failures.Add("Brightness normalization changed saved edge color");
+                edgePicker.Close();
+            }
             brightnessProbe.Close();
             foreach (string language in new[] { "en-US", "ru-RU" })
             {
@@ -1004,12 +1024,14 @@ public partial class MainWindow : Window
             sceneMenu.IsOpen = false;
 
             double baseColumnWidth = TimelineGrid.ColumnDefinitions[0].ActualWidth;
+            double baseHeaderHeight = TimelineGrid.RowDefinitions[0].ActualHeight;
             double baseRowHeight = TimelineGrid.RowDefinitions[1].MinHeight;
             var baseText = FindVisualChildren<TextBlock>(TimelineGrid).First();
             double baseFontSize = baseText.FontSize;
             SetTimelineZoom(1.5); UpdateLayout();
             if (Math.Abs(TimelineGrid.ColumnDefinitions[0].ActualWidth / baseColumnWidth - 1.5) > 0.02 || Math.Abs(TimelineGrid.RowDefinitions[1].MinHeight / baseRowHeight - 1.5) > 0.02) failures.Add("Zoom did not resize table cells");
             if (FindVisualChildren<TextBlock>(TimelineGrid).First().FontSize != baseFontSize || !TimelineGrid.LayoutTransform.Value.IsIdentity) failures.Add("Zoom scaled table text");
+            if (Math.Abs(TimelineGrid.RowDefinitions[0].ActualHeight - baseHeaderHeight) > 0.01) failures.Add("Zoom changed table header height");
             SetTimelineZoom(1); UpdateLayout();
             var widthGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineColumnResize") && Grid.GetColumn(t) == 1);
             var heightGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineRowResize") && Grid.GetRow(t) == 1);
@@ -1178,7 +1200,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.21\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.22\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

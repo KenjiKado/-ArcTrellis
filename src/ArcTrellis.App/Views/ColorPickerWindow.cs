@@ -62,7 +62,13 @@ public sealed class ColorPickerWindow : Window
     private void SetColor(Color color)
     {
         _updating = true;
-        _red.Value = color.R; _green.Value = color.G; _blue.Value = color.B;
+        // Stored colors contain the final RGB value. Recover brightness from
+        // its strongest channel and normalize the base color without dimming twice.
+        double peak = Math.Max(color.R, Math.Max(color.G, color.B));
+        _brightness.Value = peak / 255 * 100;
+        _red.Value = peak == 0 ? 255 : Math.Round(color.R * 255 / peak);
+        _green.Value = peak == 0 ? 255 : Math.Round(color.G * 255 / peak);
+        _blue.Value = peak == 0 ? 255 : Math.Round(color.B * 255 / peak);
         _updating = false;
         SyncFromRgb();
     }
