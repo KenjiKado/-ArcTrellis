@@ -91,7 +91,7 @@ public sealed class ColorPickerWindow : Window
             < 4 => (0d, x, c), < 5 => (x, 0d, c), _ => (c, 0d, x)
         };
         _updating = true;
-        _red.Value = Math.Round((r + m) * 255); _green.Value = Math.Round((g + m) * 255); _blue.Value = Math.Round((b + m) * 255);
+        _red.Value = Math.Round(Math.Round((r + m) * 255, 6), MidpointRounding.AwayFromZero); _green.Value = Math.Round(Math.Round((g + m) * 255, 6), MidpointRounding.AwayFromZero); _blue.Value = Math.Round(Math.Round((b + m) * 255, 6), MidpointRounding.AwayFromZero);
         _updating = false;
         UpdatePreview();
     }
