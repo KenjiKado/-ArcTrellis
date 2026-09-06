@@ -7,15 +7,16 @@ namespace ArcTrellis.App.Views;
 public sealed class ColorPickerWindow : Window
 {
     private bool _updating;
-    private double _hue;
-    private double _colorSaturation;
-    private readonly Slider _brightness = new() { Minimum = 0, Maximum = 100, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(0, 2, 0, 6) };
+    private readonly Slider _brightness = new() { Minimum = 0, Maximum = 100, Value = 100, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(0, 2, 0, 6) };
     internal double Brightness { get => _brightness.Value; set => _brightness.Value = value; }
     private readonly Slider _red = Channel();
     private readonly Slider _green = Channel();
     private readonly Slider _blue = Channel();
     private readonly Border _preview = new() { Height = 42, CornerRadius = new CornerRadius(5), Margin = new Thickness(0, 12, 0, 12) };
-    public string SelectedColor => $"#{(byte)_red.Value:X2}{(byte)_green.Value:X2}{(byte)_blue.Value:X2}";
+    internal Color BaseColor => Color.FromRgb((byte)_red.Value, (byte)_green.Value, (byte)_blue.Value);
+    private Color OutputColor => Color.FromRgb(Dim(_red.Value), Dim(_green.Value), Dim(_blue.Value));
+    private byte Dim(double channel) => (byte)Math.Round(channel * Brightness / 100, MidpointRounding.AwayFromZero);
+    public string SelectedColor { get { var c = OutputColor; return $"#{c.R:X2}{c.G:X2}{c.B:X2}"; } }
 
     public ColorPickerWindow(Color initial)
     {
@@ -65,35 +66,7 @@ public sealed class ColorPickerWindow : Window
         _updating = false;
         SyncFromRgb();
     }
-    private void SyncFromRgb()
-    {
-        if (_updating) return;
-        double r = _red.Value / 255, g = _green.Value / 255, b = _blue.Value / 255;
-        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b)), delta = max - min;
-        if (delta > 0)
-        {
-            _hue = max == r ? ((g - b) / delta + 6) % 6 : max == g ? (b - r) / delta + 2 : (r - g) / delta + 4;
-        }
-        if (max > 0) _colorSaturation = delta / max;
-        _updating = true;
-        _brightness.Value = max * 100;
-        _updating = false;
-        UpdatePreview();
-    }
-    private void ApplyBrightness()
-    {
-        if (_updating) return;
-        double value = _brightness.Value / 100;
-        double c = value * _colorSaturation, x = c * (1 - Math.Abs(_hue % 2 - 1)), m = value - c;
-        var (r, g, b) = _hue switch
-        {
-            < 1 => (c, x, 0d), < 2 => (x, c, 0d), < 3 => (0d, c, x),
-            < 4 => (0d, x, c), < 5 => (x, 0d, c), _ => (c, 0d, x)
-        };
-        _updating = true;
-        _red.Value = Math.Round(Math.Round((r + m) * 255, 6), MidpointRounding.AwayFromZero); _green.Value = Math.Round(Math.Round((g + m) * 255, 6), MidpointRounding.AwayFromZero); _blue.Value = Math.Round(Math.Round((b + m) * 255, 6), MidpointRounding.AwayFromZero);
-        _updating = false;
-        UpdatePreview();
-    }
-    private void UpdatePreview() => _preview.Background = new SolidColorBrush(Color.FromRgb((byte)_red.Value, (byte)_green.Value, (byte)_blue.Value));
+    private void SyncFromRgb() { if (!_updating) UpdatePreview(); }
+    private void ApplyBrightness() => UpdatePreview();
+    private void UpdatePreview() => _preview.Background = new SolidColorBrush(OutputColor);
 }

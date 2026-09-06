@@ -210,7 +210,24 @@ public partial class MainWindow : Window
                 border.MouseLeftButtonDown += TimelineCell_MouseLeftButtonDown;
             }
         }
+        ApplyTimelineDimensions();
         AddTimelineResizeHandles(book, chapters, plotlines);
+    }
+
+    private void ApplyTimelineDimensions()
+    {
+        // Measure the unzoomed table to obtain stable row heights. Zoom changes
+        // cell space only; controls, fonts, borders and padding stay unscaled.
+        var heights = TimelineGrid.RowDefinitions.Select(row => row.MinHeight).ToArray();
+        foreach (FrameworkElement cell in TimelineGrid.Children)
+        {
+            int row = Grid.GetRow(cell), column = Grid.GetColumn(cell);
+            cell.Measure(new Size(TimelineGrid.ColumnDefinitions[column].Width.Value, double.PositiveInfinity));
+            heights[row] = Math.Max(heights[row], cell.DesiredSize.Height);
+        }
+        foreach (var column in TimelineGrid.ColumnDefinitions)
+            column.Width = new GridLength(column.Width.Value * _timelineZoom);
+        for (int i = 0; i < heights.Length; i++) TimelineGrid.RowDefinitions[i].MinHeight = heights[i] * _timelineZoom;
     }
 
     private void AddTimelineResizeHandles(Book book, List<Chapter> chapters, List<Plotline> plotlines)
@@ -272,7 +289,7 @@ public partial class MainWindow : Window
         };
         handle.DragDelta += (_, e) =>
         {
-            size = Math.Clamp(size + (column ? e.HorizontalChange : e.VerticalChange), column ? 130 : 40, 4000);
+            size = Math.Clamp(size + (column ? e.HorizontalChange : e.VerticalChange), (column ? 130 : 40) * _timelineZoom, 4000 * _timelineZoom);
             if (column) TimelineGrid.ColumnDefinitions[index].Width = new GridLength(size);
             else TimelineGrid.RowDefinitions[index].MinHeight = size;
             e.Handled = true;
@@ -286,7 +303,7 @@ public partial class MainWindow : Window
             }
             else
             {
-                save(size);
+                save(size / _timelineZoom);
                 Vm.Project.ModifiedUtc = DateTime.UtcNow;
                 Vm.MarkDirty();
             }
@@ -412,7 +429,7 @@ public partial class MainWindow : Window
             !Guid.TryParse(e.Data.GetData("ArcTrellis.Scene")?.ToString(), out Guid id) || id != _draggedSceneId) return;
         var slot = GetTimelineInsertion(border, e.GetPosition(border).Y, id);
         Point start = border.TranslatePoint(new Point(6, slot.Y), (UIElement)Content);
-        _sceneDragAdorner?.ShowInsertion(new Rect(start, new Size(Math.Max(0, (border.ActualWidth - 12) * _timelineZoom), 0)));
+        _sceneDragAdorner?.ShowInsertion(new Rect(start, new Size(Math.Max(0, border.ActualWidth - 12), 0)));
         _sceneDragAdorner?.FollowCursor();
         e.Effects = DragDropEffects.Move;
     }
@@ -648,7 +665,7 @@ public partial class MainWindow : Window
     private void SetTimelineZoom(double zoom)
     {
         _timelineZoom = Math.Clamp(zoom, 0.5, 2.5);
-        TimelineGrid.LayoutTransform = new ScaleTransform(_timelineZoom, _timelineZoom);
+        BuildTimeline();
     }
     private void Timeline_MouseWheel(object sender, MouseWheelEventArgs e)
     {
@@ -719,7 +736,9 @@ public partial class MainWindow : Window
             brightnessProbe.Brightness = 0;
             if (brightnessProbe.SelectedColor != "#000000") failures.Add("Zero brightness is not black");
             brightnessProbe.Brightness = 100;
-            if (brightnessProbe.SelectedColor != "#FF8040") failures.Add("Brightness did not retain hue and saturation");
+            if (brightnessProbe.SelectedColor != "#C86432") failures.Add("Full brightness did not restore the RGB color");
+            brightnessProbe.Brightness = 50;
+            if (brightnessProbe.SelectedColor != "#643219" || brightnessProbe.BaseColor != Color.FromRgb(200, 100, 50)) failures.Add("Brightness changed RGB sliders or incorrect half-brightness output");
             brightnessProbe.Close();
             foreach (string language in new[] { "en-US", "ru-RU" })
             {
@@ -984,10 +1003,13 @@ public partial class MainWindow : Window
             SaveVisualPng(sceneMenu, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scene-context-menu.png"));
             sceneMenu.IsOpen = false;
 
-            var beforeZoom = TimelineGrid.TransformToAncestor(this).TransformBounds(new Rect(TimelineGrid.RenderSize));
+            double baseColumnWidth = TimelineGrid.ColumnDefinitions[0].ActualWidth;
+            double baseRowHeight = TimelineGrid.RowDefinitions[1].MinHeight;
+            var baseText = FindVisualChildren<TextBlock>(TimelineGrid).First();
+            double baseFontSize = baseText.FontSize;
             SetTimelineZoom(1.5); UpdateLayout();
-            var afterZoom = TimelineGrid.TransformToAncestor(this).TransformBounds(new Rect(TimelineGrid.RenderSize));
-            if (Math.Abs(afterZoom.Width / beforeZoom.Width - 1.5) > 0.02 || Math.Abs(afterZoom.Height / beforeZoom.Height - 1.5) > 0.02) failures.Add("Zoom did not scale the whole timeline");
+            if (Math.Abs(TimelineGrid.ColumnDefinitions[0].ActualWidth / baseColumnWidth - 1.5) > 0.02 || Math.Abs(TimelineGrid.RowDefinitions[1].MinHeight / baseRowHeight - 1.5) > 0.02) failures.Add("Zoom did not resize table cells");
+            if (FindVisualChildren<TextBlock>(TimelineGrid).First().FontSize != baseFontSize || !TimelineGrid.LayoutTransform.Value.IsIdentity) failures.Add("Zoom scaled table text");
             SetTimelineZoom(1); UpdateLayout();
             var widthGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineColumnResize") && Grid.GetColumn(t) == 1);
             var heightGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineRowResize") && Grid.GetRow(t) == 1);
@@ -1156,7 +1178,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.20\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.21\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
