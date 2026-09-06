@@ -174,7 +174,14 @@ public static class Loc
     }
 }
 
-public sealed record SceneStatusOption(string Code, string Label);
+public sealed class SceneStatusOption : ArcTrellis.Core.Models.ObservableObject
+{
+    private string _label;
+    public SceneStatusOption(string code, string label) { Code = code; _label = label; }
+    public string Code { get; }
+    public string Label { get => _label; private set => Set(ref _label, value); }
+    public void RefreshLocalization() => Label = Loc.T(Code);
+}
 
 public sealed class StatusTextConverter : IValueConverter
 {
