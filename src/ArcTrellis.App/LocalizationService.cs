@@ -26,6 +26,7 @@ public static class Loc
         ["Series overview"] = "Обзор серии", ["Title"] = "Название", ["Author"] = "Автор", ["Genre"] = "Жанр", ["Premise / series description"] = "Замысел / описание серии",
         ["Books in this series"] = "Книги серии", ["Add book"] = "Добавить книгу", ["Delete book"] = "Удалить книгу", ["Writing progress"] = "Прогресс написания",
         ["Choose color"] = "Выбрать цвет", ["Red"] = "Красный", ["Green"] = "Зелёный", ["Blue"] = "Синий",
+        ["Edit plotline"] = "Редактировать сюжетную линию", ["Plotline updated"] = "Сюжетная линия обновлена", ["Color"] = "Цвет",
         ["Edit book"] = "Редактировать книгу", ["Subtitle"] = "Подзаголовок", ["Book goal"] = "Цель книги", ["Book updated"] = "Книга обновлена",
         ["Current words"] = "Написано слов", ["Series goal"] = "Цель серии", ["At a glance"] = "Сводка", ["Local-first"] = "Только локально",
         ["Your project stays in the file you choose. ArcTrellis creates rotating local backups and an autosave recovery copy. No account or network connection is used."] = "Проект хранится в выбранном вами файле. ArcTrellis создаёт локальные резервные копии и файл автовосстановления. Учётная запись и подключение к сети не используются.",
@@ -174,14 +175,7 @@ public static class Loc
     }
 }
 
-public sealed class SceneStatusOption : ArcTrellis.Core.Models.ObservableObject
-{
-    private string _label;
-    public SceneStatusOption(string code, string label) { Code = code; _label = label; }
-    public string Code { get; }
-    public string Label { get => _label; private set => Set(ref _label, value); }
-    public void RefreshLocalization() => Label = Loc.T(Code);
-}
+public sealed record SceneStatusOption(string Code, string Label);
 
 public sealed class StatusTextConverter : IValueConverter
 {

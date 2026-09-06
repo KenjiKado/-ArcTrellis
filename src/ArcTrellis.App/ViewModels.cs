@@ -64,8 +64,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public IEnumerable<Scene> BookScenes => SelectedBook is null ? [] : Project.Scenes.Where(s => s.BookId == SelectedBook.Id).OrderBy(s => s.Order);
     public IEnumerable<Scene> ChapterScenes => SelectedChapter is null ? [] : Project.Scenes.Where(s => s.ChapterId == SelectedChapter.Id).OrderBy(s => s.Order);
     public ObservableCollection<SearchResult> SearchResults { get; } = [];
-    public IReadOnlyList<SceneStatusOption> SceneStatuses { get; } = [new("Planned", Loc.T("Planned")), new("Drafted", Loc.T("Drafted")), new("Revised", Loc.T("Revised")), new("Final", Loc.T("Final")), new("Cut", Loc.T("Cut"))];
-    public void RefreshLocalization() { foreach (var option in SceneStatuses) option.RefreshLocalization(); Raise(nameof(BookPlotlines)); Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Status = Loc.T("Ready"); }
+    public IReadOnlyList<SceneStatusOption> SceneStatuses => [new("Planned", Loc.T("Planned")), new("Drafted", Loc.T("Drafted")), new("Revised", Loc.T("Revised")), new("Final", Loc.T("Final")), new("Cut", Loc.T("Cut"))];
+    public void RefreshLocalization() { Raise(nameof(SceneStatuses)); Raise(nameof(BookPlotlines)); Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Status = Loc.T("Ready"); }
 
     public void ReplaceProject(StoryProject project, string? path = null)
     {
@@ -83,6 +83,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
         book.Chapters.Add(new Chapter { Title = Loc.F("Chapter {0}", 1), Section = Loc.T("Act I") });
         var plotline = new Plotline { BookId = book.Id, Name = Loc.T("Main Plot"), Order = 0, Color = "#5B7CFA" };
         Project.Books.Add(book); Project.Plotlines.Add(plotline); SelectedBook = book; Dirty("Book added");
+    }
+
+    public void EditPlotline(Plotline plotline, string title, string description, string color)
+    {
+        if (!Project.Plotlines.Contains(plotline)) return;
+        if (plotline.Name == title && plotline.Description == description && plotline.Color == color) return;
+        Snapshot();
+        plotline.Name = title;
+        plotline.Description = description;
+        plotline.Color = color;
+        Dirty("Plotline updated");
     }
 
     public void EditBook(Book book, string title, string subtitle)
