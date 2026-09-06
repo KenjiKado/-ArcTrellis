@@ -203,11 +203,7 @@ public partial class MainWindow : Window
 
     private Border CreateSceneCard(Scene scene, Plotline plot)
     {
-        var panel = new StackPanel();
-        panel.Children.Add(new TextBlock { Text = scene.Title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
-        if (!string.IsNullOrWhiteSpace(scene.Summary)) panel.Children.Add(new TextBlock { Text = scene.Summary, TextWrapping = TextWrapping.Wrap, MaxHeight = 54, Foreground = FindBrush("MutedBrush"), Margin = new Thickness(0, 4, 0, 0) });
-        panel.Children.Add(new TextBlock { Text = Loc.T(scene.Status), FontSize = 11, Foreground = BrushFrom(plot.Color), Margin = new Thickness(0, 5, 0, 0) });
-        var card = new Border { Tag = scene, Child = panel, Background = new SolidColorBrush(Color.FromArgb(24, BrushColor(plot.Color).R, BrushColor(plot.Color).G, BrushColor(plot.Color).B)), BorderBrush = BrushFrom(plot.Color), BorderThickness = new Thickness(3, 0, 0, 0), CornerRadius = new CornerRadius(5), Margin = new Thickness(2, 3, 2, 3), Padding = new Thickness(9), Cursor = Cursors.Hand };
+        var card = SceneCardVisual.Create(scene, BrushColor(plot.Color));
         card.PreviewMouseMove += SceneCard_MouseMove;
         card.GiveFeedback += (_, _) => _sceneDragAdorner?.FollowCursor();
         card.MouseLeftButtonDown += SceneCard_MouseLeftButtonDown;

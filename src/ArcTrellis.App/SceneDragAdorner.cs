@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Documents;
+using System.Windows.Controls;
+using ArcTrellis.Core.Models;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -24,17 +26,20 @@ internal sealed class SceneDragAdorner : Adorner
 
     internal static BitmapSource CaptureCard(FrameworkElement card)
     {
-        // Render at a new origin: rendering the arranged card directly includes its
-        // position in the stack, which clips cards below the first out of the bitmap.
+        // A detached copy has no stack offset or ancestor clipping. Reuse the live
+        // card factory so every scene keeps its title, summary, status and color.
+        if (card is not Border { Tag: Scene scene, BorderBrush: SolidColorBrush accent })
+            throw new ArgumentException("Expected a timeline scene card.", nameof(card));
         var bounds = new Rect(card.RenderSize);
-        var brush = new VisualBrush(card)
-        {
-            ViewboxUnits = BrushMappingMode.Absolute, Viewbox = bounds,
-            ViewportUnits = BrushMappingMode.Absolute, Viewport = bounds,
-            Stretch = Stretch.Fill
-        };
-        var visual = new DrawingVisual();
-        using (var drawing = visual.RenderOpen()) drawing.DrawRectangle(brush, null, bounds);
+        var visual = SceneCardVisual.Create(scene, accent.Color);
+        visual.Margin = new Thickness(0);
+        TextElement.SetFontFamily(visual, TextElement.GetFontFamily(card));
+        TextElement.SetFontSize(visual, TextElement.GetFontSize(card));
+        TextElement.SetFontWeight(visual, TextElement.GetFontWeight(card));
+        TextElement.SetForeground(visual, TextElement.GetForeground(card));
+        visual.Measure(bounds.Size);
+        visual.Arrange(bounds);
+        visual.UpdateLayout();
         var dpi = VisualTreeHelper.GetDpi(card);
         var bitmap = new RenderTargetBitmap(
             Math.Max(1, (int)Math.Ceiling(bounds.Width * dpi.DpiScaleX)),
