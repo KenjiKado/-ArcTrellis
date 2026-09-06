@@ -8,8 +8,9 @@ public sealed class ColorPickerWindow : Window
 {
     private bool _updating;
     private double _hue;
-    private readonly Slider _saturation = new() { Minimum = 0, Maximum = 100, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(0, 2, 0, 6) };
-    internal double Saturation { get => _saturation.Value; set => _saturation.Value = value; }
+    private double _colorSaturation;
+    private readonly Slider _brightness = new() { Minimum = 0, Maximum = 100, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(0, 2, 0, 6) };
+    internal double Brightness { get => _brightness.Value; set => _brightness.Value = value; }
     private readonly Slider _red = Channel();
     private readonly Slider _green = Channel();
     private readonly Slider _blue = Channel();
@@ -40,10 +41,10 @@ public sealed class ColorPickerWindow : Window
             panel.Children.Add(slider);
             slider.ValueChanged += (_, _) => SyncFromRgb();
         }
-        panel.Children.Add(new TextBlock { Text = Loc.T("Saturation"), Margin = new Thickness(0, 5, 0, 3) });
-        System.Windows.Automation.AutomationProperties.SetName(_saturation, Loc.T("Saturation"));
-        panel.Children.Add(_saturation);
-        _saturation.ValueChanged += (_, _) => ApplySaturation();
+        panel.Children.Add(new TextBlock { Text = Loc.T("Brightness"), Margin = new Thickness(0, 5, 0, 3) });
+        System.Windows.Automation.AutomationProperties.SetName(_brightness, Loc.T("Brightness"));
+        panel.Children.Add(_brightness);
+        _brightness.ValueChanged += (_, _) => ApplyBrightness();
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
         var save = new Button { Content = Loc.T("Save"), IsDefault = true };
         save.Click += (_, _) => DialogResult = true;
@@ -73,16 +74,17 @@ public sealed class ColorPickerWindow : Window
         {
             _hue = max == r ? ((g - b) / delta + 6) % 6 : max == g ? (b - r) / delta + 2 : (r - g) / delta + 4;
         }
+        if (max > 0) _colorSaturation = delta / max;
         _updating = true;
-        _saturation.Value = max == 0 ? 0 : 100 * delta / max;
+        _brightness.Value = max * 100;
         _updating = false;
         UpdatePreview();
     }
-    private void ApplySaturation()
+    private void ApplyBrightness()
     {
         if (_updating) return;
-        double value = Math.Max(_red.Value, Math.Max(_green.Value, _blue.Value)) / 255;
-        double c = value * _saturation.Value / 100, x = c * (1 - Math.Abs(_hue % 2 - 1)), m = value - c;
+        double value = _brightness.Value / 100;
+        double c = value * _colorSaturation, x = c * (1 - Math.Abs(_hue % 2 - 1)), m = value - c;
         var (r, g, b) = _hue switch
         {
             < 1 => (c, x, 0d), < 2 => (x, c, 0d), < 3 => (0d, c, x),

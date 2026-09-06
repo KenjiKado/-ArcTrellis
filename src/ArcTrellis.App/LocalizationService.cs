@@ -25,7 +25,7 @@ public static class Loc
         ["Places"] = "Места", ["Notes"] = "Заметки", ["Relationships"] = "Связи", ["Search"] = "Поиск", ["Series View"] = "Серия",
         ["Series overview"] = "Обзор серии", ["Title"] = "Название", ["Author"] = "Автор", ["Genre"] = "Жанр", ["Premise / series description"] = "Замысел / описание серии",
         ["Books in this series"] = "Книги серии", ["Add book"] = "Добавить книгу", ["Delete book"] = "Удалить книгу", ["Writing progress"] = "Прогресс написания",
-        ["Saturation"] = "Насыщенность", ["Yes"] = "Да", ["No"] = "Нет",
+        ["Brightness"] = "Яркость", ["Yes"] = "Да", ["No"] = "Нет",
         ["Choose color"] = "Выбрать цвет", ["Red"] = "Красный", ["Green"] = "Зелёный", ["Blue"] = "Синий",
         ["Edit scene"] = "Редактировать сцену", ["Duplicate scene"] = "Дублировать сцену", ["Delete scene"] = "Удалить сцену", ["Scene duplicated"] = "Сцена продублирована", ["{0} (duplicate)"] = "{0} (копия)",
         ["Edit plotline"] = "Редактировать сюжетную линию", ["Plotline updated"] = "Сюжетная линия обновлена", ["Color"] = "Цвет",

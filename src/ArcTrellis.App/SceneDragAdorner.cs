@@ -19,8 +19,8 @@ internal sealed class SceneDragAdorner : Adorner
     public SceneDragAdorner(UIElement surface, FrameworkElement card, Point grabOffset) : base(surface)
     {
         IsHitTestVisible = false;
-        _size = card.RenderSize;
-        _grabOffset = grabOffset;
+        _size = card.TransformToAncestor(surface).TransformBounds(new Rect(card.RenderSize)).Size;
+        _grabOffset = new Point(grabOffset.X * _size.Width / card.RenderSize.Width, grabOffset.Y * _size.Height / card.RenderSize.Height);
         _image = CaptureCard(card);
     }
 

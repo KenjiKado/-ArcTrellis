@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private bool _loaded;
     private bool _closingAfterSave;
     private double _timelineCardWidth = 220;
+    private double _timelineZoom = 1;
     private bool _isDark;
     private SceneDragAdorner? _sceneDragAdorner;
     private Guid? _draggedSceneId;
@@ -411,7 +412,7 @@ public partial class MainWindow : Window
             !Guid.TryParse(e.Data.GetData("ArcTrellis.Scene")?.ToString(), out Guid id) || id != _draggedSceneId) return;
         var slot = GetTimelineInsertion(border, e.GetPosition(border).Y, id);
         Point start = border.TranslatePoint(new Point(6, slot.Y), (UIElement)Content);
-        _sceneDragAdorner?.ShowInsertion(new Rect(start, new Size(Math.Max(0, border.ActualWidth - 12), 0)));
+        _sceneDragAdorner?.ShowInsertion(new Rect(start, new Size(Math.Max(0, (border.ActualWidth - 12) * _timelineZoom), 0)));
         _sceneDragAdorner?.FollowCursor();
         e.Effects = DragDropEffects.Move;
     }
@@ -419,8 +420,6 @@ public partial class MainWindow : Window
     private void TimelineCell_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not Border { Tag: ValueTuple<Guid, Guid> target }) return;
-        if (Vm.BookPlotlines.FirstOrDefault(p => p.Id == target.Item2) is { } plotline)
-            SelectTimelinePlotline(plotline);
         if (e.ClickCount != 2) return;
         Vm.SelectedChapter = Vm.SelectedBook?.Chapters.FirstOrDefault(c => c.Id == target.Item1);
         Vm.AddScene(target.Item1, target.Item2); BuildTimeline();
@@ -429,7 +428,6 @@ public partial class MainWindow : Window
     private void PlotlineLabel_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not Border { Tag: Plotline plotline }) return;
-        SelectTimelinePlotline(plotline);
         e.Handled = true;
         if (e.ClickCount == 2) EditTimelinePlotline(plotline);
     }
@@ -443,20 +441,7 @@ public partial class MainWindow : Window
         RefreshAll();
     }
 
-    private static void AnchorTimelineContextMenu(FrameworkElement target)
-    {
-        target.ContextMenuOpening += (_, e) =>
-        {
-            if (target.ContextMenu is not { } menu) return;
-            var point = e.CursorLeft < 0 ? new Point(0, target.ActualHeight) : Mouse.GetPosition(target);
-            menu.PlacementTarget = target;
-            menu.Placement = PlacementMode.Custom;
-            menu.HorizontalOffset = point.X;
-            menu.VerticalOffset = point.Y;
-            menu.CustomPopupPlacementCallback = (_, _, offset) =>
-                new[] { new CustomPopupPlacement(offset, PopupPrimaryAxis.Horizontal) };
-        };
-    }
+    private static void AnchorTimelineContextMenu(FrameworkElement target) => TimelineMenuPosition.Attach(target);
 
     private static ContextMenu TimelineContextMenu()
     {
@@ -658,8 +643,19 @@ public partial class MainWindow : Window
     private void Search_Click(object sender, RoutedEventArgs e) => Vm.RunSearch();
     private void Undo_Click(object sender, RoutedEventArgs e) { Vm.Undo(); RefreshAll(); }
     private void Redo_Click(object sender, RoutedEventArgs e) { Vm.Redo(); RefreshAll(); }
-    private void ZoomIn_Click(object sender, RoutedEventArgs e) { _timelineCardWidth = Math.Min(380, _timelineCardWidth + 30); BuildTimeline(); }
-    private void ZoomOut_Click(object sender, RoutedEventArgs e) { _timelineCardWidth = Math.Max(130, _timelineCardWidth - 30); BuildTimeline(); }
+    private void ZoomIn_Click(object sender, RoutedEventArgs e) => SetTimelineZoom(_timelineZoom + 0.1);
+    private void ZoomOut_Click(object sender, RoutedEventArgs e) => SetTimelineZoom(_timelineZoom - 0.1);
+    private void SetTimelineZoom(double zoom)
+    {
+        _timelineZoom = Math.Clamp(zoom, 0.5, 2.5);
+        TimelineGrid.LayoutTransform = new ScaleTransform(_timelineZoom, _timelineZoom);
+    }
+    private void Timeline_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+        SetTimelineZoom(_timelineZoom + e.Delta / 120.0 * 0.1);
+        e.Handled = true;
+    }
 
     private void SearchResult_DoubleClick(object sender, MouseButtonEventArgs e)
     {
@@ -719,12 +715,12 @@ public partial class MainWindow : Window
         {
             var failures = new List<string>();
             VerifySceneReordering(failures);
-            var saturationProbe = new ColorPickerWindow(Color.FromRgb(200, 100, 50));
-            saturationProbe.Saturation = 0;
-            if (saturationProbe.SelectedColor != "#C8C8C8") failures.Add("Zero saturation is not gray");
-            saturationProbe.Saturation = 100;
-            if (saturationProbe.SelectedColor != "#C84300") failures.Add("Saturation did not retain hue and brightness");
-            saturationProbe.Close();
+            var brightnessProbe = new ColorPickerWindow(Color.FromRgb(200, 100, 50));
+            brightnessProbe.Brightness = 0;
+            if (brightnessProbe.SelectedColor != "#000000") failures.Add("Zero brightness is not black");
+            brightnessProbe.Brightness = 100;
+            if (brightnessProbe.SelectedColor != "#FF8040") failures.Add("Brightness did not retain hue and saturation");
+            brightnessProbe.Close();
             foreach (string language in new[] { "en-US", "ru-RU" })
             {
                 Loc.SetLanguage(language);
@@ -979,13 +975,20 @@ public partial class MainWindow : Window
             var menuCard = FindVisualChildren<Border>(TimelineGrid).First(b => b.Tag is Scene);
             var sceneMenu = menuCard.ContextMenu!;
             if (sceneMenu.Items.Count != 3) failures.Add("Scene context menu actions missing");
-            sceneMenu.PlacementTarget = menuCard;
-            sceneMenu.IsOpen = true;
+            var menuPoint = menuCard.PointToScreen(new Point(20, 20));
+            TimelineMenuPosition.Open(menuCard, menuPoint);
             UpdateLayout(); sceneMenu.UpdateLayout();
+            var menuOrigin = sceneMenu.PointToScreen(new Point());
+            if ((menuOrigin - menuPoint).Length > 3) failures.Add("Context menu left edge did not match click position");
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scene-menu-host.png"));
             SaveVisualPng(sceneMenu, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scene-context-menu.png"));
             sceneMenu.IsOpen = false;
 
+            var beforeZoom = TimelineGrid.TransformToAncestor(this).TransformBounds(new Rect(TimelineGrid.RenderSize));
+            SetTimelineZoom(1.5); UpdateLayout();
+            var afterZoom = TimelineGrid.TransformToAncestor(this).TransformBounds(new Rect(TimelineGrid.RenderSize));
+            if (Math.Abs(afterZoom.Width / beforeZoom.Width - 1.5) > 0.02 || Math.Abs(afterZoom.Height / beforeZoom.Height - 1.5) > 0.02) failures.Add("Zoom did not scale the whole timeline");
+            SetTimelineZoom(1); UpdateLayout();
             var widthGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineColumnResize") && Grid.GetColumn(t) == 1);
             var heightGrip = TimelineGrid.Children.OfType<Thumb>().First(t => Equals(t.Tag, "TimelineRowResize") && Grid.GetRow(t) == 1);
             double oldWidth = TimelineGrid.ColumnDefinitions[1].ActualWidth;
@@ -1153,7 +1156,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.19\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.20\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
