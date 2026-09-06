@@ -96,7 +96,7 @@
                 <Border Style="{StaticResource Card}">
                   <StackPanel>
                     <TextBlock Text="Books in this series" FontSize="18" FontWeight="SemiBold"/>
-                    <ListBox ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" Margin="0,8,0,0" Height="180">
+                    <ListBox MouseDoubleClick="DashboardBook_MouseDoubleClick" ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" Margin="0,8,0,0" Height="180">
                       <ListBox.ItemTemplate><DataTemplate><Grid Margin="3"><Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Order, StringFormat='#{0}'}" Foreground="{DynamicResource MutedBrush}"/><StackPanel Grid.Column="1"><TextBlock Text="{Binding Title}" FontWeight="SemiBold"/><TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource MutedBrush}"/></StackPanel></Grid></DataTemplate></ListBox.ItemTemplate>
                     </ListBox>
                     <StackPanel Orientation="Horizontal"><Button Content="Add book" Click="AddBook_Click"/><Button Content="Edit book" Click="EditBook_Click"/><Button Content="Delete book" Click="DeleteBook_Click"/></StackPanel>

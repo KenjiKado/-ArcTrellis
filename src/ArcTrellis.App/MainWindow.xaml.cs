@@ -629,6 +629,15 @@ public partial class MainWindow : Window
         catch (Exception ex) { MessageBox.Show(ex.Message, Loc.T("Export failed"), MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
+    private void DashboardBook_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not ListBox list || e.OriginalSource is not DependencyObject source) return;
+        if (ItemsControl.ContainerFromElement(list, source) is not ListBoxItem { Content: Book book }) return;
+        e.Handled = true;
+        Vm.SelectedBook = book;
+        EditBook_Click(sender, e);
+    }
+
     private void EditBook_Click(object sender, RoutedEventArgs e)
     {
         if (Vm.SelectedBook is not { } book) return;
@@ -741,6 +750,39 @@ public partial class MainWindow : Window
         {
             var failures = new List<string>();
             VerifySceneReordering(failures);
+            var originalHistoryProject = Vm.Project;
+            Vm.ReplaceProject(new TemplateService().CreateBlank());
+            Vm.AddBook("History test book");
+            var activeHistoryBookId = Vm.SelectedBook!.Id;
+            Vm.AddScene(); Vm.Undo(); UpdateLayout();
+            if (Vm.SelectedBook?.Id != activeHistoryBookId) failures.Add("UI undo switched away from second book");
+            Vm.Redo(); UpdateLayout();
+            if (Vm.SelectedBook?.Id != activeHistoryBookId) failures.Add("UI redo switched away from second book");
+            Vm.ReplaceProject(originalHistoryProject);
+
+            var historyVm = new MainViewModel(new TemplateService().CreateBlank());
+            historyVm.AddBook("Second book");
+            var historyBookId = historyVm.SelectedBook!.Id;
+            historyVm.AddScene();
+            var historySceneId = historyVm.SelectedScene!.Id;
+            var historyChapterId = historyVm.SelectedChapter!.Id;
+            historyVm.AddPlotline();
+            historyVm.Undo();
+            if (historyVm.SelectedBook?.Id != historyBookId || historyVm.SelectedScene?.Id != historySceneId || historyVm.SelectedChapter?.Id != historyChapterId) failures.Add("Undo lost the active second-book context");
+            historyVm.Redo();
+            if (historyVm.SelectedBook?.Id != historyBookId || historyVm.SelectedScene?.Id != historySceneId || !historyVm.Project.Books.Contains(historyVm.SelectedBook)) failures.Add("Redo lost the active second-book context");
+            foreach (string promptLanguage in new[] { "en-US", "ru-RU" })
+            {
+                Loc.SetLanguage(promptLanguage);
+                var closingPrompt = new SaveChangesWindow { Owner = this };
+                closingPrompt.Show(); closingPrompt.UpdateLayout();
+                var labels = FindVisualChildren<Button>(closingPrompt).Select(b => b.Content?.ToString()).ToList();
+                if (!labels.SequenceEqual(new[] { Loc.T("Yes"), Loc.T("No"), Loc.T("Cancel") })) failures.Add("Closing prompt buttons did not use app language");
+                if (closingPrompt.Result != MessageBoxResult.Cancel) failures.Add("Closing prompt default must cancel");
+                SaveVisualPng(closingPrompt, Path.Combine(Path.GetDirectoryName(reportPath)!, $"ArcTrellis-close-{promptLanguage}.png"));
+                closingPrompt.Close();
+            }
+
             var brightnessProbe = new ColorPickerWindow(Color.FromRgb(200, 100, 50));
             if (brightnessProbe.SelectedColor != "#C86432" || Math.Abs(brightnessProbe.Brightness - 200d / 255 * 100) > 0.01) failures.Add("Picker did not recover brightness from saved color");
             brightnessProbe.Brightness = 0;
@@ -1200,7 +1242,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.22\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.23\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -1216,7 +1258,9 @@ public partial class MainWindow : Window
     private async void Window_Closing(object? sender, CancelEventArgs e)
     {
         if (_closingAfterSave || !Vm.IsDirty) return;
-        var result = MessageBox.Show(Loc.T("Save changes before closing?"), "ArcTrellis", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        var prompt = new SaveChangesWindow { Owner = this };
+        prompt.ShowDialog();
+        var result = prompt.Result;
         if (result == MessageBoxResult.Cancel) { e.Cancel = true; return; }
         if (result == MessageBoxResult.No) return;
         e.Cancel = true;

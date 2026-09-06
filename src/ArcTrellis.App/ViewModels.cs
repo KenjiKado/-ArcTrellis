@@ -24,6 +24,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _searchText = "";
     private string? _filePath;
     private bool _isDirty;
+    private bool _restoringHistory;
     private string _status = Loc.T("Ready");
 
     public MainViewModel(StoryProject project)
@@ -40,7 +41,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _selectedBook;
         set
         {
-            if (!Set(ref _selectedBook, value)) return;
+            if (_restoringHistory || !Set(ref _selectedBook, value)) return;
             SelectedChapter = value?.Chapters.OrderBy(x => x.Order).FirstOrDefault();
             Raise(nameof(BookPlotlines));
             SelectedPlotline = value is null ? null : Project.Plotlines.Where(plotline => plotline.BookId == value.Id).OrderBy(plotline => plotline.Order).FirstOrDefault();
@@ -48,13 +49,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Raise(nameof(BookScenes));
         }
     }
-    public Chapter? SelectedChapter { get => _selectedChapter; set { if (Set(ref _selectedChapter, value)) Raise(nameof(ChapterScenes)); } }
-    public Plotline? SelectedPlotline { get => _selectedPlotline; set => Set(ref _selectedPlotline, value); }
-    public Scene? SelectedScene { get => _selectedScene; set => Set(ref _selectedScene, value); }
-    public StoryEntity? SelectedCharacter { get => _selectedCharacter; set => Set(ref _selectedCharacter, value); }
-    public StoryEntity? SelectedPlace { get => _selectedPlace; set => Set(ref _selectedPlace, value); }
-    public StoryEntity? SelectedNote { get => _selectedNote; set => Set(ref _selectedNote, value); }
-    public Relationship? SelectedRelationship { get => _selectedRelationship; set => Set(ref _selectedRelationship, value); }
+    public Chapter? SelectedChapter { get => _selectedChapter; set { if (!_restoringHistory && Set(ref _selectedChapter, value)) Raise(nameof(ChapterScenes)); } }
+    public Plotline? SelectedPlotline { get => _selectedPlotline; set { if (!_restoringHistory) Set(ref _selectedPlotline, value); } }
+    public Scene? SelectedScene { get => _selectedScene; set { if (!_restoringHistory) Set(ref _selectedScene, value); } }
+    public StoryEntity? SelectedCharacter { get => _selectedCharacter; set { if (!_restoringHistory) Set(ref _selectedCharacter, value); } }
+    public StoryEntity? SelectedPlace { get => _selectedPlace; set { if (!_restoringHistory) Set(ref _selectedPlace, value); } }
+    public StoryEntity? SelectedNote { get => _selectedNote; set { if (!_restoringHistory) Set(ref _selectedNote, value); } }
+    public Relationship? SelectedRelationship { get => _selectedRelationship; set { if (!_restoringHistory) Set(ref _selectedRelationship, value); } }
     public string SearchText { get => _searchText; set => Set(ref _searchText, value); }
     public string? FilePath { get => _filePath; set { if (Set(ref _filePath, value)) Raise(nameof(WindowTitle)); } }
     public bool IsDirty { get => _isDirty; set { if (Set(ref _isDirty, value)) Raise(nameof(WindowTitle)); } }
@@ -255,12 +256,35 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void Undo()
     {
         if (_undo.Count == 0) return;
-        _redo.Push(_projects.Serialize(Project)); Project = _projects.Deserialize(_undo.Pop()); SelectDefaults(); Dirty("Undid last structural change");
+        _redo.Push(_projects.Serialize(Project)); RestoreHistory(_undo.Pop()); Dirty("Undid last structural change");
     }
     public void Redo()
     {
         if (_redo.Count == 0) return;
-        _undo.Push(_projects.Serialize(Project)); Project = _projects.Deserialize(_redo.Pop()); SelectDefaults(); Dirty("Redid change");
+        _undo.Push(_projects.Serialize(Project)); RestoreHistory(_redo.Pop()); Dirty("Redid change");
+    }
+
+    private void RestoreHistory(string json)
+    {
+        var bookId = _selectedBook?.Id; var chapterId = _selectedChapter?.Id;
+        var plotlineId = _selectedPlotline?.Id; var sceneId = _selectedScene?.Id;
+        var characterId = _selectedCharacter?.Id; var placeId = _selectedPlace?.Id;
+        var noteId = _selectedNote?.Id; var relationshipId = _selectedRelationship?.Id;
+        int bookIndex = _selectedBook is null ? 0 : Project.Books.IndexOf(_selectedBook);
+        // Rebind selections to the restored objects before notifying the UI.
+        _project = _projects.Deserialize(json);
+        _selectedBook = Project.Books.FirstOrDefault(b => b.Id == bookId)
+            ?? Project.Books.ElementAtOrDefault(Math.Clamp(bookIndex, 0, Math.Max(0, Project.Books.Count - 1)));
+        _selectedChapter = _selectedBook?.Chapters.FirstOrDefault(c => c.Id == chapterId) ?? _selectedBook?.Chapters.OrderBy(c => c.Order).FirstOrDefault();
+        _selectedPlotline = BookPlotlines.FirstOrDefault(p => p.Id == plotlineId) ?? BookPlotlines.FirstOrDefault();
+        _selectedScene = BookScenes.FirstOrDefault(s => s.Id == sceneId) ?? BookScenes.FirstOrDefault();
+        _selectedCharacter = Project.Characters.FirstOrDefault(c => c.Id == characterId) ?? Project.Characters.FirstOrDefault();
+        _selectedPlace = Project.Places.FirstOrDefault(p => p.Id == placeId) ?? Project.Places.FirstOrDefault();
+        _selectedNote = Project.Notes.FirstOrDefault(n => n.Id == noteId) ?? Project.Notes.FirstOrDefault();
+        _selectedRelationship = Project.Relationships.FirstOrDefault(r => r.Id == relationshipId);
+        _restoringHistory = true;
+        try { RaiseAll(); Raise(nameof(SelectedRelationship)); }
+        finally { _restoringHistory = false; }
     }
 
     public void MarkDirty() { IsDirty = true; }
