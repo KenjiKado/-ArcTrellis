@@ -6,6 +6,10 @@ namespace ArcTrellis.App.Views;
 
 public sealed class ColorPickerWindow : Window
 {
+    private bool _updating;
+    private double _hue;
+    private readonly Slider _saturation = new() { Minimum = 0, Maximum = 100, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(0, 2, 0, 6) };
+    internal double Saturation { get => _saturation.Value; set => _saturation.Value = value; }
     private readonly Slider _red = Channel();
     private readonly Slider _green = Channel();
     private readonly Slider _blue = Channel();
@@ -34,8 +38,12 @@ public sealed class ColorPickerWindow : Window
             panel.Children.Add(new TextBlock { Text = Loc.T(label), Margin = new Thickness(0, 5, 0, 3) });
             System.Windows.Automation.AutomationProperties.SetName(slider, Loc.T(label));
             panel.Children.Add(slider);
-            slider.ValueChanged += (_, _) => UpdatePreview();
+            slider.ValueChanged += (_, _) => SyncFromRgb();
         }
+        panel.Children.Add(new TextBlock { Text = Loc.T("Saturation"), Margin = new Thickness(0, 5, 0, 3) });
+        System.Windows.Automation.AutomationProperties.SetName(_saturation, Loc.T("Saturation"));
+        panel.Children.Add(_saturation);
+        _saturation.ValueChanged += (_, _) => ApplySaturation();
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
         var save = new Button { Content = Loc.T("Save"), IsDefault = true };
         save.Click += (_, _) => DialogResult = true;
@@ -49,6 +57,41 @@ public sealed class ColorPickerWindow : Window
     }
 
     private static Slider Channel() => new() { Minimum = 0, Maximum = 255, TickFrequency = 1, IsSnapToTickEnabled = true, Margin = new Thickness(0, 2, 0, 6) };
-    private void SetColor(Color color) { _red.Value = color.R; _green.Value = color.G; _blue.Value = color.B; UpdatePreview(); }
+    private void SetColor(Color color)
+    {
+        _updating = true;
+        _red.Value = color.R; _green.Value = color.G; _blue.Value = color.B;
+        _updating = false;
+        SyncFromRgb();
+    }
+    private void SyncFromRgb()
+    {
+        if (_updating) return;
+        double r = _red.Value / 255, g = _green.Value / 255, b = _blue.Value / 255;
+        double max = Math.Max(r, Math.Max(g, b)), min = Math.Min(r, Math.Min(g, b)), delta = max - min;
+        if (delta > 0)
+        {
+            _hue = max == r ? ((g - b) / delta + 6) % 6 : max == g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+        }
+        _updating = true;
+        _saturation.Value = max == 0 ? 0 : 100 * delta / max;
+        _updating = false;
+        UpdatePreview();
+    }
+    private void ApplySaturation()
+    {
+        if (_updating) return;
+        double value = Math.Max(_red.Value, Math.Max(_green.Value, _blue.Value)) / 255;
+        double c = value * _saturation.Value / 100, x = c * (1 - Math.Abs(_hue % 2 - 1)), m = value - c;
+        var (r, g, b) = _hue switch
+        {
+            < 1 => (c, x, 0d), < 2 => (x, c, 0d), < 3 => (0d, c, x),
+            < 4 => (0d, x, c), < 5 => (x, 0d, c), _ => (c, 0d, x)
+        };
+        _updating = true;
+        _red.Value = Math.Round((r + m) * 255); _green.Value = Math.Round((g + m) * 255); _blue.Value = Math.Round((b + m) * 255);
+        _updating = false;
+        UpdatePreview();
+    }
     private void UpdatePreview() => _preview.Background = new SolidColorBrush(Color.FromRgb((byte)_red.Value, (byte)_green.Value, (byte)_blue.Value));
 }

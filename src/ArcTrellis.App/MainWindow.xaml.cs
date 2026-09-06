@@ -194,6 +194,7 @@ public partial class MainWindow : Window
             label.MouseLeftButtonDown += PlotlineLabel_MouseLeftButtonDown;
             var plotCell = AddTimelineCell(label, r + 1, 0, false);
             plotCell.ContextMenu = CreatePlotlineMenu(plot);
+            AnchorTimelineContextMenu(plotCell);
             for (int c = 0; c < chapters.Count; c++)
             {
                 var stack = new StackPanel { MinHeight = 105 };
@@ -304,6 +305,7 @@ public partial class MainWindow : Window
     {
         var card = SceneCardVisual.Create(scene, BrushColor(plot.Color));
         card.ContextMenu = CreateSceneMenu(scene);
+        AnchorTimelineContextMenu(card);
         card.PreviewMouseMove += SceneCard_MouseMove;
         card.GiveFeedback += (_, _) => _sceneDragAdorner?.FollowCursor();
         card.MouseLeftButtonDown += SceneCard_MouseLeftButtonDown;
@@ -439,6 +441,21 @@ public partial class MainWindow : Window
         if (editor.ShowDialog() != true) return;
         Vm.EditPlotline(plotline, editor.PlotlineTitle, editor.PlotlineDescription, editor.PlotlineColor);
         RefreshAll();
+    }
+
+    private static void AnchorTimelineContextMenu(FrameworkElement target)
+    {
+        target.ContextMenuOpening += (_, e) =>
+        {
+            if (target.ContextMenu is not { } menu) return;
+            var point = e.CursorLeft < 0 ? new Point(0, target.ActualHeight) : Mouse.GetPosition(target);
+            menu.PlacementTarget = target;
+            menu.Placement = PlacementMode.Custom;
+            menu.HorizontalOffset = point.X;
+            menu.VerticalOffset = point.Y;
+            menu.CustomPopupPlacementCallback = (_, _, offset) =>
+                new[] { new CustomPopupPlacement(offset, PopupPrimaryAxis.Horizontal) };
+        };
     }
 
     private static ContextMenu TimelineContextMenu()
@@ -702,6 +719,24 @@ public partial class MainWindow : Window
         {
             var failures = new List<string>();
             VerifySceneReordering(failures);
+            var saturationProbe = new ColorPickerWindow(Color.FromRgb(200, 100, 50));
+            saturationProbe.Saturation = 0;
+            if (saturationProbe.SelectedColor != "#C8C8C8") failures.Add("Zero saturation is not gray");
+            saturationProbe.Saturation = 100;
+            if (saturationProbe.SelectedColor != "#C84300") failures.Add("Saturation did not retain hue and brightness");
+            saturationProbe.Close();
+            foreach (string language in new[] { "en-US", "ru-RU" })
+            {
+                Loc.SetLanguage(language);
+                var confirmation = new DeleteConfirmationWindow("scene") { Owner = this };
+                confirmation.Show(); confirmation.UpdateLayout();
+                var buttons = FindVisualChildren<Button>(confirmation).Select(b => b.Content?.ToString()).ToList();
+                if (!buttons.Contains(Loc.T("Yes")) || !buttons.Contains(Loc.T("No"))) failures.Add("Delete confirmation buttons did not use app language");
+                if (language == "ru-RU" && Loc.F("Delete this {0}?", Loc.T("scene")) != "Удалить сцену?") failures.Add("Russian delete prompt has incorrect punctuation");
+                SaveVisualPng(confirmation, Path.Combine(Path.GetDirectoryName(reportPath)!, $"ArcTrellis-delete-{language}.png"));
+                confirmation.Close();
+            }
+
             var duplicateVm = new MainViewModel(new TemplateService().CreateBlank());
             duplicateVm.AddScene();
             var sourceScene = duplicateVm.SelectedScene!;
@@ -1118,7 +1153,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.18\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.19\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -1147,7 +1182,7 @@ public partial class MainWindow : Window
         var result = MessageBox.Show(Loc.T("This project has unsaved changes. Continue and discard them?"), "ArcTrellis", MessageBoxButton.YesNo, MessageBoxImage.Warning);
         return result == MessageBoxResult.Yes;
     }
-    private static bool ConfirmDelete(string item) => MessageBox.Show(Loc.F("Delete this {0}?", Loc.T(item)), "ArcTrellis", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+    private bool ConfirmDelete(string item) => new DeleteConfirmationWindow(item) { Owner = this }.ShowDialog() == true;
     private StoryProject CreateBlankProject()
     {
         var project = _templates.CreateBlank();
