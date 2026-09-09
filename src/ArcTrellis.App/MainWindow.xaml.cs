@@ -80,7 +80,16 @@ public partial class MainWindow : Window
             ShowNewProjectDialog(firstRun: true);
     }
 
-    private void Vm_ProjectReplaced(object? sender, EventArgs e) => Dispatcher.BeginInvoke(new Action(RefreshAll));
+    private void Vm_ProjectReplaced(object? sender, EventArgs e) => Dispatcher.BeginInvoke(new Action(() =>
+    {
+        RefreshAll();
+        // Reapply selection after WPF replaces the book instances in ItemsSource.
+        foreach (var selector in FindVisualChildren<Selector>(this))
+        {
+            var binding = selector.GetBindingExpression(Selector.SelectedItemProperty);
+            if (binding?.ParentBinding.Path?.Path == nameof(MainViewModel.SelectedBook)) binding.UpdateTarget();
+        }
+    }), DispatcherPriority.Loaded);
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.OriginalSource, WorkspaceTabs)) return;
@@ -754,10 +763,14 @@ public partial class MainWindow : Window
             Vm.ReplaceProject(new TemplateService().CreateBlank());
             Vm.AddBook("History test book");
             var activeHistoryBookId = Vm.SelectedBook!.Id;
-            Vm.AddScene(); Vm.Undo(); UpdateLayout();
+            Vm.AddScene(); Vm.Undo();
+            Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
             if (Vm.SelectedBook?.Id != activeHistoryBookId) failures.Add("UI undo switched away from second book");
-            Vm.Redo(); UpdateLayout();
+            if (!ReferenceEquals(TimelineBookCombo.SelectedItem, Vm.SelectedBook) || TimelineBookCombo.Text != Vm.SelectedBook?.Title) failures.Add("Book dropdown blank or incorrect after undo");
+            Vm.Redo();
+            Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
             if (Vm.SelectedBook?.Id != activeHistoryBookId) failures.Add("UI redo switched away from second book");
+            if (!ReferenceEquals(TimelineBookCombo.SelectedItem, Vm.SelectedBook) || TimelineBookCombo.Text != Vm.SelectedBook?.Title) failures.Add("Book dropdown blank or incorrect after redo");
             Vm.ReplaceProject(originalHistoryProject);
 
             var historyVm = new MainViewModel(new TemplateService().CreateBlank());
@@ -1242,7 +1255,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.23\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.24\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
