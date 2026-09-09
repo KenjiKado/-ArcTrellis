@@ -310,7 +310,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _selectedCharacter = Project.Characters.FirstOrDefault();
         _selectedPlace = Project.Places.FirstOrDefault();
         _selectedNote = Project.Notes.FirstOrDefault();
-        RaiseAll();
+        _restoringHistory = true;
+        try { RaiseAll(); }
+        finally { _restoringHistory = false; }
     }
     private static void Renumber<T>(IEnumerable<T> items) where T : ObservableObject
     {
