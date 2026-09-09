@@ -96,7 +96,7 @@
                 <Border Style="{StaticResource Card}">
                   <StackPanel>
                     <TextBlock Text="Books in this series" FontSize="18" FontWeight="SemiBold"/>
-                    <ListBox MouseDoubleClick="DashboardBook_MouseDoubleClick" ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" Margin="0,8,0,0" Height="180">
+                    <ListBox MouseDoubleClick="DashboardBook_MouseDoubleClick" ItemsSource="{Binding Project.Books}" SelectedValuePath="Id" SelectedValue="{Binding SelectedBookId}" Margin="0,8,0,0" Height="180">
                       <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}"><Setter Property="Cursor" Value="Hand"/></Style></ListBox.ItemContainerStyle>
                       <ListBox.ItemTemplate><DataTemplate><Grid Margin="3"><Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Order, StringFormat='#{0}'}" Foreground="{DynamicResource MutedBrush}"/><StackPanel Grid.Column="1"><TextBlock Text="{Binding Title}" FontWeight="SemiBold"/><TextBlock Text="{Binding Subtitle}" Foreground="{DynamicResource MutedBrush}"/></StackPanel></Grid></DataTemplate></ListBox.ItemTemplate>
                     </ListBox>
@@ -116,7 +116,7 @@
         <TabItem Header="Timeline">
           <DockPanel>
             <Border DockPanel.Dock="Top" Background="{DynamicResource PanelBrush}" Padding="8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-              <WrapPanel><TextBlock Text="Book:" VerticalAlignment="Center"/><ComboBox x:Name="TimelineBookCombo" ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" DisplayMemberPath="Title" Width="190" Margin="8,0"/><Button Content="＋ Plotline" Click="AddPlotline_Click"/><Button Content="＋ Chapter" Click="AddChapter_Click"/><Button Content="Zoom −" Click="ZoomOut_Click"/><Button Content="Zoom +" Click="ZoomIn_Click"/></WrapPanel>
+              <WrapPanel><TextBlock Text="Book:" VerticalAlignment="Center"/><ComboBox x:Name="TimelineBookCombo" ItemsSource="{Binding Project.Books}" SelectedValuePath="Id" SelectedValue="{Binding SelectedBookId}" DisplayMemberPath="Title" Width="190" Margin="8,0"/><Button Content="＋ Plotline" Click="AddPlotline_Click"/><Button Content="＋ Chapter" Click="AddChapter_Click"/><Button Content="Zoom −" Click="ZoomOut_Click"/><Button Content="Zoom +" Click="ZoomIn_Click"/></WrapPanel>
             </Border>
             <ScrollViewer PreviewMouseWheel="Timeline_MouseWheel" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="{DynamicResource PageBrush}"><Grid x:Name="TimelineGrid" Margin="10" HorizontalAlignment="Left" VerticalAlignment="Top"/></ScrollViewer>
           </DockPanel>
@@ -124,7 +124,7 @@
 
         <TabItem Header="Outline">
           <Grid Margin="8"><Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <Border Style="{StaticResource Card}"><DockPanel><StackPanel DockPanel.Dock="Top"><ComboBox ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" DisplayMemberPath="Title"/><StackPanel Orientation="Horizontal"><Button Content="＋ Chapter" Click="AddChapter_Click"/><Button Content="↑" Click="ChapterUp_Click"/><Button Content="↓" Click="ChapterDown_Click"/><Button Content="Delete" Click="DeleteChapter_Click"/></StackPanel></StackPanel><ListBox ItemsSource="{Binding SelectedBook.Chapters}" SelectedItem="{Binding SelectedChapter}" DisplayMemberPath="Title"/></DockPanel></Border>
+            <Border Style="{StaticResource Card}"><DockPanel><StackPanel DockPanel.Dock="Top"><ComboBox ItemsSource="{Binding Project.Books}" SelectedValuePath="Id" SelectedValue="{Binding SelectedBookId}" DisplayMemberPath="Title"/><StackPanel Orientation="Horizontal"><Button Content="＋ Chapter" Click="AddChapter_Click"/><Button Content="↑" Click="ChapterUp_Click"/><Button Content="↓" Click="ChapterDown_Click"/><Button Content="Delete" Click="DeleteChapter_Click"/></StackPanel></StackPanel><ListBox ItemsSource="{Binding SelectedBook.Chapters}" SelectedItem="{Binding SelectedChapter}" DisplayMemberPath="Title"/></DockPanel></Border>
             <Border Grid.Column="1" Style="{StaticResource Card}"><Grid DataContext="{Binding SelectedChapter}"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><TextBlock Text="Chapter / beat details" FontSize="20" FontWeight="SemiBold"/><TextBox Grid.Row="1" Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}" FontSize="18" Margin="0,12,0,3"/><StackPanel Grid.Row="2" Orientation="Horizontal"><TextBlock Text="Section / act:" VerticalAlignment="Center"/><TextBox Text="{Binding Section, UpdateSourceTrigger=PropertyChanged}" Width="180" Margin="8,3"/><TextBlock Text="Words:" VerticalAlignment="Center"/><TextBox Tag="Numeric" Text="{Binding WordCount, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NonNegativeIntegerConverter}}" Width="100" Margin="8,3"/></StackPanel><TextBox Grid.Row="3" Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Margin="0,10,0,0"/></Grid></Border>
           </Grid>
         </TabItem>
@@ -136,7 +136,7 @@
               <DockPanel>
                 <StackPanel DockPanel.Dock="Top">
                   <TextBlock Text="Scenes" FontSize="18" FontWeight="SemiBold" Margin="2,0,0,8"/>
-                  <ComboBox ItemsSource="{Binding Project.Books}" SelectedItem="{Binding SelectedBook}" DisplayMemberPath="Title"/>
+                  <ComboBox ItemsSource="{Binding Project.Books}" SelectedValuePath="Id" SelectedValue="{Binding SelectedBookId}" DisplayMemberPath="Title"/>
                   <Grid Margin="-3,3,-3,7"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Content="＋ Scene" Click="AddScene_Click"/><Button Grid.Column="1" Content="Delete" Click="DeleteScene_Click"/></Grid>
                 </StackPanel>
                 <ListBox ItemsSource="{Binding BookScenes}" SelectedItem="{Binding SelectedScene}" BorderThickness="0" Background="Transparent">

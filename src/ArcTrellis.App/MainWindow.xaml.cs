@@ -86,8 +86,12 @@ public partial class MainWindow : Window
         // Reapply selection after WPF replaces the book instances in ItemsSource.
         foreach (var selector in FindVisualChildren<Selector>(this))
         {
-            var binding = selector.GetBindingExpression(Selector.SelectedItemProperty);
-            if (binding?.ParentBinding.Path?.Path == nameof(MainViewModel.SelectedBook)) binding.UpdateTarget();
+            var binding = selector.GetBindingExpression(Selector.SelectedValueProperty);
+            if (binding?.ParentBinding.Path?.Path == nameof(MainViewModel.SelectedBookId))
+            {
+                selector.GetBindingExpression(ItemsControl.ItemsSourceProperty)?.UpdateTarget();
+                binding.UpdateTarget();
+            }
         }
     }), DispatcherPriority.Loaded);
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -766,11 +770,11 @@ public partial class MainWindow : Window
             Vm.AddScene(); Vm.Undo();
             Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
             if (Vm.SelectedBook?.Id != activeHistoryBookId) failures.Add("UI undo switched away from second book");
-            if (!ReferenceEquals(TimelineBookCombo.SelectedItem, Vm.SelectedBook) || TimelineBookCombo.Text != Vm.SelectedBook?.Title) failures.Add("Book dropdown blank or incorrect after undo");
+            if (!ReferenceEquals(TimelineBookCombo.SelectedItem, Vm.SelectedBook) || TimelineBookCombo.Text != Vm.SelectedBook?.Title) failures.Add($"Book dropdown incorrect after undo: selected={(TimelineBookCombo.SelectedItem as Book)?.Id}, expected={Vm.SelectedBook?.Id}, text={TimelineBookCombo.Text}, items={TimelineBookCombo.Items.Count}");
             Vm.Redo();
             Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
             if (Vm.SelectedBook?.Id != activeHistoryBookId) failures.Add("UI redo switched away from second book");
-            if (!ReferenceEquals(TimelineBookCombo.SelectedItem, Vm.SelectedBook) || TimelineBookCombo.Text != Vm.SelectedBook?.Title) failures.Add("Book dropdown blank or incorrect after redo");
+            if (!ReferenceEquals(TimelineBookCombo.SelectedItem, Vm.SelectedBook) || TimelineBookCombo.Text != Vm.SelectedBook?.Title) failures.Add($"Book dropdown incorrect after redo: selected={(TimelineBookCombo.SelectedItem as Book)?.Id}, expected={Vm.SelectedBook?.Id}, text={TimelineBookCombo.Text}, items={TimelineBookCombo.Items.Count}");
             Vm.ReplaceProject(originalHistoryProject);
 
             var historyVm = new MainViewModel(new TemplateService().CreateBlank());

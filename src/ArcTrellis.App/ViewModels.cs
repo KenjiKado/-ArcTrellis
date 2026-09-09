@@ -47,6 +47,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
             SelectedPlotline = value is null ? null : Project.Plotlines.Where(plotline => plotline.BookId == value.Id).OrderBy(plotline => plotline.Order).FirstOrDefault();
             SelectedScene = value is null ? null : Project.Scenes.Where(s => s.BookId == value.Id).OrderBy(s => s.Order).FirstOrDefault();
             Raise(nameof(BookScenes));
+            Raise(nameof(SelectedBookId));
+        }
+    }
+    public Guid? SelectedBookId
+    {
+        get => _selectedBook?.Id;
+        set
+        {
+            // Ignore transient deselection while WPF replaces the book collection.
+            if (value is Guid id && Project.Books.FirstOrDefault(book => book.Id == id) is { } book)
+                SelectedBook = book;
         }
     }
     public Chapter? SelectedChapter { get => _selectedChapter; set { if (!_restoringHistory && Set(ref _selectedChapter, value)) Raise(nameof(ChapterScenes)); } }
@@ -323,6 +334,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void Raise([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     private void RaiseAll()
     {
-        foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedChapter), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedCharacter), nameof(SelectedPlace), nameof(SelectedNote), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
+        foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedCharacter), nameof(SelectedPlace), nameof(SelectedNote), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
     }
 }
