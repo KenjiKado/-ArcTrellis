@@ -182,8 +182,11 @@ public partial class MainWindow : Window
         for (int c = 0; c < chapters.Count; c++)
         {
             var header = new StackPanel { Margin = new Thickness(5) };
-            header.Children.Add(new TextBlock { Text = chapters[c].Section, Foreground = FindBrush("MutedBrush"), FontSize = 11 });
-            header.Children.Add(new TextBlock { Text = chapters[c].Title, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap });
+            var sectionText = new TextBlock { Foreground = FindBrush("MutedBrush"), FontSize = 11 };
+            sectionText.SetBinding(TextBlock.TextProperty, new Binding(nameof(Chapter.Section)) { Source = chapters[c] });
+            var chapterText = new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+            chapterText.SetBinding(TextBlock.TextProperty, new Binding(nameof(Chapter.Title)) { Source = chapters[c] });
+            header.Children.Add(sectionText); header.Children.Add(chapterText);
             AddTimelineCell(header, 0, c + 1, false);
         }
         for (int r = 0; r < plotlines.Count; r++)
@@ -674,8 +677,29 @@ public partial class MainWindow : Window
     private void DeleteBook_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("book and all of its scenes")) { Vm.DeleteBook(); RefreshAll(); } }
     private void AddChapter_Click(object sender, RoutedEventArgs e) { Vm.AddChapter(); if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 2; RefreshAll(); }
     private void DeleteChapter_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("chapter and all of its scenes")) { Vm.DeleteChapter(); RefreshAll(); } }
-    private void ChapterUp_Click(object sender, RoutedEventArgs e) { Vm.MoveChapter(-1); RefreshAll(); }
-    private void ChapterDown_Click(object sender, RoutedEventArgs e) { Vm.MoveChapter(1); RefreshAll(); }
+    private void AddChapterScene_Click(object sender, RoutedEventArgs e)
+    {
+        if (Vm.SelectedChapter is not { } chapter) return;
+        Vm.AddScene(chapter.Id);
+        ChapterScenesTable.SelectedItem = Vm.SelectedScene;
+        ChapterScenesTable.ScrollIntoView(Vm.SelectedScene);
+        RefreshAll();
+    }
+    private void DeleteChapterScene_Click(object sender, RoutedEventArgs e)
+    {
+        if (ChapterScenesTable.SelectedItem is not Scene scene || scene.ChapterId != Vm.SelectedChapter?.Id) return;
+        Vm.SelectedScene = scene;
+        DeleteScene_Click(sender, e);
+    }
+    private void ChapterScene_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject source || ItemsControl.ContainerFromElement(ChapterScenesTable, source) is not DataGridRow { Item: Scene scene }) return;
+        e.Handled = true;
+        OpenTimelineScene(scene);
+    }
+
+    private void ChapterUp_Click(object sender, RoutedEventArgs e) { Vm.MoveChapter(-1); ChapterList.Items.Refresh(); RefreshAll(); }
+    private void ChapterDown_Click(object sender, RoutedEventArgs e) { Vm.MoveChapter(1); ChapterList.Items.Refresh(); RefreshAll(); }
     private void AddPlotline_Click(object sender, RoutedEventArgs e) { Vm.AddPlotline(); if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 1; RefreshAll(); }
     private void DeletePlotline_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("plotline (its scenes will move to another plotline)")) { Vm.DeletePlotline(); RefreshAll(); } }
     private void AddScene_Click(object sender, RoutedEventArgs e) { Vm.AddScene(); WorkspaceTabs.SelectedIndex = 3; RefreshAll(); }
@@ -763,6 +787,17 @@ public partial class MainWindow : Window
         {
             var failures = new List<string>();
             VerifySceneReordering(failures);
+            var chaptersVm = new MainViewModel(new TemplateService().CreateBlank());
+            chaptersVm.AddChapter();
+            var movedChapter = chaptersVm.SelectedChapter!;
+            movedChapter.Status = "Drafted"; movedChapter.TagsText = "turning point, climax"; movedChapter.WordCount = 1200; movedChapter.Section = "Act II";
+            chaptersVm.MoveChapter(-1);
+            if (chaptersVm.SelectedBook!.Chapters.OrderBy(c => c.Order).First().Id != movedChapter.Id) failures.Add("Chapter up did not reorder timeline chapters");
+            chaptersVm.MoveChapter(1);
+            if (chaptersVm.SelectedBook.Chapters.OrderBy(c => c.Order).Last().Id != movedChapter.Id) failures.Add("Chapter down did not reorder timeline chapters");
+            var chapterCopy = System.Text.Json.JsonSerializer.Deserialize<Chapter>(System.Text.Json.JsonSerializer.Serialize(movedChapter))!;
+            if (chapterCopy.Status != "Drafted" || chapterCopy.Tags.Count != 2 || chapterCopy.WordCount != 1200 || chapterCopy.Section != "Act II") failures.Add("Chapter fields did not survive save/reopen");
+
             var originalHistoryProject = Vm.Project;
             Vm.ReplaceProject(new TemplateService().CreateBlank());
             Vm.AddBook("History test book");
@@ -934,7 +969,7 @@ public partial class MainWindow : Window
             AddPlotline_Click(new MenuItem(), new RoutedEventArgs());
             if (WorkspaceTabs.SelectedIndex != 1) failures.Add("Add Plotline menu action did not open Timeline");
             AddChapter_Click(new MenuItem(), new RoutedEventArgs());
-            if (WorkspaceTabs.SelectedIndex != 2) failures.Add("Add Chapter menu action did not open Outline");
+            if (WorkspaceTabs.SelectedIndex != 2) failures.Add("Add Chapter menu action did not open Chapters");
             AddScene_Click(new MenuItem(), new RoutedEventArgs());
             if (WorkspaceTabs.SelectedIndex != 3) failures.Add("Add Scene menu action did not open Scenes");
 
@@ -1069,6 +1104,14 @@ public partial class MainWindow : Window
             WorkspaceTabs.SelectedIndex = 1;
             BuildTimeline();
             UpdateLayout();
+            WorkspaceTabs.SelectedIndex = 2; UpdateLayout();
+            AddChapterScene_Click(this, new RoutedEventArgs()); UpdateLayout();
+            if (!ChapterScenesTable.Items.Contains(Vm.SelectedScene) || Vm.SelectedScene?.ChapterId != Vm.SelectedChapter?.Id) failures.Add("Chapter scene table did not show newly added scene");
+            Vm.SelectedChapter!.Section = "Live act edit";
+            BuildTimeline();
+            if (!FindVisualChildren<TextBlock>(TimelineGrid).Any(text => text.Text == "Live act edit")) failures.Add("Chapter act did not update Timeline");
+            SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-chapters.png"));
+            WorkspaceTabs.SelectedIndex = 1; UpdateLayout();
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-timeline.png"));
             var menuCard = FindVisualChildren<Border>(TimelineGrid).First(b => b.Tag is Scene);
             var sceneMenu = menuCard.ContextMenu!;
@@ -1259,7 +1302,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.1.24\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.0\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

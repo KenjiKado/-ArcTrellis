@@ -21,7 +21,7 @@ public static class Loc
         ["View"] = "Вид", ["Light theme"] = "Светлая тема", ["Dark theme"] = "Тёмная тема",
         ["Language"] = "Язык", ["English"] = "English", ["Russian"] = "Русский", ["Help"] = "Справка", ["User Guide"] = "Руководство пользователя", ["About ArcTrellis"] = "О программе ArcTrellis",
         ["＋ Scene"] = "＋ Сцена", ["Save"] = "Сохранить", ["Story planning studio"] = "Студия планирования историй",
-        ["Dashboard"] = "Обзор", ["Timeline"] = "Хронология", ["Outline"] = "План", ["Scenes"] = "Сцены", ["Characters"] = "Персонажи",
+        ["Dashboard"] = "Обзор", ["Timeline"] = "Хронология", ["Outline"] = "План", ["Chapters"] = "Главы", ["Chapter details"] = "Сведения о главе", ["Move chapter up"] = "Переместить главу вверх", ["Move chapter down"] = "Переместить главу вниз", ["Scenes"] = "Сцены", ["Characters"] = "Персонажи",
         ["Places"] = "Места", ["Notes"] = "Заметки", ["Relationships"] = "Связи", ["Search"] = "Поиск", ["Series View"] = "Серия",
         ["Series overview"] = "Обзор серии", ["Title"] = "Название", ["Author"] = "Автор", ["Genre"] = "Жанр", ["Premise / series description"] = "Замысел / описание серии",
         ["Books in this series"] = "Книги серии", ["Add book"] = "Добавить книгу", ["Delete book"] = "Удалить книгу", ["Writing progress"] = "Прогресс написания",

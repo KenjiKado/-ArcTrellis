@@ -64,6 +64,20 @@ public sealed class Chapter : ObservableObject
     private string _summary = "";
     private int _order;
     private string _section = "Act I";
+    private string _status = "Planned";
+    public string Status { get => _status; set => Set(ref _status, value); }
+    public ObservableCollection<string> Tags { get; set; } = [];
+    [JsonIgnore]
+    public string TagsText
+    {
+        get => string.Join(", ", Tags);
+        set
+        {
+            Tags.Clear();
+            foreach (string tag in (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.CurrentCultureIgnoreCase)) Tags.Add(tag);
+            Raise();
+        }
+    }
     private int _wordCount;
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Title { get => _title; set => Set(ref _title, value); }
