@@ -1110,6 +1110,8 @@ public partial class MainWindow : Window
             Vm.SelectedChapter!.Section = "Live act edit";
             BuildTimeline();
             if (!FindVisualChildren<TextBlock>(TimelineGrid).Any(text => text.Text == "Live act edit")) failures.Add("Chapter act did not update Timeline");
+            ChapterScenesTable.UpdateLayout();
+            if (ChapterScenesTable.Columns.Any(column => column.ActualWidth < 100)) failures.Add("Chapter scene table columns are too narrow to read");
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-chapters.png"));
             WorkspaceTabs.SelectedIndex = 1; UpdateLayout();
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-timeline.png"));
