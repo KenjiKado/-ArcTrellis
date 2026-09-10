@@ -40,7 +40,7 @@ public sealed class TextUndoController
         window.AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler((_, e) =>
         {
             if (_applying || e.OriginalSource is not TextBox box || !box.IsKeyboardFocusWithin) return;
-            string key = Key(box);
+            string key = EditorKey(box);
             if (!_keys.TryGetValue(box, out var previousKey) || previousKey != key) { Prepare(box); return; }
             var history = History(box);
             var before = _before.GetValueOrDefault(box) ?? new(history.Current, 0);
@@ -54,7 +54,7 @@ public sealed class TextUndoController
             _before[box] = after;
         }), true);
     }
-    private string Key(TextBox box)
+    private string EditorKey(TextBox box)
     {
         var binding = box.GetBindingExpression(TextBox.TextProperty);
         object source = binding?.ResolvedSource ?? box;
@@ -63,15 +63,15 @@ public sealed class TextUndoController
     }
     private TextEditHistory History(TextBox box)
     {
-        string key = Key(box);
+        string key = EditorKey(box);
         if (!_histories.TryGetValue(key, out var history)) _histories[key] = history = new(box.Text);
         return history;
     }
     public void Prepare(TextBox box)
     {
-        _keys[box] = Key(box);
+        _keys[box] = EditorKey(box);
         var history = History(box);
-        if (history.Current != box.Text) _histories[Key(box)] = new(box.Text);
+        if (history.Current != box.Text) _histories[EditorKey(box)] = new(box.Text);
         _before[box] = new(box.Text, box.SelectionStart, box.SelectionLength);
     }
     public void Clear() { _histories.Clear(); _keys.Clear(); _before.Clear(); _atomic.Clear(); }
