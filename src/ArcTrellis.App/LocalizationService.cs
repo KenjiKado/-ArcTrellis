@@ -21,7 +21,7 @@ public static class Loc
         ["View"] = "Вид", ["Light theme"] = "Светлая тема", ["Dark theme"] = "Тёмная тема",
         ["Language"] = "Язык", ["English"] = "English", ["Russian"] = "Русский", ["Help"] = "Справка", ["User Guide"] = "Руководство пользователя", ["About ArcTrellis"] = "О программе ArcTrellis",
         ["＋ Scene"] = "＋ Сцена", ["Save"] = "Сохранить", ["Story planning studio"] = "Студия планирования историй",
-        ["Dashboard"] = "Обзор", ["Timeline"] = "Хронология", ["Outline"] = "План", ["Chapters"] = "Главы", ["Chapter details"] = "Сведения о главе", ["Move chapter up"] = "Переместить главу вверх", ["Move chapter down"] = "Переместить главу вниз", ["Scenes"] = "Сцены", ["Characters"] = "Персонажи",
+        ["Dashboard"] = "Обзор", ["Timeline"] = "Хронология", ["Outline"] = "План", ["Chapters"] = "Главы", ["Plotline"] = "Сюжетная линия", ["Chapter details"] = "Сведения о главе", ["Move chapter up"] = "Переместить главу вверх", ["Move chapter down"] = "Переместить главу вниз", ["Scenes"] = "Сцены", ["Characters"] = "Персонажи",
         ["Places"] = "Места", ["Notes"] = "Заметки", ["Relationships"] = "Связи", ["Search"] = "Поиск", ["Series View"] = "Серия",
         ["Series overview"] = "Обзор серии", ["Title"] = "Название", ["Author"] = "Автор", ["Genre"] = "Жанр", ["Premise / series description"] = "Замысел / описание серии",
         ["Books in this series"] = "Книги серии", ["Add book"] = "Добавить книгу", ["Delete book"] = "Удалить книгу", ["Writing progress"] = "Прогресс написания",
@@ -198,4 +198,13 @@ public sealed class NonNegativeIntegerConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         => int.TryParse(value?.ToString(), out int number) && number >= 0 ? number : 0;
+}
+
+public sealed class ScenePlotlineConverter : IMultiValueConverter
+{
+    public object? Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        => values.Length >= 2 && values[0] is Guid id && values[1] is IEnumerable<ArcTrellis.Core.Models.Plotline> plots
+            ? plots.FirstOrDefault(plot => plot.Id == id) : null;
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        => targetTypes.Select(_ => Binding.DoNothing).ToArray();
 }

@@ -787,6 +787,15 @@ public partial class MainWindow : Window
         {
             var failures = new List<string>();
             VerifySceneReordering(failures);
+            var groupedVm = new MainViewModel(new TemplateService().CreateBlank());
+            var firstPlotline = groupedVm.SelectedPlotline!;
+            groupedVm.AddPlotline();
+            var secondPlotline = groupedVm.SelectedPlotline!;
+            groupedVm.AddScene(plotlineId: secondPlotline.Id); var laterGroupScene = groupedVm.SelectedScene!;
+            groupedVm.AddScene(plotlineId: firstPlotline.Id); var firstGroupScene = groupedVm.SelectedScene!;
+            groupedVm.AddScene(plotlineId: firstPlotline.Id); var nextGroupScene = groupedVm.SelectedScene!;
+            if (!groupedVm.ChapterScenes.Select(scene => scene.Id).SequenceEqual(new[] { firstGroupScene.Id, nextGroupScene.Id, laterGroupScene.Id })) failures.Add("Chapter scenes do not follow plotline and scene order");
+
             var chaptersVm = new MainViewModel(new TemplateService().CreateBlank());
             chaptersVm.AddChapter();
             var movedChapter = chaptersVm.SelectedChapter!;
@@ -1110,7 +1119,12 @@ public partial class MainWindow : Window
             Vm.SelectedChapter!.Section = "Live act edit";
             BuildTimeline();
             if (!FindVisualChildren<TextBlock>(TimelineGrid).Any(text => text.Text == "Live act edit")) failures.Add("Chapter act did not update Timeline");
+            ChapterScenesTable.SelectedItem = Vm.SelectedScene;
+            ChapterScenesTable.ScrollIntoView(Vm.SelectedScene);
             ChapterScenesTable.UpdateLayout();
+            if (ChapterScenesTable.ItemContainerGenerator.ContainerFromItem(Vm.SelectedScene) is not DataGridRow selectedChapterRow || !selectedChapterRow.IsSelected || selectedChapterRow.ActualHeight < 40 || !Equals(selectedChapterRow.Background, Application.Current.FindResource("SelectedBrush"))) failures.Add("Chapter scene row selection is not prominent");
+            var expectedPlotlineName = Vm.Project.Plotlines.First(plot => plot.Id == Vm.SelectedScene!.PlotlineId).Name;
+            if (!FindVisualChildren<TextBlock>(ChapterScenesTable).Any(text => text.Text == expectedPlotlineName)) failures.Add("Chapter scene table did not display plotline name");
             if (ChapterScenesTable.Columns.Any(column => column.ActualWidth < 100)) failures.Add("Chapter scene table columns are too narrow to read");
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-chapters.png"));
             WorkspaceTabs.SelectedIndex = 1; UpdateLayout();
@@ -1304,7 +1318,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.0\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.1\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
