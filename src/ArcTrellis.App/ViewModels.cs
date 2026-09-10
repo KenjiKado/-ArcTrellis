@@ -60,7 +60,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 SelectedBook = book;
         }
     }
-    public Chapter? SelectedChapter { get => _selectedChapter; set { if (!_restoringHistory && Set(ref _selectedChapter, value)) Raise(nameof(ChapterScenes)); } }
+    public Chapter? SelectedChapter { get => _selectedChapter; set { if (!_restoringHistory && Set(ref _selectedChapter, value)) { Raise(nameof(ChapterScenes)); Raise(nameof(SelectedChapterId)); } } }
+    public Guid? SelectedChapterId
+    {
+        get => _selectedChapter?.Id;
+        set
+        {
+            if (value is Guid id && SelectedBook?.Chapters.FirstOrDefault(candidate => candidate.Id == id) is { } chapter)
+                SelectedChapter = chapter;
+        }
+    }
     public Plotline? SelectedPlotline { get => _selectedPlotline; set { if (!_restoringHistory) Set(ref _selectedPlotline, value); } }
     public Scene? SelectedScene { get => _selectedScene; set { if (!_restoringHistory) Set(ref _selectedScene, value); } }
     public StoryEntity? SelectedCharacter { get => _selectedCharacter; set { if (!_restoringHistory) Set(ref _selectedCharacter, value); } }
@@ -336,6 +345,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void Raise([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     private void RaiseAll()
     {
-        foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedCharacter), nameof(SelectedPlace), nameof(SelectedNote), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
+        foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedChapterId), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedCharacter), nameof(SelectedPlace), nameof(SelectedNote), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
     }
 }

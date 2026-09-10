@@ -87,7 +87,7 @@ public partial class MainWindow : Window
         foreach (var selector in FindVisualChildren<Selector>(this))
         {
             var binding = selector.GetBindingExpression(Selector.SelectedValueProperty);
-            if (binding?.ParentBinding.Path?.Path == nameof(MainViewModel.SelectedBookId))
+            if (binding?.ParentBinding.Path?.Path is nameof(MainViewModel.SelectedBookId) or nameof(MainViewModel.SelectedChapterId))
             {
                 selector.GetBindingExpression(ItemsControl.ItemsSourceProperty)?.UpdateTarget();
                 binding.UpdateTarget();
@@ -713,8 +713,18 @@ public partial class MainWindow : Window
     private void AddRelationship_Click(object sender, RoutedEventArgs e) { Vm.AddRelationship(); RefreshAll(); }
     private void DeleteRelationship_Click(object sender, RoutedEventArgs e) { if (Vm.SelectedRelationship is { } r) { Vm.Project.Relationships.Remove(r); Vm.SelectedRelationship = Vm.Project.Relationships.FirstOrDefault(); Vm.MarkDirty(); } }
     private void Search_Click(object sender, RoutedEventArgs e) => Vm.RunSearch();
-    private void Undo_Click(object sender, RoutedEventArgs e) { Vm.Undo(); RefreshAll(); }
-    private void Redo_Click(object sender, RoutedEventArgs e) { Vm.Redo(); RefreshAll(); }
+    private TextBoxBase? FocusedTextEditor()
+        => Keyboard.FocusedElement as TextBoxBase ?? FocusManager.GetFocusedElement(this) as TextBoxBase;
+    private void Undo_Click(object sender, RoutedEventArgs e)
+    {
+        if (FocusedTextEditor() is { } editor) { if (editor.CanUndo) editor.Undo(); return; }
+        Vm.Undo(); RefreshAll();
+    }
+    private void Redo_Click(object sender, RoutedEventArgs e)
+    {
+        if (FocusedTextEditor() is { } editor) { if (editor.CanRedo) editor.Redo(); return; }
+        Vm.Redo(); RefreshAll();
+    }
     private void ZoomIn_Click(object sender, RoutedEventArgs e) => SetTimelineZoom(_timelineZoom + 0.1);
     private void ZoomOut_Click(object sender, RoutedEventArgs e) => SetTimelineZoom(_timelineZoom - 0.1);
     private void SetTimelineZoom(double zoom)
@@ -810,16 +820,33 @@ public partial class MainWindow : Window
             var originalHistoryProject = Vm.Project;
             Vm.ReplaceProject(new TemplateService().CreateBlank());
             Vm.AddBook("History test book");
+            WorkspaceTabs.SelectedIndex = 2;
+            Vm.AddChapter();
+            var activeHistoryChapterId = Vm.SelectedChapter!.Id;
             var activeHistoryBookId = Vm.SelectedBook!.Id;
             Vm.AddScene(); Vm.Undo();
             Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
             if (Vm.SelectedBook?.Id != activeHistoryBookId) failures.Add("UI undo switched away from second book");
+            if (Vm.SelectedChapter?.Id != activeHistoryChapterId || (ChapterList.SelectedItem as Chapter)?.Id != activeHistoryChapterId) failures.Add("Scene undo lost the selected second chapter");
             if (!ReferenceEquals(TimelineBookCombo.SelectedItem, Vm.SelectedBook) || TimelineBookCombo.Text != Vm.SelectedBook?.Title) failures.Add($"Book dropdown incorrect after undo: selected={(TimelineBookCombo.SelectedItem as Book)?.Id}, expected={Vm.SelectedBook?.Id}, text={TimelineBookCombo.Text}, items={TimelineBookCombo.Items.Count}");
             Vm.Redo();
             Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
             if (Vm.SelectedBook?.Id != activeHistoryBookId) failures.Add("UI redo switched away from second book");
+            if (Vm.SelectedChapter?.Id != activeHistoryChapterId || (ChapterList.SelectedItem as Chapter)?.Id != activeHistoryChapterId) failures.Add("Scene redo lost the selected second chapter");
             if (!ReferenceEquals(TimelineBookCombo.SelectedItem, Vm.SelectedBook) || TimelineBookCombo.Text != Vm.SelectedBook?.Title) failures.Add($"Book dropdown incorrect after redo: selected={(TimelineBookCombo.SelectedItem as Book)?.Id}, expected={Vm.SelectedBook?.Id}, text={TimelineBookCombo.Text}, items={TimelineBookCombo.Items.Count}");
+            UpdateLayout();
+            var chapterTitleInput = FindVisualChildren<TextBox>(this).First(box => box.DataContext is Chapter && box.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path?.Path == nameof(Chapter.Title));
+            chapterTitleInput.Focus(); chapterTitleInput.ClearUndo();
+            string originalChapterTitle = chapterTitleInput.Text;
+            int chapterCountBeforeTyping = Vm.SelectedBook!.Chapters.Count;
+            chapterTitleInput.SelectAll(); chapterTitleInput.SelectedText = "Typing history test";
+            Undo_Click(this, new RoutedEventArgs());
+            if (chapterTitleInput.Text != originalChapterTitle || Vm.SelectedBook!.Chapters.Count != chapterCountBeforeTyping) failures.Add("Text undo changed structural chapter history");
+            Redo_Click(this, new RoutedEventArgs());
+            if (chapterTitleInput.Text != "Typing history test" || Vm.SelectedBook!.Chapters.Count != chapterCountBeforeTyping) failures.Add("Text redo changed structural chapter history");
+            ChapterList.Focus();
             Vm.ReplaceProject(originalHistoryProject);
+            WorkspaceTabs.SelectedIndex = 1;
 
             var historyVm = new MainViewModel(new TemplateService().CreateBlank());
             historyVm.AddBook("Second book");
@@ -1318,7 +1345,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.1\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.2\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

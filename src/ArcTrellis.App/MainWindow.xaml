@@ -134,7 +134,7 @@
                 <ComboBox ItemsSource="{Binding Project.Books}" SelectedValuePath="Id" SelectedValue="{Binding SelectedBookId}" DisplayMemberPath="Title"/>
                 <StackPanel Orientation="Horizontal"><Button Content="＋ Chapter" Click="AddChapter_Click"/><Button Content="↑" ToolTip="Move chapter up" Click="ChapterUp_Click"/><Button Content="↓" ToolTip="Move chapter down" Click="ChapterDown_Click"/><Button Content="Delete" Click="DeleteChapter_Click"/></StackPanel>
               </StackPanel>
-              <ListBox x:Name="ChapterList" ItemsSource="{Binding Source={StaticResource ChapterListView}}" SelectedItem="{Binding SelectedChapter}" DisplayMemberPath="Title"/>
+              <ListBox x:Name="ChapterList" ItemsSource="{Binding Source={StaticResource ChapterListView}}" IsSynchronizedWithCurrentItem="False" SelectedValuePath="Id" SelectedValue="{Binding SelectedChapterId}" DisplayMemberPath="Title"/>
             </DockPanel></Border>
             <Border Grid.Column="1" Style="{StaticResource Card}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
               <StackPanel DataContext="{Binding SelectedChapter}">
