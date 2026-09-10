@@ -836,7 +836,8 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(TimelineBookCombo.SelectedItem, Vm.SelectedBook) || TimelineBookCombo.Text != Vm.SelectedBook?.Title) failures.Add($"Book dropdown incorrect after redo: selected={(TimelineBookCombo.SelectedItem as Book)?.Id}, expected={Vm.SelectedBook?.Id}, text={TimelineBookCombo.Text}, items={TimelineBookCombo.Items.Count}");
             UpdateLayout();
             var chapterTitleInput = FindVisualChildren<TextBox>(this).First(box => box.DataContext is Chapter && box.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path?.Path == nameof(Chapter.Title));
-            chapterTitleInput.Focus(); chapterTitleInput.ClearUndo();
+            chapterTitleInput.Focus(); chapterTitleInput.IsUndoEnabled = false;
+            chapterTitleInput.IsUndoEnabled = true;
             string originalChapterTitle = chapterTitleInput.Text;
             int chapterCountBeforeTyping = Vm.SelectedBook!.Chapters.Count;
             chapterTitleInput.SelectAll(); chapterTitleInput.SelectedText = "Typing history test";
