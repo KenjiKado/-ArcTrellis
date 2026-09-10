@@ -122,6 +122,54 @@ finally
     try { Directory.Delete(temp, true); } catch { }
 }
 
+
+var typing = new TextEditHistory("");
+var clock = DateTime.UtcNow;
+string typed = "";
+foreach (char c in "First second")
+{
+    var before = new TextEditHistory.State(typed, typed.Length);
+    typed += c; typing.Record(before, new(typed, typed.Length), clock);
+    clock = clock.AddMilliseconds(50);
+}
+Check(typing.Undo()?.Text == "First ", "text undo removes the last word, not the entire entry");
+Check(typing.Undo()?.Text == "First", "text undo keeps a separate whitespace unit");
+Check(typing.Redo()?.Text == "First " && typing.Redo()?.Text == "First second", "text redo restores typing groups");
+typing.Record(new(typed, typed.Length), new(typed + "X", typed.Length + 1), clock.AddSeconds(2));
+Check(typing.Undo()?.Text == typed, "typing pauses end an undo group");
+typing.Record(new(typed, 0), new("X" + typed, 1), clock.AddSeconds(3));
+Check(typing.Undo()?.Text == typed, "moving the caret starts a separate group");
+typing.Record(new(typed, 0, typed.Length), new("Pasted replacement", 18), clock.AddSeconds(4), atomic: true);
+Check(typing.Undo() is { Text: "First second", Start: 0, Length: 12 }, "replacement undo restores text and selection");
+Check(typing.Redo()?.Text == "Pasted replacement", "paste redo restores one paste operation");
+var deletion = new TextEditHistory("First second");
+string deleted = "First second";
+for (int i = 0; i < 6; i++)
+{
+    string next = deleted[..^1]; deletion.Record(new(deleted, deleted.Length), new(next, next.Length), clock);
+    deleted = next; clock = clock.AddMilliseconds(50);
+}
+Check(deletion.Undo()?.Text == "First second", "consecutive backspaces undo as a word");
+var scoped = new ScopedHistory();
+string h0 = "{\"Chapters\":[{\"Id\":\"one\",\"Title\":\"One\",\"Status\":\"Planned\"},{\"Id\":\"two\",\"Title\":\"Two\"}]}";
+string h1 = h0.Replace("One", "Edited one"), h2 = h1.Replace("Two", "Edited two");
+scoped.Record("chapters/one", h0, h1); scoped.Record("chapters/two", h1, h2);
+string h3 = scoped.Apply("chapters/one", h2, false)!;
+Check(h3.Contains("Edited two") && !h3.Contains("Edited one"), "chapter one undo preserves chapter two edits");
+Check(scoped.Apply("timeline/one", h3, false) is null, "empty tab history never falls back to another tab");
+string h4 = h3.Replace("Planned", "Drafted"); scoped.Record("scenes/one", h3, h4);
+string h5 = scoped.Apply("chapters/one", h4, true)!;
+Check(h5.Contains("Edited one") && h5.Contains("Drafted") && h5.Contains("Edited two"), "redo survives unrelated changes and preserves unrelated fields");
+Check(scoped.Apply("chapters/one", h5.Replace("Edited one", "Later external edit"), false) is null, "undo never overwrites conflicting changes");
+var membership = new ScopedHistory();
+string emptyMembers = "{\"Scenes\":[]}";
+string firstMember = "{\"Scenes\":[{\"Id\":\"a\",\"Title\":\"A\"}]}";
+string bothMembers = "{\"Scenes\":[{\"Id\":\"a\",\"Title\":\"A\"},{\"Id\":\"b\",\"Title\":\"B\"}]}";
+membership.Record("one", emptyMembers, firstMember);
+string withoutFirst = membership.Apply("one", bothMembers, false)!;
+Check(!withoutFirst.Contains("\"A\"") && withoutFirst.Contains("\"B\""), "undo scene creation preserves another chapter's new scene");
+Check(membership.Apply("one", withoutFirst, true)!.Contains("\"A\""), "redo restores only the removed scene");
+
 if (failures.Count > 0)
 {
     Console.Error.WriteLine($"{failures.Count} smoke test(s) failed.");
@@ -129,3 +177,4 @@ if (failures.Count > 0)
 }
 Console.WriteLine("All ArcTrellis smoke tests passed.");
 return 0;
+

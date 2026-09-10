@@ -51,6 +51,8 @@ public partial class MainWindow : Window
             if (_loaded && args.PropertyName == nameof(MainViewModel.SelectedBook))
                 Dispatcher.BeginInvoke(new Action(() => { RefreshStats(); BuildTimeline(); }));
         };
+        _textUndo = new TextUndoController(this, () => WorkspaceTabs.SelectedIndex);
+        Vm.HistoryReset += (_, _) => _textUndo.Clear();
         _autosaveTimer.Tick += AutosaveTimer_Tick;
         WorkspaceTabs.SelectionChanged += WorkspaceTabs_SelectionChanged;
         AddHandler(TextCompositionManager.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
@@ -58,6 +60,8 @@ public partial class MainWindow : Window
         AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(AnyTextChanged));
         AddHandler(ComboBox.SelectionChangedEvent, new SelectionChangedEventHandler(AnySelectionChanged));
     }
+
+    private readonly TextUndoController _textUndo;
 
     private void Window_Loaded(object sender, RoutedEventArgs e)
     {
@@ -87,7 +91,7 @@ public partial class MainWindow : Window
         foreach (var selector in FindVisualChildren<Selector>(this))
         {
             var binding = selector.GetBindingExpression(Selector.SelectedValueProperty);
-            if (binding?.ParentBinding.Path?.Path is nameof(MainViewModel.SelectedBookId) or nameof(MainViewModel.SelectedChapterId))
+            if (binding?.ParentBinding.Path?.Path is nameof(MainViewModel.SelectedBookId) or nameof(MainViewModel.SelectedChapterId) or nameof(MainViewModel.SelectedSceneId) or nameof(MainViewModel.SelectedCharacterId) or nameof(MainViewModel.SelectedPlaceId) or nameof(MainViewModel.SelectedNoteId) or nameof(MainViewModel.SelectedRelationshipId))
             {
                 selector.GetBindingExpression(ItemsControl.ItemsSourceProperty)?.UpdateTarget();
                 binding.UpdateTarget();
@@ -97,6 +101,7 @@ public partial class MainWindow : Window
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.OriginalSource, WorkspaceTabs)) return;
+        Vm.ActiveTab = WorkspaceTabs.SelectedIndex;
         Dispatcher.BeginInvoke(new Action(ApplyLocalization), DispatcherPriority.Loaded);
     }
     private void AnyTextChanged(object sender, TextChangedEventArgs e)
@@ -140,7 +145,13 @@ public partial class MainWindow : Window
         if (!_loaded) return;
         if (e.OriginalSource is not ComboBox box || !box.IsKeyboardFocusWithin) return;
         if (box.SelectedItem is Book) Dispatcher.BeginInvoke(new Action(BuildTimeline), DispatcherPriority.Background);
-        else if (box.SelectedItem is not StoryEntity) Vm.MarkDirty();
+        else if (e.RemovedItems.Count == 1 && e.AddedItems.Count == 1 && box.GetBindingExpression(Selector.SelectedValueProperty) is { } binding && binding.ResolvedSource is ObservableObject source)
+        {
+            var previous = e.RemovedItems[0].GetType().GetProperty(box.SelectedValuePath)?.GetValue(e.RemovedItems[0]);
+            var next = box.SelectedValue;
+            binding.UpdateSource();
+            Vm.RecordPropertyEdit(source, binding.ResolvedSourcePropertyName, previous, next);
+        }
     }
 
     private void RefreshAll()
@@ -675,7 +686,7 @@ public partial class MainWindow : Window
     }
 
     private void DeleteBook_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("book and all of its scenes")) { Vm.DeleteBook(); RefreshAll(); } }
-    private void AddChapter_Click(object sender, RoutedEventArgs e) { Vm.AddChapter(); if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 2; RefreshAll(); }
+    private void AddChapter_Click(object sender, RoutedEventArgs e) { if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 2; Vm.AddChapter(); RefreshAll(); }
     private void DeleteChapter_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("chapter and all of its scenes")) { Vm.DeleteChapter(); RefreshAll(); } }
     private void AddChapterScene_Click(object sender, RoutedEventArgs e)
     {
@@ -700,9 +711,9 @@ public partial class MainWindow : Window
 
     private void ChapterUp_Click(object sender, RoutedEventArgs e) { Vm.MoveChapter(-1); ChapterList.Items.Refresh(); RefreshAll(); }
     private void ChapterDown_Click(object sender, RoutedEventArgs e) { Vm.MoveChapter(1); ChapterList.Items.Refresh(); RefreshAll(); }
-    private void AddPlotline_Click(object sender, RoutedEventArgs e) { Vm.AddPlotline(); if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 1; RefreshAll(); }
+    private void AddPlotline_Click(object sender, RoutedEventArgs e) { if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 1; Vm.AddPlotline(); RefreshAll(); }
     private void DeletePlotline_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("plotline (its scenes will move to another plotline)")) { Vm.DeletePlotline(); RefreshAll(); } }
-    private void AddScene_Click(object sender, RoutedEventArgs e) { Vm.AddScene(); WorkspaceTabs.SelectedIndex = 3; RefreshAll(); }
+    private void AddScene_Click(object sender, RoutedEventArgs e) { WorkspaceTabs.SelectedIndex = 3; Vm.AddScene(); RefreshAll(); }
     private void DeleteScene_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("scene")) { Vm.DeleteScene(); RefreshAll(); } }
     private void AddCharacter_Click(object sender, RoutedEventArgs e) { Vm.SelectedCharacter = Vm.AddEntity(Vm.Project.Characters, "Character"); RefreshAll(); }
     private void DeleteCharacter_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("character")) { Vm.DeleteEntity(Vm.Project.Characters, Vm.SelectedCharacter); Vm.SelectedCharacter = Vm.Project.Characters.FirstOrDefault(); RefreshAll(); } }
@@ -711,18 +722,18 @@ public partial class MainWindow : Window
     private void AddNote_Click(object sender, RoutedEventArgs e) { Vm.SelectedNote = Vm.AddEntity(Vm.Project.Notes, "Note"); RefreshAll(); }
     private void DeleteNote_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("note")) { Vm.DeleteEntity(Vm.Project.Notes, Vm.SelectedNote); Vm.SelectedNote = Vm.Project.Notes.FirstOrDefault(); RefreshAll(); } }
     private void AddRelationship_Click(object sender, RoutedEventArgs e) { Vm.AddRelationship(); RefreshAll(); }
-    private void DeleteRelationship_Click(object sender, RoutedEventArgs e) { if (Vm.SelectedRelationship is { } r) { Vm.Project.Relationships.Remove(r); Vm.SelectedRelationship = Vm.Project.Relationships.FirstOrDefault(); Vm.MarkDirty(); } }
+    private void DeleteRelationship_Click(object sender, RoutedEventArgs e) { if (Vm.SelectedRelationship is { } r) { Vm.DeleteRelationship(); } }
     private void Search_Click(object sender, RoutedEventArgs e) => Vm.RunSearch();
     private TextBoxBase? FocusedTextEditor()
-        => Keyboard.FocusedElement as TextBoxBase ?? FocusManager.GetFocusedElement(this) as TextBoxBase;
+        => (Keyboard.FocusedElement as TextBoxBase ?? FocusManager.GetFocusedElement(this) as TextBoxBase) is { IsVisible: true } editor ? editor : null;
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
-        if (FocusedTextEditor() is { } editor) { if (editor.CanUndo) editor.Undo(); return; }
+        if (FocusedTextEditor() is TextBox editor) { _textUndo.Apply(editor, false); return; }
         Vm.Undo(); RefreshAll();
     }
     private void Redo_Click(object sender, RoutedEventArgs e)
     {
-        if (FocusedTextEditor() is { } editor) { if (editor.CanRedo) editor.Redo(); return; }
+        if (FocusedTextEditor() is TextBox editor) { _textUndo.Apply(editor, true); return; }
         Vm.Redo(); RefreshAll();
     }
     private void ZoomIn_Click(object sender, RoutedEventArgs e) => SetTimelineZoom(_timelineZoom + 0.1);
@@ -840,14 +851,39 @@ public partial class MainWindow : Window
             chapterTitleInput.IsUndoEnabled = true;
             string originalChapterTitle = chapterTitleInput.Text;
             int chapterCountBeforeTyping = Vm.SelectedBook!.Chapters.Count;
-            chapterTitleInput.SelectAll(); chapterTitleInput.SelectedText = "Typing history test";
+            chapterTitleInput.SelectAll(); _textUndo.Prepare(chapterTitleInput); chapterTitleInput.SelectedText = "Typing history test";
             Undo_Click(this, new RoutedEventArgs());
             if (chapterTitleInput.Text != originalChapterTitle || Vm.SelectedBook!.Chapters.Count != chapterCountBeforeTyping) failures.Add("Text undo changed structural chapter history");
             Redo_Click(this, new RoutedEventArgs());
             if (chapterTitleInput.Text != "Typing history test" || Vm.SelectedBook!.Chapters.Count != chapterCountBeforeTyping) failures.Add("Text redo changed structural chapter history");
+            chapterTitleInput.CaretIndex = chapterTitleInput.Text.Length;
+            foreach (char character in " next word")
+            {
+                _textUndo.Prepare(chapterTitleInput); chapterTitleInput.SelectedText = character.ToString();
+                chapterTitleInput.CaretIndex = chapterTitleInput.Text.Length;
+            }
+            Undo_Click(this, new RoutedEventArgs());
+            if (chapterTitleInput.Text != "Typing history test next " || Vm.SelectedChapter!.Title != chapterTitleInput.Text) failures.Add("Word undo did not preserve earlier typing or update chapter title");
+            Redo_Click(this, new RoutedEventArgs());
+            if (chapterTitleInput.Text != "Typing history test next word") failures.Add("Word redo did not restore the last word");
             ChapterList.Focus();
             Vm.ReplaceProject(originalHistoryProject);
             WorkspaceTabs.SelectedIndex = 1;
+
+            var isolatedVm = new MainViewModel(new TemplateService().CreateBlank()) { ActiveTab = 2 };
+            var firstChapterId = isolatedVm.SelectedChapter!.Id;
+            isolatedVm.AddScene(); var firstScopedSceneId = isolatedVm.SelectedScene!.Id;
+            isolatedVm.AddChapter(); var secondChapterId = isolatedVm.SelectedChapter!.Id;
+            isolatedVm.AddScene(); var secondScopedSceneId = isolatedVm.SelectedScene!.Id;
+            isolatedVm.SelectedChapterId = firstChapterId; isolatedVm.Undo();
+            if (isolatedVm.Project.Scenes.Any(s => s.Id == firstScopedSceneId) || !isolatedVm.Project.Scenes.Any(s => s.Id == secondScopedSceneId)) failures.Add("Chapter undo affected another chapter");
+            isolatedVm.ActiveTab = 1; isolatedVm.Undo();
+            if (!isolatedVm.Project.Scenes.Any(s => s.Id == secondScopedSceneId)) failures.Add("Empty Timeline history used chapter history");
+            isolatedVm.AddPlotline(); var timelinePlotId = isolatedVm.SelectedPlotline!.Id;
+            isolatedVm.ActiveTab = 2; isolatedVm.Redo();
+            if (!isolatedVm.Project.Scenes.Any(s => s.Id == firstScopedSceneId) || !isolatedVm.Project.Plotlines.Any(p => p.Id == timelinePlotId)) failures.Add("Chapter redo was cleared by a Timeline action");
+            isolatedVm.SelectedChapterId = secondChapterId; isolatedVm.Undo();
+            if (isolatedVm.Project.Scenes.Any(s => s.Id == secondScopedSceneId) || !isolatedVm.Project.Scenes.Any(s => s.Id == firstScopedSceneId)) failures.Add("Second chapter undo affected the first chapter");
 
             var historyVm = new MainViewModel(new TemplateService().CreateBlank());
             historyVm.AddBook("Second book");
@@ -1346,7 +1382,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.2\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.3\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -1356,7 +1392,7 @@ public partial class MainWindow : Window
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.O) { Open_Click(sender, e); e.Handled = true; }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.N) { New_Click(sender, e); e.Handled = true; }
         else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Z) { Undo_Click(sender, e); e.Handled = true; }
-        else if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Y) { Redo_Click(sender, e); e.Handled = true; }
+        else if ((Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.Y) || (Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.Z)) { Redo_Click(sender, e); e.Handled = true; }
     }
 
     private async void Window_Closing(object? sender, CancelEventArgs e)
@@ -1393,3 +1429,4 @@ public partial class MainWindow : Window
     private static SolidColorBrush BrushFrom(string color) => new(BrushColor(color));
     private static Color BrushColor(string color) { try { return (Color)ColorConverter.ConvertFromString(color); } catch { return Colors.SlateBlue; } }
 }
+
