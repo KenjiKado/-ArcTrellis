@@ -170,9 +170,9 @@
                   </Style>
                 </DataGrid.CellStyle>
                 <DataGrid.Columns>
-                  <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="2*"/>
-                  <DataGridTextColumn Header="Status" Binding="{Binding Status, Converter={StaticResource StatusTextConverter}}" Width="*"/>
-                  <DataGridTemplateColumn Header="Plotline" Width="2*"><DataGridTemplateColumn.CellTemplate><DataTemplate>
+                  <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="220"/>
+                  <DataGridTextColumn Header="Status" Binding="{Binding Status, Converter={StaticResource StatusTextConverter}}" Width="170"/>
+                  <DataGridTemplateColumn Header="Plotline" Width="240"><DataGridTemplateColumn.CellTemplate><DataTemplate>
                     <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis">
                       <TextBlock.DataContext><MultiBinding Converter="{StaticResource ScenePlotlineConverter}"><Binding Path="Item.PlotlineId" RelativeSource="{RelativeSource AncestorType=DataGridRow}"/><Binding Path="DataContext.Project.Plotlines" RelativeSource="{RelativeSource AncestorType=Window}"/></MultiBinding></TextBlock.DataContext>
                     </TextBlock>
