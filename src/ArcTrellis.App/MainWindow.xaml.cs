@@ -949,7 +949,10 @@ public partial class MainWindow : Window
             duplicate.Tags.Add("independent");
             if (sourceScene.Tags.Contains("independent")) failures.Add("Duplicate scene shares mutable data");
             duplicateVm.Undo();
-            if (duplicateVm.Project.Scenes.Count != 1) failures.Add("Undo failed for duplicate scene");
+            if (duplicateVm.Project.Scenes.Count != 2 || !duplicate.Tags.Contains("independent")) failures.Add("Undo discarded a newer edit to a duplicate");
+            duplicate.Tags.Remove("independent");
+            duplicateVm.Undo();
+            if (duplicateVm.Project.Scenes.Count != 1) failures.Add("Undo failed for duplicate scene after reverting the later edit");
             foreach (Window titleEditor in new Window[] { new EditBookWindow(new Book()), new EditPlotlineWindow(new Plotline()) })
             {
                 var input = (TextBox)titleEditor.FindName("TitleInput");
