@@ -13,6 +13,7 @@ public static class Loc
     private static readonly Dictionary<string, string> Ru = new(StringComparer.Ordinal)
     {
         ["This action conflicts with newer changes in another editor."] = "Это действие затрагивает более новые изменения в другом редакторе.",
+        ["Tags"] = "Теги", ["Remove tag"] = "Удалить тег", ["Tag added"] = "Тег добавлен", ["Tag removed"] = "Тег удалён",
         ["File"] = "Файл", ["New from Template…"] = "Создать из шаблона…", ["Open…"] = "Открыть…",
         ["Save As…"] = "Сохранить как…", ["Save as reusable Template…"] = "Сохранить как шаблон…",
         ["Import Markdown…"] = "Импортировать Markdown…", ["Export"] = "Экспорт", ["Microsoft Word (.docx)…"] = "Microsoft Word (.docx)…",
@@ -209,4 +210,5 @@ public sealed class ScenePlotlineConverter : IMultiValueConverter
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         => targetTypes.Select(_ => Binding.DoNothing).ToArray();
 }
+
 

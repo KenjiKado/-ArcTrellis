@@ -13,7 +13,7 @@
     <local:StatusTextConverter x:Key="StatusTextConverter"/>
     <local:NonNegativeIntegerConverter x:Key="NonNegativeIntegerConverter"/>
     <DataTemplate x:Key="EntityEditorTemplate">
-      <Border Style="{StaticResource Card}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel><TextBlock Text="Story bible entry" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="Name" Margin="0,10,0,0"/><TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontSize="18"/><TextBlock Text="Category"/><TextBox Text="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Tags (comma separated)"/><TextBox Text="{Binding TagsText, UpdateSourceTrigger=LostFocus}"/><TextBlock Text="One-line summary"/><TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Details"/><TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Height="220" VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="True"/><TextBlock Text="Image file path (optional)"/><TextBox Text="{Binding ImagePath, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Custom sheet fields" FontWeight="SemiBold" Margin="0,10,0,0"/><DataGrid ItemsSource="{Binding Fields}" AutoGenerateColumns="False" CanUserAddRows="True" MinHeight="160"><DataGrid.Columns><DataGridTextColumn Header="Field" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="*"/><DataGridTextColumn Header="Value" Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="2*"/></DataGrid.Columns></DataGrid></StackPanel></ScrollViewer></Border>
+      <Border Style="{StaticResource Card}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel><TextBlock Text="Story bible entry" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="Name" Margin="0,10,0,0"/><TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontSize="18"/><TextBlock Text="Category"/><TextBox Text="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Tags"/><local:TagInput Tags="{Binding Tags}" Project="{Binding DataContext.Project, RelativeSource={RelativeSource AncestorType=Window}}"/><TextBlock Text="One-line summary"/><TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Details"/><TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Height="220" VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="True"/><TextBlock Text="Image file path (optional)"/><TextBox Text="{Binding ImagePath, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Custom sheet fields" FontWeight="SemiBold" Margin="0,10,0,0"/><DataGrid ItemsSource="{Binding Fields}" AutoGenerateColumns="False" CanUserAddRows="True" MinHeight="160"><DataGrid.Columns><DataGridTextColumn Header="Field" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="*"/><DataGridTextColumn Header="Value" Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="2*"/></DataGrid.Columns></DataGrid></StackPanel></ScrollViewer></Border>
     </DataTemplate>
   </Window.Resources>
   <DockPanel>
@@ -138,7 +138,7 @@
                   <StackPanel Grid.Column="1" Margin="0,0,8,0"><TextBlock Text="Status"/><ComboBox ItemsSource="{Binding DataContext.SceneStatuses, RelativeSource={RelativeSource AncestorType=Window}}" DisplayMemberPath="Label" SelectedValuePath="Code" SelectedValue="{Binding Status}"/></StackPanel>
                   <StackPanel Grid.Column="2"><TextBlock Text="Word count"/><TextBox Tag="Numeric" Text="{Binding WordCount, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NonNegativeIntegerConverter}}"/></StackPanel>
                 </Grid>
-                <TextBlock Text="Tags (comma separated)" Margin="0,8,0,3"/><TextBox Text="{Binding TagsText, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock Text="Tags" Margin="0,8,0,3"/><local:TagInput Tags="{Binding Tags}" Project="{Binding DataContext.Project, RelativeSource={RelativeSource AncestorType=Window}}"/>
                 <TextBlock Text="Description" Margin="0,8,0,3"/><TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" Height="90" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto"/>
               </StackPanel>
               <TextBlock Text="Scenes" FontSize="18" FontWeight="SemiBold" Margin="0,14,0,4"/>
@@ -203,7 +203,7 @@
                     <StackPanel Grid.Row="1"><TextBlock Text="Setting" Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,0"/><TextBox Text="{Binding Setting, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
                     <StackPanel Grid.Row="1" Grid.Column="2"><TextBlock Text="Word count" Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,0"/><TextBox Tag="Numeric" Text="{Binding WordCount, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource NonNegativeIntegerConverter}}"/></StackPanel>
                   </Grid>
-                  <TextBlock Text="Tags (comma separated)" Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,0"/><TextBox Text="{Binding TagsText, UpdateSourceTrigger=LostFocus}"/>
+                  <TextBlock Text="Tags" Foreground="{DynamicResource MutedBrush}" Margin="0,7,0,0"/><local:TagInput Tags="{Binding Tags}" Project="{Binding DataContext.Project, RelativeSource={RelativeSource AncestorType=Window}}"/>
                   <TextBlock Text="Summary" FontWeight="SemiBold" Margin="0,14,0,2"/><TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="110" VerticalContentAlignment="Top"/>
                   <TextBlock Text="Scene notes / draft" FontWeight="SemiBold" Margin="0,14,0,2"/><TextBox Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="True" Height="220" VerticalContentAlignment="Top"/>
                   <TextBlock Text="Editing notes" FontWeight="SemiBold" Margin="0,14,0,2"/><TextBox Text="{Binding EditingNotes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Height="110" VerticalContentAlignment="Top"/>
@@ -238,5 +238,6 @@
   </DockPanel>
 
 </Window>
+
 
 

@@ -57,6 +57,10 @@ public partial class MainWindow : Window
         WorkspaceTabs.SelectionChanged += WorkspaceTabs_SelectionChanged;
         AddHandler(TextCompositionManager.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
         AddHandler(DataObject.PastingEvent, new DataObjectPastingEventHandler(NumericTextBox_Pasting));
+        AddHandler(TagInput.TagEditRequestedEvent, new EventHandler<TagEditEventArgs>((_, e) =>
+        {
+            if (e.Source is TagInput { Tags: { } tags }) { Vm.EditTag(tags, e.Tag, e.Remove); e.Handled = true; }
+        }));
         AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(AnyTextChanged));
         AddHandler(ComboBox.SelectionChangedEvent, new SelectionChangedEventHandler(AnySelectionChanged));
     }
@@ -107,6 +111,7 @@ public partial class MainWindow : Window
     private void AnyTextChanged(object sender, TextChangedEventArgs e)
     {
         if (!_loaded || e.OriginalSource is not TextBox box || !box.IsKeyboardFocusWithin) return;
+        if (Equals(box.Tag, "TagDraft")) return;
         if (IsNumericInput(box) && NormalizeNumericInput(box)) return;
         Vm.MarkDirty();
         Title = Vm.WindowTitle;
@@ -1183,6 +1188,49 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             WorkspaceTabs.SelectedIndex = 2; UpdateLayout();
+            var tagVm = new MainViewModel(new TemplateService().CreateBlank()) { ActiveTab = 2 };
+            tagVm.AddScene();
+            var tagChapter = tagVm.SelectedChapter!;
+            var tagScene = tagVm.SelectedScene!;
+            tagVm.EditTag(tagChapter.Tags, "Angular", false);
+            tagVm.EditTag(tagScene.Tags, "angular", false);
+            if (tagScene.Tags.Single() != "Angular") failures.Add("Tag spelling was not reused case-insensitively");
+            tagVm.EditTag(tagChapter.Tags, "Angular", true);
+            if (!tagVm.Project.Tags.Contains("Angular") || !TagService.Suggest(tagVm.Project, tagChapter.Tags, "ang").Contains("Angular")) failures.Add("Removing a shared tag removed it from the project");
+            tagVm.EditTag(tagScene.Tags, "Angular", true);
+            if (tagVm.Project.Tags.Contains("Angular") || TagService.Existing(tagVm.Project).Any()) failures.Add("Unused tag was not removed completely");
+            tagVm.Undo();
+            if (!TagService.Existing(tagVm.Project).Contains("Angular")) failures.Add("Undo did not restore tag usage and suggestions");
+            tagVm.Redo();
+            if (TagService.Existing(tagVm.Project).Any()) failures.Add("Redo did not remove the last tag usage");
+
+            var tagSeed = new StoryEntity { Name = "Tag suggestions probe" };
+            tagSeed.Tags.Add("Angular"); tagSeed.Tags.Add("Angle");
+            Vm.Project.Notes.Add(tagSeed);
+            var tagInput = FindVisualChildren<TagInput>(this).First(input => ReferenceEquals(input.Tags, Vm.SelectedChapter!.Tags));
+            tagInput.Input.Focus(); tagInput.Input.Text = "An";
+            if (tagInput.SuggestionsOpen || tagInput.Suggestions.Any()) failures.Add("Tag suggestions opened before three characters");
+            tagInput.Input.Text = "aNg";
+            if (!tagInput.SuggestionsOpen || !tagInput.Suggestions.Contains("Angular") || !tagInput.Suggestions.Contains("Angle")) failures.Add("Tag suggestions did not match a three-letter prefix");
+            tagInput.Input.Text = "angu";
+            if (!tagInput.Suggestions.SequenceEqual(new[] { "Angular" })) failures.Add("Tag suggestions did not narrow with more letters");
+            tagInput.Input.Text = "no-match";
+            if (tagInput.SuggestionsOpen || tagInput.Suggestions.Any()) failures.Add("Tag dropdown showed non-matching tags");
+            tagInput.Input.Text = "Angular";
+            tagInput.Input.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(tagInput.Input), 0, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+            if (!Vm.SelectedChapter!.Tags.Contains("Angular") || tagInput.Input.Text.Length != 0) failures.Add("Enter did not create a tag chip and clear the typing area");
+            Vm.EditTag(Vm.SelectedChapter.Tags, "jQuery", false); Vm.EditTag(Vm.SelectedChapter.Tags, "Polymer", false);
+            UpdateLayout();
+            var chips = FindVisualChildren<Button>(tagInput).Where(button => button.Tag is string).ToList();
+            if (chips.Count != Vm.SelectedChapter.Tags.Count) failures.Add("Tag chips do not have remove buttons");
+            var row = FindVisualChildren<WrapPanel>(tagInput).Single();
+            if (!ReferenceEquals(row.Children[row.Children.Count - 1], tagInput.Input)) failures.Add("Tag typing area is not after all chips");
+            SaveVisualPng(tagInput, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-tag-input.png"));
+            chips.First(button => Equals(button.Tag, "Angular")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if (Vm.SelectedChapter.Tags.Contains("Angular") || !TagService.Existing(Vm.Project).Contains("Angular")) failures.Add("Tag remove button did not preserve shared usage");
+            Vm.Project.Notes.Remove(tagSeed); TagService.Synchronize(Vm.Project);
+            if (TagService.Existing(Vm.Project).Contains("Angular") || Vm.Project.Tags.Contains("Angular")) failures.Add("Removed tag remained after its last other use disappeared");
+            ChapterList.Focus();
             int scenesBeforePopup = Vm.Project.Scenes.Count;
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -1420,7 +1468,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.4\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.5\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -1467,5 +1515,6 @@ public partial class MainWindow : Window
     private static SolidColorBrush BrushFrom(string color) => new(BrushColor(color));
     private static Color BrushColor(string color) { try { return (Color)ColorConverter.ConvertFromString(color); } catch { return Colors.SlateBlue; } }
 }
+
 
 

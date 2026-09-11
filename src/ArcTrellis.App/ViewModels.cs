@@ -131,6 +131,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void ReplaceProject(StoryProject project, string? path = null)
     {
+        TagService.Synchronize(project);
         Project = project;
         FilePath = path;
         _history.Clear(); _pendingSnapshot = _pendingScope = _pinnedScope = _pinnedSelection = null;
@@ -344,6 +345,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _history.Record(HistoryScope, after.ToJsonString(), afterJson); MarkDirty();
     }
 
+    public void EditTag(ObservableCollection<string> tags, string value, bool remove)
+    {
+        if (!TagService.Collections(Project).Contains(tags)) return;
+        string tag = value.Trim(); if (tag.Length == 0) return;
+        var matches = tags.Where(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (remove ? matches.Count == 0 : matches.Count > 0) return;
+        Snapshot();
+        if (remove) foreach (string match in matches) tags.Remove(match);
+        else tags.Add(TagService.Existing(Project).FirstOrDefault(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)) ?? tag);
+        Dirty(remove ? "Tag removed" : "Tag added");
+    }
+
     public void RunSearch()
     {
         SearchResults.Clear();
@@ -387,6 +400,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         int bookIndex = _selectedBook is null ? 0 : Project.Books.IndexOf(_selectedBook);
         // Rebind selections to the restored objects before notifying the UI.
         _project = _projects.Deserialize(json);
+        TagService.Synchronize(Project);
         _selectedBook = Project.Books.FirstOrDefault(b => b.Id == bookId)
             ?? Project.Books.ElementAtOrDefault(Math.Clamp(bookIndex, 0, Math.Max(0, Project.Books.Count - 1)));
         _selectedChapter = _selectedBook?.Chapters.FirstOrDefault(c => c.Id == chapterId) ?? _selectedBook?.Chapters.OrderBy(c => c.Order).FirstOrDefault();
@@ -413,6 +427,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             _pendingSnapshot = _pendingScope = null;
             _pinnedScope = scope; _pinnedSelection = RawHistoryScope;
         }
+        TagService.Synchronize(Project);
         IsDirty = true; Status = Loc.T(message); Project.ModifiedUtc = DateTime.UtcNow;
         ProjectReplaced?.Invoke(this, EventArgs.Empty);
     }
@@ -450,5 +465,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
         foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedChapterId), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedSceneId), nameof(SelectedCharacter), nameof(SelectedCharacterId), nameof(SelectedPlace), nameof(SelectedPlaceId), nameof(SelectedNote), nameof(SelectedNoteId), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
     }
 }
+
 
 
