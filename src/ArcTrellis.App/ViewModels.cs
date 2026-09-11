@@ -124,16 +124,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string WindowTitle => $"{Project.Title}{(IsDirty ? " *" : "")} — ArcTrellis";
     public IEnumerable<Plotline> BookPlotlines => SelectedBook is null ? [] : Project.Plotlines.Where(plotline => plotline.BookId == SelectedBook.Id).OrderBy(plotline => plotline.Order);
     public IEnumerable<Scene> BookScenes => SelectedBook is null ? [] : Project.Scenes.Where(s => s.BookId == SelectedBook.Id).OrderBy(s => s.Order);
-    public HashSet<string> ChapterSceneStatusFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
-    public HashSet<string> ChapterSceneTagFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
-    public bool HasChapterSceneFilters => ChapterSceneStatusFilter.Count > 0 || ChapterSceneTagFilter.Count > 0;
-    public void SetChapterSceneFilters(IEnumerable<string> statuses, IEnumerable<string> tags)
+    public HashSet<string> ChapterStatusFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<string> ChapterTagFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public bool HasChapterFilters => ChapterStatusFilter.Count > 0 || ChapterTagFilter.Count > 0;
+    public void SetChapterFilters(IEnumerable<string> statuses, IEnumerable<string> tags)
     {
-        ChapterSceneStatusFilter = statuses.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        ChapterSceneTagFilter = tags.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        Raise(nameof(ChapterScenes)); Raise(nameof(HasChapterSceneFilters));
+        ChapterStatusFilter = statuses.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        ChapterTagFilter = tags.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Raise(nameof(ChapterScenes)); Raise(nameof(HasChapterFilters));
     }
-    public IEnumerable<Scene> ChapterScenes => SelectedChapter is null ? [] : Project.Scenes.Where(s => s.ChapterId == SelectedChapter.Id && (ChapterSceneStatusFilter.Count == 0 || ChapterSceneStatusFilter.Contains(s.Status)) && (ChapterSceneTagFilter.Count == 0 || s.Tags.Any(ChapterSceneTagFilter.Contains))).OrderBy(s => Project.Plotlines.FirstOrDefault(p => p.Id == s.PlotlineId)?.Order ?? int.MaxValue).ThenBy(s => s.Order);
+    public bool MatchesChapterFilter(Chapter chapter) =>
+        (ChapterStatusFilter.Count == 0 || ChapterStatusFilter.Contains(chapter.Status))
+        && (ChapterTagFilter.Count == 0 || chapter.Tags.Any(ChapterTagFilter.Contains));
+    public IEnumerable<Scene> ChapterScenes => SelectedChapter is null ? [] : Project.Scenes.Where(s => s.ChapterId == SelectedChapter.Id).OrderBy(s => Project.Plotlines.FirstOrDefault(p => p.Id == s.PlotlineId)?.Order ?? int.MaxValue).ThenBy(s => s.Order);
     public ObservableCollection<SearchResult> SearchResults { get; } = [];
     public IReadOnlyList<SceneStatusOption> SceneStatuses { get; } = [new("Planned", Loc.T("Planned")), new("Drafted", Loc.T("Drafted")), new("Revised", Loc.T("Revised")), new("Final", Loc.T("Final")), new("Cut", Loc.T("Cut"))];
     public void RefreshLocalization() { foreach (var option in SceneStatuses) option.RefreshLocalization(); Raise(nameof(BookPlotlines)); Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Status = Loc.T("Ready"); }
@@ -144,7 +147,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Project = project;
         FilePath = path;
         _history.Clear(); _pendingSnapshot = _pendingScope = _pinnedScope = _pinnedSelection = null;
-        SetChapterSceneFilters([], []);
+        SetChapterFilters([], []);
         SelectDefaults();
         IsDirty = false;
         HistoryReset?.Invoke(this, EventArgs.Empty);
@@ -475,6 +478,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedChapterId), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedSceneId), nameof(SelectedCharacter), nameof(SelectedCharacterId), nameof(SelectedPlace), nameof(SelectedPlaceId), nameof(SelectedNote), nameof(SelectedNoteId), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
     }
 }
+
 
 
 

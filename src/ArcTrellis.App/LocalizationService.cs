@@ -14,7 +14,7 @@ public static class Loc
     {
         ["This action conflicts with newer changes in another editor."] = "Это действие затрагивает более новые изменения в другом редакторе.",
         ["Tags"] = "Теги", ["Remove tag"] = "Удалить тег", ["Tag added"] = "Тег добавлен", ["Tag removed"] = "Тег удалён",
-        ["Filter scenes"] = "Фильтр сцен", ["Apply"] = "Применить", ["Clear filters"] = "Сбросить фильтры",
+        ["Filter chapters"] = "Фильтр глав", ["Apply"] = "Применить", ["Clear filters"] = "Сбросить фильтры",
         ["Any selected status and any selected tag"] = "Любой выбранный статус и любой выбранный тег",
         ["File"] = "Файл", ["New from Template…"] = "Создать из шаблона…", ["Open…"] = "Открыть…",
         ["Save As…"] = "Сохранить как…", ["Save as reusable Template…"] = "Сохранить как шаблон…",
@@ -212,6 +212,7 @@ public sealed class ScenePlotlineConverter : IMultiValueConverter
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         => targetTypes.Select(_ => Binding.DoNothing).ToArray();
 }
+
 
 
 

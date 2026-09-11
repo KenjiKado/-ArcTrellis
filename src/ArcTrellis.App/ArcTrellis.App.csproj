@@ -8,7 +8,7 @@
     <AssemblyName>ArcTrellis</AssemblyName>
     <RootNamespace>ArcTrellis.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.2.7</Version>
+    <Version>1.2.8</Version>
     <Authors>ArcTrellis</Authors>
     <Product>ArcTrellis Story Planner</Product>
     <PublishSingleFile>true</PublishSingleFile>
@@ -35,6 +35,7 @@
     </Content>
   </ItemGroup>
 </Project>
+
 
 
 
