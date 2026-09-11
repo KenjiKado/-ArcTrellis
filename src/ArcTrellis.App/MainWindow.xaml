@@ -26,14 +26,6 @@
         <MenuItem Header="Save As…" InputGestureText="Ctrl+Shift+S" Click="SaveAs_Click"/>
         <MenuItem Header="Save as reusable Template…" Click="SaveTemplate_Click"/>
         <Separator/>
-        <MenuItem Header="Import Markdown…" Click="ImportMarkdown_Click"/>
-        <MenuItem Header="Export">
-          <MenuItem Header="Microsoft Word (.docx)…" Click="ExportDocx_Click"/>
-          <MenuItem Header="Markdown (.md)…" Click="ExportMarkdown_Click"/>
-          <MenuItem Header="Timeline CSV (.csv)…" Click="ExportCsv_Click"/>
-          <MenuItem Header="Scrivener project folder…" Click="ExportScrivener_Click"/>
-        </MenuItem>
-        <Separator/>
         <MenuItem Header="Print Timeline…" Click="Print_Click"/>
         <MenuItem Header="Exit" Click="Exit_Click"/>
       </MenuItem>
@@ -246,4 +238,5 @@
   </DockPanel>
 
 </Window>
+
 

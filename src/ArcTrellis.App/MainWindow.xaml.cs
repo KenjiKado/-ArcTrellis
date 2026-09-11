@@ -691,7 +691,9 @@ public partial class MainWindow : Window
     private void AddChapterScene_Click(object sender, RoutedEventArgs e)
     {
         if (Vm.SelectedChapter is not { } chapter) return;
-        Vm.AddScene(chapter.Id);
+        var editor = new AddSceneWindow(Loc.F("Scene {0}", Vm.Project.Scenes.Count + 1), Vm.SceneStatuses, Vm.BookPlotlines, Vm.SelectedPlotline?.Id) { Owner = this };
+        if (editor.ShowDialog() != true) return;
+        Vm.AddScene(chapter.Id, editor.PlotlineId, editor.SceneTitle, editor.SceneStatus);
         ChapterScenesTable.SelectedItem = Vm.SelectedScene;
         ChapterScenesTable.ScrollIntoView(Vm.SelectedScene);
         RefreshAll();
@@ -1181,7 +1183,40 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             WorkspaceTabs.SelectedIndex = 2; UpdateLayout();
+            int scenesBeforePopup = Vm.Project.Scenes.Count;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                var popup = OwnedWindows.OfType<AddSceneWindow>().Single();
+                if (string.IsNullOrWhiteSpace(((TextBox)popup.FindName("TitleInput")).Text)) failures.Add("Add scene popup has no default title");
+                popup.DialogResult = false;
+            }), DispatcherPriority.ApplicationIdle);
+            AddChapterScene_Click(this, new RoutedEventArgs());
+            if (Vm.Project.Scenes.Count != scenesBeforePopup) failures.Add("Canceling Add Scene created a scene");
+            Guid popupPlotId = Vm.BookPlotlines.Last().Id;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                var popup = OwnedWindows.OfType<AddSceneWindow>().Single();
+                var title = (TextBox)popup.FindName("TitleInput");
+                var save = (Button)popup.FindName("SaveButton");
+                title.Text = "   ";
+                if (save.IsEnabled) failures.Add("Add scene permits an empty title");
+                title.Text = "Scene from popup";
+                ((ComboBox)popup.FindName("StatusInput")).SelectedValue = "Revised";
+                var plots = (ComboBox)popup.FindName("PlotlineInput");
+                if (plots.Items.Cast<Plotline>().Any(p => p.BookId != Vm.SelectedBook!.Id)) failures.Add("Add scene popup lists another book's plotlines");
+                plots.SelectedValue = popupPlotId;
+                popup.UpdateLayout();
+                SaveVisualPng(popup, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-add-scene.png"));
+                save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }), DispatcherPriority.ApplicationIdle);
             AddChapterScene_Click(this, new RoutedEventArgs()); UpdateLayout();
+            if (Vm.Project.Scenes.Count != scenesBeforePopup + 1 || Vm.SelectedScene is not { Title: "Scene from popup", Status: "Revised" } || Vm.SelectedScene.PlotlineId != popupPlotId || WorkspaceTabs.SelectedIndex != 2) failures.Add("Add scene popup did not save the chosen fields in Chapters");
+            var popupSceneId = Vm.SelectedScene!.Id;
+            Vm.Undo(); Vm.Redo();
+            if (Vm.Project.Scenes.FirstOrDefault(s => s.Id == popupSceneId) is not { Title: "Scene from popup", Status: "Revised" }) failures.Add("Popup scene undo/redo lost its data");
+            Vm.SelectedSceneId = popupSceneId;
+            Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
+            if (FileMenuItem.Items.OfType<MenuItem>().Any(item => item.Header?.ToString() is "Export" or "Import Markdown…" or "Экспорт" or "Импортировать Markdown…")) failures.Add("File menu still contains import/export");
             if (!ChapterScenesTable.Items.Contains(Vm.SelectedScene) || Vm.SelectedScene?.ChapterId != Vm.SelectedChapter?.Id) failures.Add("Chapter scene table did not show newly added scene");
             Vm.SelectedChapter!.Section = "Live act edit";
             BuildTimeline();
@@ -1385,7 +1420,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.3\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.4\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -1432,4 +1467,5 @@ public partial class MainWindow : Window
     private static SolidColorBrush BrushFrom(string color) => new(BrushColor(color));
     private static Color BrushColor(string color) { try { return (Color)ColorConverter.ConvertFromString(color); } catch { return Colors.SlateBlue; } }
 }
+
 

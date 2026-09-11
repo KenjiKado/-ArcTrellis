@@ -225,7 +225,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Project.Plotlines.Remove(SelectedPlotline); Renumber(plotlines.Where(plotline => plotline != SelectedPlotline)); Raise(nameof(BookPlotlines)); SelectedPlotline = fallback; Dirty("Plotline deleted");
     }
 
-    public void AddScene(Guid? chapterId = null, Guid? plotlineId = null)
+    public void AddScene(Guid? chapterId = null, Guid? plotlineId = null, string? title = null, string status = "Planned")
     {
         if (SelectedBook is null || (SelectedChapter is null && chapterId is null)) return;
         Chapter? chapter = SelectedBook.Chapters.FirstOrDefault(x => x.Id == (chapterId ?? SelectedChapter!.Id));
@@ -233,9 +233,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Plotline? plotline = plotlineId.HasValue
             ? plotlines.FirstOrDefault(candidate => candidate.Id == plotlineId.Value)
             : (SelectedPlotline is not null && SelectedPlotline.BookId == SelectedBook.Id ? SelectedPlotline : plotlines.FirstOrDefault());
-        if (chapter is null || plotline is null) return;
+        if (chapter is null || plotline is null || (title is not null && string.IsNullOrWhiteSpace(title)) || !SceneStatuses.Any(option => option.Code == status)) return;
         Snapshot();
-        var scene = new Scene { Title = Loc.F("Scene {0}", Project.Scenes.Count + 1), BookId = SelectedBook.Id, ChapterId = chapter.Id,
+        var scene = new Scene { Title = title?.Trim() ?? Loc.F("Scene {0}", Project.Scenes.Count + 1), Status = status, BookId = SelectedBook.Id, ChapterId = chapter.Id,
             PlotlineId = plotline.Id,
             Order = Project.Scenes.Count };
         Project.Scenes.Add(scene); SelectedScene = scene; Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene added");
@@ -450,4 +450,5 @@ public sealed class MainViewModel : INotifyPropertyChanged
         foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedChapterId), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedSceneId), nameof(SelectedCharacter), nameof(SelectedCharacterId), nameof(SelectedPlace), nameof(SelectedPlaceId), nameof(SelectedNote), nameof(SelectedNoteId), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
     }
 }
+
 
