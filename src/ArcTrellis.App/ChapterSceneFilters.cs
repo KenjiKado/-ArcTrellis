@@ -63,6 +63,14 @@ public partial class MainWindow
 
         // A dropdown menu attached to the toolbar, with no dialog window or modal state.
         _chapterSceneFilter = new ContextMenu { PlacementTarget = ChapterSceneFilterButton, Placement = PlacementMode.Custom, StaysOpen = true, Padding = new Thickness(0) };
+        _chapterSceneFilter.SetResourceReference(ForegroundProperty, "TextBrush");
+        var menuBorder = new FrameworkElementFactory(typeof(Border));
+        menuBorder.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
+        menuBorder.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        menuBorder.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+        menuBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
+        menuBorder.AppendChild(new FrameworkElementFactory(typeof(ItemsPresenter)));
+        _chapterSceneFilter.Template = new ControlTemplate(typeof(ContextMenu)) { VisualTree = menuBorder };
         _chapterSceneFilter.CustomPopupPlacementCallback = (_, size, _) => [new CustomPopupPlacement(new Point(0, size.Height), PopupPrimaryAxis.Vertical)];
         var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
         presenter.SetValue(ContentPresenter.ContentSourceProperty, "Header");
