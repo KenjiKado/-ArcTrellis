@@ -105,7 +105,12 @@ public sealed class TagInput : UserControl
     }
     private void InputKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter) { Commit(_popup.IsOpen ? _suggestions.SelectedItem as string ?? Input.Text : Input.Text); e.Handled = true; }
+        if (e.Key == Key.Back && ReferenceEquals(sender, Input) && Input.Text.Length == 0 && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            if (Tags is { Count: > 0 }) Request(Tags[^1], true);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter) { Commit(_popup.IsOpen ? _suggestions.SelectedItem as string ?? Input.Text : Input.Text); e.Handled = true; }
         else if (e.Key == Key.Escape) { _popup.IsOpen = false; Input.Focus(); e.Handled = true; }
         else if (_popup.IsOpen && e.Key is Key.Down or Key.Up)
         {
@@ -125,3 +130,4 @@ public sealed class TagInput : UserControl
         RaiseEvent(new TagEditEventArgs(value, remove) { Source = this });
     }
 }
+
