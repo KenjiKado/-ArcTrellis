@@ -21,6 +21,17 @@ public partial class MainWindow
     {
         if (_chapterSceneFilter is not null) _chapterSceneFilter.IsOpen = false;
     }
+    private bool IsChapterFilterInteraction(DependencyObject? source)
+    {
+        var visited = new HashSet<DependencyObject>();
+        while (source is not null && visited.Add(source))
+        {
+            if (ReferenceEquals(source, _chapterSceneFilter) || ReferenceEquals(source, ChapterSceneFilterButton)) return true;
+            if (source is Popup popup) source = popup.PlacementTarget;
+            else source = LogicalTreeHelper.GetParent(source) ?? (source is Visual ? VisualTreeHelper.GetParent(source) : null);
+        }
+        return false;
+    }
     private void UpdateChapterSceneFilterButton() => ChapterSceneFilterButton.SetResourceReference(BorderBrushProperty,
         Vm.HasChapterSceneFilters ? "AccentBrush" : "BorderBrush");
 
@@ -57,6 +68,16 @@ public partial class MainWindow
         presenter.SetValue(ContentPresenter.ContentSourceProperty, "Header");
         var item = new MenuItem { Header = panel, StaysOpenOnClick = true, Focusable = false, Template = new ControlTemplate(typeof(MenuItem)) { VisualTree = presenter } };
         _chapterSceneFilter.Items.Add(item);
+        _chapterSceneFilter.PreviewMouseDown += (_, click) =>
+        {
+            Point point = click.GetPosition(_chapterSceneFilter);
+            if ((point.X < 0 || point.Y < 0 || point.X > _chapterSceneFilter.ActualWidth || point.Y > _chapterSceneFilter.ActualHeight)
+                && _filterTagsInput?.IsSuggestionsMouseOver != true && !ChapterSceneFilterButton.IsMouseOver) CloseChapterSceneFilter();
+        };
+        _chapterSceneFilter.AddHandler(Mouse.PreviewMouseDownOutsideCapturedElementEvent, new MouseButtonEventHandler((_, _) =>
+        {
+            if (_filterTagsInput?.IsSuggestionsMouseOver != true && !ChapterSceneFilterButton.IsMouseOver) CloseChapterSceneFilter();
+        }));
         _chapterSceneFilter.PreviewKeyDown += (_, key) => { if (key.Key == Key.Escape) { CloseChapterSceneFilter(); key.Handled = true; } };
         ChapterSceneFilterButton.ContextMenu = _chapterSceneFilter;
         TimelineMenuPosition.Open(ChapterSceneFilterButton, ChapterSceneFilterButton.PointToScreen(new Point(0, ChapterSceneFilterButton.ActualHeight)));

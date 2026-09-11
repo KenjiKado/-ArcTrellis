@@ -55,7 +55,7 @@ public partial class MainWindow : Window
         Vm.HistoryReset += (_, _) => _textUndo.Clear();
         _autosaveTimer.Tick += AutosaveTimer_Tick;
         WorkspaceTabs.SelectionChanged += WorkspaceTabs_SelectionChanged;
-        PreviewMouseDown += (_, _) => { if (!ChapterSceneFilterButton.IsMouseOver && _chapterSceneFilter?.IsMouseOver != true && _filterTagsInput?.IsSuggestionsMouseOver != true) CloseChapterSceneFilter(); };
+        PreviewMouseDown += (_, e) => { if (!IsChapterFilterInteraction(e.OriginalSource as DependencyObject)) CloseChapterSceneFilter(); };
         Deactivated += (_, _) => CloseChapterSceneFilter();
         Vm.PropertyChanged += (_, args) =>
         {
