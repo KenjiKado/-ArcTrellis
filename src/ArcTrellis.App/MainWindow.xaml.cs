@@ -1207,6 +1207,7 @@ public partial class MainWindow : Window
             var tagSeed = new StoryEntity { Name = "Tag suggestions probe" };
             tagSeed.Tags.Add("Angular"); tagSeed.Tags.Add("Angle");
             Vm.Project.Notes.Add(tagSeed);
+            Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
             var tagInput = FindVisualChildren<TagInput>(this).First(input => ReferenceEquals(input.Tags, Vm.SelectedChapter!.Tags));
             tagInput.Input.Focus(); tagInput.Input.Text = "An";
             if (tagInput.SuggestionsOpen || tagInput.Suggestions.Any()) failures.Add("Tag suggestions opened before three characters");
@@ -1226,7 +1227,8 @@ public partial class MainWindow : Window
             var row = FindVisualChildren<WrapPanel>(tagInput).Single();
             if (!ReferenceEquals(row.Children[row.Children.Count - 1], tagInput.Input)) failures.Add("Tag typing area is not after all chips");
             SaveVisualPng(tagInput, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-tag-input.png"));
-            chips.First(button => Equals(button.Tag, "Angular")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if (chips.FirstOrDefault(button => Equals(button.Tag, "Angular")) is { } angularChip) angularChip.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            else failures.Add($"Angular tag chip missing: loaded={tagInput.IsLoaded}, tags={string.Join(",", Vm.SelectedChapter.Tags)}, chips={string.Join(",", chips.Select(b => b.Tag))}");
             if (Vm.SelectedChapter.Tags.Contains("Angular") || !TagService.Existing(Vm.Project).Contains("Angular")) failures.Add("Tag remove button did not preserve shared usage");
             Vm.Project.Notes.Remove(tagSeed); TagService.Synchronize(Vm.Project);
             if (TagService.Existing(Vm.Project).Contains("Angular") || Vm.Project.Tags.Contains("Angular")) failures.Add("Removed tag remained after its last other use disappeared");
