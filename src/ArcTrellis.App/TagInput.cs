@@ -26,6 +26,7 @@ public sealed class TagInput : UserControl
     public static readonly DependencyProperty ProjectProperty = DependencyProperty.Register(nameof(Project), typeof(StoryProject), typeof(TagInput));
     public static readonly DependencyProperty TagsProperty = DependencyProperty.Register(nameof(Tags), typeof(ObservableCollection<string>), typeof(TagInput), new PropertyMetadata(null, TagsChanged));
     public static readonly RoutedEvent TagEditRequestedEvent = EventManager.RegisterRoutedEvent("TagEditRequested", RoutingStrategy.Bubble, typeof(EventHandler<TagEditEventArgs>), typeof(TagInput));
+    public bool ExistingOnly { get; set; }
     public StoryProject? Project { get => (StoryProject?)GetValue(ProjectProperty); set => SetValue(ProjectProperty, value); }
     public ObservableCollection<string>? Tags { get => (ObservableCollection<string>?)GetValue(TagsProperty); set => SetValue(TagsProperty, value); }
     private readonly WrapPanel _row = new() { Orientation = Orientation.Horizontal };
@@ -33,6 +34,7 @@ public sealed class TagInput : UserControl
     private readonly Border _frame = new() { CornerRadius = new CornerRadius(5), BorderThickness = new Thickness(1), Padding = new Thickness(4), MinHeight = 40 };
     private readonly ListBox _suggestions = new() { MaxHeight = 210, MinWidth = 180, BorderThickness = new Thickness(0) };
     private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Custom };
+    internal bool IsSuggestionsMouseOver => _suggestions.IsMouseOver;
     internal bool SuggestionsOpen => _popup.IsOpen;
     internal IEnumerable<string> Suggestions => _suggestions.Items.Cast<string>();
 
@@ -127,7 +129,18 @@ public sealed class TagInput : UserControl
     private void Request(string value, bool remove)
     {
         if (Tags is null || Project is null) return;
+        if (ExistingOnly)
+        {
+            if (remove)
+            {
+                foreach (string tag in Tags.Where(t => string.Equals(t, value, StringComparison.OrdinalIgnoreCase)).ToList()) Tags.Remove(tag);
+            }
+            else if (TagService.Existing(Project).FirstOrDefault(t => string.Equals(t, value, StringComparison.OrdinalIgnoreCase)) is { } existing
+                && !Tags.Contains(existing, StringComparer.OrdinalIgnoreCase)) Tags.Add(existing);
+            return;
+        }
         RaiseEvent(new TagEditEventArgs(value, remove) { Source = this });
     }
 }
+
 

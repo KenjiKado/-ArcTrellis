@@ -55,6 +55,13 @@ public partial class MainWindow : Window
         Vm.HistoryReset += (_, _) => _textUndo.Clear();
         _autosaveTimer.Tick += AutosaveTimer_Tick;
         WorkspaceTabs.SelectionChanged += WorkspaceTabs_SelectionChanged;
+        PreviewMouseDown += (_, _) => { if (!ChapterSceneFilterButton.IsMouseOver && _chapterSceneFilter?.IsMouseOver != true && _filterTagsInput?.IsSuggestionsMouseOver != true) CloseChapterSceneFilter(); };
+        Deactivated += (_, _) => CloseChapterSceneFilter();
+        Vm.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is nameof(MainViewModel.SelectedBook) or nameof(MainViewModel.SelectedChapter)) CloseChapterSceneFilter();
+            if (args.PropertyName == nameof(MainViewModel.HasChapterSceneFilters)) UpdateChapterSceneFilterButton();
+        };
         AddHandler(TextCompositionManager.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
         AddHandler(DataObject.PastingEvent, new DataObjectPastingEventHandler(NumericTextBox_Pasting));
         AddHandler(TagInput.TagEditRequestedEvent, new EventHandler<TagEditEventArgs>((_, e) =>
@@ -105,6 +112,7 @@ public partial class MainWindow : Window
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.OriginalSource, WorkspaceTabs)) return;
+        CloseChapterSceneFilter();
         Vm.ActiveTab = WorkspaceTabs.SelectedIndex;
         Dispatcher.BeginInvoke(new Action(ApplyLocalization), DispatcherPriority.Loaded);
     }
@@ -1188,6 +1196,7 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             WorkspaceTabs.SelectedIndex = 2; UpdateLayout();
+            CheckChapterSceneFilters(failures, reportPath);
             var tagVm = new MainViewModel(new TemplateService().CreateBlank()) { ActiveTab = 2 };
             tagVm.AddScene();
             var tagChapter = tagVm.SelectedChapter!;
@@ -1470,7 +1479,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.6\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.7\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -1517,6 +1526,7 @@ public partial class MainWindow : Window
     private static SolidColorBrush BrushFrom(string color) => new(BrushColor(color));
     private static Color BrushColor(string color) { try { return (Color)ColorConverter.ConvertFromString(color); } catch { return Colors.SlateBlue; } }
 }
+
 
 
 

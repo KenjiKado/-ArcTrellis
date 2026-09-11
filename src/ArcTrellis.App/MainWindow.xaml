@@ -142,7 +142,7 @@
                 <TextBlock Text="Description" Margin="0,8,0,3"/><TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}" Height="90" AcceptsReturn="True" TextWrapping="Wrap" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto"/>
               </StackPanel>
               <TextBlock Text="Scenes" FontSize="18" FontWeight="SemiBold" Margin="0,14,0,4"/>
-              <StackPanel Orientation="Horizontal"><Button Content="＋ Scene" Click="AddChapterScene_Click"/><Button Content="Delete" Click="DeleteChapterScene_Click"/></StackPanel>
+              <StackPanel Orientation="Horizontal"><Button Content="＋ Scene" Click="AddChapterScene_Click"/><Button Content="Delete" Click="DeleteChapterScene_Click"/><Button x:Name="ChapterSceneFilterButton" ToolTip="Filter scenes" AutomationProperties.Name="Filter scenes" Click="ChapterSceneFilter_Click" Width="34" Padding="7,5"><Path Data="M 1,1 L 15,1 L 9.5,7 L 9.5,13 L 6.5,15 L 6.5,7 Z" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.5" Fill="Transparent" Width="16" Height="16" Stretch="Uniform"/></Button></StackPanel>
               <DataGrid RowHeight="44" FontSize="14" CanUserSortColumns="False" MinColumnWidth="120" x:Name="ChapterScenesTable" ItemsSource="{Binding ChapterScenes}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" SelectionMode="Single" SelectionUnit="FullRow" Height="220" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MouseDoubleClick="ChapterScene_MouseDoubleClick">
                 <DataGrid.RowStyle>
                   <Style TargetType="DataGridRow">
@@ -238,6 +238,7 @@
   </DockPanel>
 
 </Window>
+
 
 
 
