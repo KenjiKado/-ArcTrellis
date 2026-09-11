@@ -17,6 +17,8 @@ public sealed class TagEditEventArgs(string tag, bool remove) : RoutedEventArgs(
 {
     public string Tag { get; } = tag;
     public bool Remove { get; } = remove;
+    protected override void InvokeEventHandler(Delegate genericHandler, object genericTarget)
+        => ((EventHandler<TagEditEventArgs>)genericHandler)(genericTarget, this);
 }
 
 public sealed class TagInput : UserControl
