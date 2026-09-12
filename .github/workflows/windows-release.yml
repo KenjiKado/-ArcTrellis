@@ -30,3 +30,11 @@ jobs:
             artifacts/installer/*.exe
             artifacts/installer/*.sha256
             artifacts/installer/*.png
+      - name: Upload UI failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArcTrellis-UI-Diagnostics
+          path: |
+            artifacts/installer/*.png
+            artifacts/installer/*Smoke.txt

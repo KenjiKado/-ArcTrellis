@@ -76,6 +76,14 @@ public partial class MainWindow
         DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
         root.Children.Add(new ScrollViewer { Content = fields, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
         _sceneFilter = new ContextMenu { PlacementTarget = SceneFilterButton, Placement = PlacementMode.Custom, StaysOpen = true, Padding = new Thickness(0) };
+        _sceneFilter.SizeChanged += (_, size) =>
+        {
+            // WPF may constrain a popup to the space beside its anchor even
+            // before native placement moves it into the monitor work area.
+            // Let the fields scroll within that actual size, retaining the footer.
+            if (size.NewSize.Height > 100 && root.Height > size.NewSize.Height - 2)
+                root.Height = size.NewSize.Height - 2;
+        };
         _sceneFilter.SetResourceReference(ForegroundProperty, "TextBrush");
         var border = new FrameworkElementFactory(typeof(Border));
         border.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");

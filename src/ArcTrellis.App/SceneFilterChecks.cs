@@ -73,7 +73,7 @@ public partial class MainWindow
             var action = FindVisualChildren<Button>(_sceneFilter!).First(button => Equals(button.Content, Loc.T(label)));
             var bounds = action.TransformToAncestor(_sceneFilter!).TransformBounds(new Rect(action.RenderSize));
             if (bounds.Top < 0 || bounds.Bottom > _sceneFilter!.ActualHeight || bounds.Right > _sceneFilter.ActualWidth || action.ActualHeight < 20)
-                failures.Add("Expanded scene filter clips the " + label + " button");
+                failures.Add($"Expanded scene filter clips the {label} button: {bounds} inside {_sceneFilter!.RenderSize}");
         }
         SaveVisualPng(_sceneFilter!, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scenes-filter.png"));
         MenuButton("Apply"); Drain();
