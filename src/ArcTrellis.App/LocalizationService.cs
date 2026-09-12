@@ -230,6 +230,19 @@ public sealed class ScenePlotlineColorConverter : IMultiValueConverter
         => targetTypes.Select(_ => Binding.DoNothing).ToArray();
 }
 
+public sealed class SceneChapterTitleConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        => values.Length >= 2
+            && values[0] is Guid id
+            && values[1] is IEnumerable<ArcTrellis.Core.Models.Chapter> chapters
+            ? chapters.FirstOrDefault(chapter => chapter.Id == id)?.Title ?? string.Empty
+            : string.Empty;
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        => targetTypes.Select(_ => Binding.DoNothing).ToArray();
+}
+
 public sealed class NullToBooleanConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object parameter, CultureInfo culture) => value is not null;

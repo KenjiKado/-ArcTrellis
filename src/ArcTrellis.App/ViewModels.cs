@@ -124,7 +124,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string Status { get => _status; set => Set(ref _status, value); }
     public string WindowTitle => $"{Project.Title}{(IsDirty ? " *" : "")} — ArcTrellis";
     public IEnumerable<Plotline> BookPlotlines => SelectedBook is null ? [] : Project.Plotlines.Where(plotline => plotline.BookId == SelectedBook.Id).OrderBy(plotline => plotline.Order);
-    public IEnumerable<Scene> BookScenes => SelectedBook is null ? [] : Project.Scenes.Where(s => s.BookId == SelectedBook.Id).OrderBy(s => s.Order);
+    public IEnumerable<Scene> BookScenes => SelectedBook is null ? [] : Project.Scenes
+        .Where(scene => scene.BookId == SelectedBook.Id)
+        .OrderBy(scene => SelectedBook.Chapters.FirstOrDefault(chapter => chapter.Id == scene.ChapterId)?.Order ?? int.MaxValue)
+        .ThenBy(scene => Project.Plotlines.FirstOrDefault(plotline => plotline.Id == scene.PlotlineId)?.Order ?? int.MaxValue)
+        .ThenBy(scene => scene.Order);
     public HashSet<string> ChapterStatusFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> ChapterTagFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool HasChapterFilters => ChapterStatusFilter.Count > 0 || ChapterTagFilter.Count > 0;

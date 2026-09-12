@@ -142,6 +142,8 @@ public partial class MainWindow : Window
         Vm.MarkDirty();
         Title = Vm.WindowTitle;
         RefreshStats();
+        if (box.GetBindingExpression(TextBox.TextProperty)?.ResolvedSource is Chapter)
+            Dispatcher.BeginInvoke(new Action(RefreshSceneList), DispatcherPriority.Background);
     }
 
     private void NumericTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
@@ -185,7 +187,7 @@ public partial class MainWindow : Window
         Vm.MoveScene(scene, chapterId, plotlineId);
         Dispatcher.BeginInvoke(new Action(() =>
         {
-            SceneList.Items.Refresh();
+            RefreshSceneList();
             BuildTimeline();
         }), DispatcherPriority.Background);
     }
@@ -206,6 +208,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RefreshSceneList()
+    {
+        CollectionViewSource.GetDefaultCollectionView(SceneList.ItemsSource)?.Refresh();
+        SceneList.Items.Refresh();
+    }
+
     private void RefreshAll()
     {
         Title = Vm.WindowTitle;
@@ -213,6 +221,7 @@ public partial class MainWindow : Window
         RefreshRelations();
         RefreshChapterFilter();
         RefreshStats();
+        RefreshSceneList();
         Loc.Apply(this);
     }
 
