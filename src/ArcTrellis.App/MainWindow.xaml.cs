@@ -56,13 +56,20 @@ public partial class MainWindow : Window
         Vm.HistoryReset += (_, _) => _textUndo.Clear();
         _autosaveTimer.Tick += AutosaveTimer_Tick;
         WorkspaceTabs.SelectionChanged += WorkspaceTabs_SelectionChanged;
-        PreviewMouseDown += (_, e) => { if (!IsChapterFilterInteraction(e.OriginalSource as DependencyObject)) CloseChapterFilter(); };
-        Deactivated += (_, _) => CloseChapterFilter();
+        PreviewMouseDown += (_, e) =>
+        {
+            if (!IsChapterFilterInteraction(e.OriginalSource as DependencyObject)) CloseChapterFilter();
+            if (!IsSceneFilterInteraction(e.OriginalSource as DependencyObject)) CloseSceneFilter();
+        };
+        Deactivated += (_, _) => { CloseChapterFilter(); CloseSceneFilter(); };
         Vm.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(MainViewModel.SelectedBook) or nameof(MainViewModel.SelectedChapter)) CloseChapterFilter();
             if (args.PropertyName == nameof(MainViewModel.SelectedBook)) Dispatcher.BeginInvoke(new Action(RefreshChapterFilter), DispatcherPriority.Loaded);
             if (args.PropertyName == nameof(MainViewModel.HasChapterFilters)) UpdateChapterFilterButton();
+            if (args.PropertyName == nameof(MainViewModel.SelectedBook)) CloseSceneFilter();
+            if (args.PropertyName is nameof(MainViewModel.SelectedBook) or nameof(MainViewModel.HasSceneFilters))
+                Dispatcher.BeginInvoke(new Action(RefreshSceneList), DispatcherPriority.Loaded);
         };
         AddHandler(TextCompositionManager.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
         AddHandler(DataObject.PastingEvent, new DataObjectPastingEventHandler(NumericTextBox_Pasting));
@@ -148,13 +155,14 @@ public partial class MainWindow : Window
     {
         if (!ReferenceEquals(e.OriginalSource, WorkspaceTabs)) return;
         CloseChapterFilter();
+        CloseSceneFilter();
         Vm.ActiveTab = WorkspaceTabs.SelectedIndex;
         Dispatcher.BeginInvoke(new Action(ApplyLocalization), DispatcherPriority.Loaded);
     }
     private void AnyTextChanged(object sender, TextChangedEventArgs e)
     {
         if (!_loaded || Vm.IsRestoringHistory || e.OriginalSource is not TextBox box || !box.IsKeyboardFocusWithin) return;
-        if (Equals(box.Tag, "TagDraft") || Equals(box.Tag, "CharacterDraft")) return;
+        if (Equals(box.Tag, "TagDraft") || Equals(box.Tag, "CharacterDraft") || Equals(box.Tag, "FilterDraft")) return;
         if (IsNumericInput(box) && NormalizeNumericInput(box)) return;
         Vm.MarkDirty();
         Title = Vm.WindowTitle;
@@ -222,6 +230,7 @@ public partial class MainWindow : Window
             binding.UpdateSource();
             Vm.RecordPropertyEdit(source, binding.ResolvedSourcePropertyName, previous, next);
             if (source is Chapter) RefreshChapterFilter();
+            if (source is Scene) Dispatcher.BeginInvoke(new Action(RefreshSceneList), DispatcherPriority.Background);
         }
     }
 
@@ -229,6 +238,8 @@ public partial class MainWindow : Window
     {
         if (!ViewChanged(ref _sceneListState, SceneListState())) return;
         SceneList.Items.Refresh();
+        if (Vm.SelectedScene is null || !Vm.BookScenes.Contains(Vm.SelectedScene) || !Vm.MatchesSceneFilter(Vm.SelectedScene))
+            Vm.SelectedScene = Vm.BookScenes.FirstOrDefault(Vm.MatchesSceneFilter);
     }
 
     private void RefreshAll()
@@ -1511,6 +1522,7 @@ public partial class MainWindow : Window
             if (Vm.SelectedScene?.PlotlineId != originalScenePlotline || !Equals(scenePlotlineSelector.SelectedValue, originalScenePlotline))
                 failures.Add($"Plotline undo mismatch: model={Vm.SelectedScene?.PlotlineId}, selector={scenePlotlineSelector.SelectedValue}, expected={originalScenePlotline}, status={Vm.Status}, tab={Vm.ActiveTab}");
             CheckStableTagHistory(failures);
+            CheckSceneFilters(failures, reportPath);
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
             File.WriteAllText(reportPath, failures.Count == 0 ? "PASS" : "FAIL: " + string.Join("; ", failures));
         }
@@ -1652,7 +1664,4 @@ public partial class MainWindow : Window
     private static SolidColorBrush BrushFrom(string color) => new(BrushColor(color));
     private static Color BrushColor(string color) { try { return (Color)ColorConverter.ConvertFromString(color); } catch { return Colors.SlateBlue; } }
 }
-
-
-
 

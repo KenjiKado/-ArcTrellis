@@ -15,6 +15,7 @@ public static class Loc
         ["This action conflicts with newer changes in another editor."] = "Это действие затрагивает более новые изменения в другом редакторе.",
         ["Tags"] = "Теги", ["Remove tag"] = "Удалить тег", ["Tag added"] = "Тег добавлен", ["Tag removed"] = "Тег удалён", ["Remove character"] = "Удалить персонажа",
         ["Filter chapters"] = "Фильтр глав", ["Apply"] = "Применить", ["Clear filters"] = "Сбросить фильтры",
+        ["Filter scenes"] = "Фильтр сцен", ["Plotlines"] = "Сюжетные линии", ["No matches"] = "Нет совпадений", ["Remove selection"] = "Убрать выбор",
         ["File"] = "Файл", ["New from Template…"] = "Создать из шаблона…", ["Open…"] = "Открыть…",
         ["Save As…"] = "Сохранить как…", ["Save as reusable Template…"] = "Сохранить как шаблон…",
         ["Import Markdown…"] = "Импортировать Markdown…", ["Export"] = "Экспорт", ["Microsoft Word (.docx)…"] = "Microsoft Word (.docx)…",
@@ -248,7 +249,6 @@ public sealed class NullToBooleanConverter : IValueConverter
     public object Convert(object? value, Type targetType, object parameter, CultureInfo culture) => value is not null;
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }
-
 
 
 
