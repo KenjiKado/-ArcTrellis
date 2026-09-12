@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private bool _closingAfterSave;
     private double _timelineCardWidth = 220;
     private double _timelineZoom = 1;
+    private const double DefaultTimelineHeaderHeight = 60;
     private bool _isDark;
     private SceneDragAdorner? _sceneDragAdorner;
     private Guid? _draggedSceneId;
@@ -250,9 +251,12 @@ public partial class MainWindow : Window
         if (book is null) return;
         var chapters = book.Chapters.OrderBy(c => c.Order).ToList();
         var plotlines = Vm.BookPlotlines.ToList();
+        // Zero is the persisted "automatic" height for existing and new books.
+        // Keep the row visible; only the chapter title is clipped to fit it.
+        double headerHeight = book.TimelineHeaderHeight > 0 ? Math.Max(40, book.TimelineHeaderHeight) : DefaultTimelineHeaderHeight;
         TimelineGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Max(130, book.TimelineLabelWidth)) });
         foreach (var chapter in chapters) TimelineGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(chapter.TimelineWidth >= 130 ? chapter.TimelineWidth : _timelineCardWidth) });
-        TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = book.TimelineHeaderHeight });
+        TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(headerHeight), MinHeight = headerHeight });
         foreach (var plotline in plotlines) TimelineGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto, MinHeight = plotline.TimelineHeight });
 
         AddTimelineCell(new TextBlock { Text = Loc.T("PLOTLINE / CHAPTER"), FontWeight = FontWeights.SemiBold, Margin = new Thickness(8) }, 0, 0, false);
@@ -262,7 +266,7 @@ public partial class MainWindow : Window
             var sectionText = new TextBlock { Foreground = FindBrush("MutedBrush"), FontSize = 11 };
             sectionText.SetBinding(TextBlock.TextProperty, new Binding(nameof(Chapter.Section)) { Source = chapters[c] });
             sectionText.TextTrimming = TextTrimming.CharacterEllipsis;
-            var chapterText = new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = Math.Max(0, book.TimelineHeaderHeight - 35) };
+            var chapterText = new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = Math.Max(0, headerHeight - 35) };
             chapterText.SetBinding(TextBlock.TextProperty, new Binding(nameof(Chapter.Title)) { Source = chapters[c] });
             header.Children.Add(sectionText); header.Children.Add(chapterText);
             var headerCell = AddTimelineCell(header, 0, c + 1, false);
@@ -1153,11 +1157,14 @@ public partial class MainWindow : Window
             if (secondScene.BookId != secondBook.Id || secondScene.ChapterId != secondChapter.Id) failures.Add("A scene was assigned across book/chapter boundaries");
             string shortChapterTitle = secondChapter.Title;
             secondChapter.Title = string.Concat(Enumerable.Repeat("A very long chapter title that must fit inside the timeline header ", 12));
+            WorkspaceTabs.SelectedIndex = 1;
             BuildTimeline(); UpdateLayout();
             double headerHeight = TimelineGrid.RowDefinitions[0].ActualHeight;
-            if (Math.Abs(headerHeight - secondBook.TimelineHeaderHeight) > 1) failures.Add("Long chapter title expanded the timeline header");
+            double expectedHeaderHeight = secondBook.TimelineHeaderHeight > 0 ? Math.Max(40, secondBook.TimelineHeaderHeight) : DefaultTimelineHeaderHeight;
+            if (Math.Abs(headerHeight - expectedHeaderHeight) > 1) failures.Add("The timeline header is hidden or expands to fit a long title");
             var chapterLabel = FindVisualChildren<TextBlock>(TimelineGrid).FirstOrDefault(text => text.Text == secondChapter.Title);
             if (chapterLabel?.TextTrimming != TextTrimming.CharacterEllipsis) failures.Add("Timeline chapter title is not ellipsized");
+            if (chapterLabel is null || chapterLabel.ActualHeight < 10) failures.Add("Timeline chapter title is hidden inside its header");
             TimelineGrid.RowDefinitions[0].Height = new GridLength(headerHeight + 40);
             UpdateLayout();
             if (chapterLabel is not null && chapterLabel.MaxHeight <= headerHeight - 35) failures.Add("Timeline title clipping did not adapt to a resized header");
@@ -1630,7 +1637,6 @@ public partial class MainWindow : Window
     private static SolidColorBrush BrushFrom(string color) => new(BrushColor(color));
     private static Color BrushColor(string color) { try { return (Color)ColorConverter.ConvertFromString(color); } catch { return Colors.SlateBlue; } }
 }
-
 
 
 
