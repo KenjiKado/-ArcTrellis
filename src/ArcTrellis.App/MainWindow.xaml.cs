@@ -210,7 +210,6 @@ public partial class MainWindow : Window
 
     private void RefreshSceneList()
     {
-        CollectionViewSource.GetDefaultCollectionView(SceneList.ItemsSource)?.Refresh();
         SceneList.Items.Refresh();
     }
 
