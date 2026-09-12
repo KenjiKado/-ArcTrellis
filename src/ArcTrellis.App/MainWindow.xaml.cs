@@ -183,6 +183,16 @@ public partial class MainWindow : Window
             binding.UpdateSource();
             Vm.RecordPropertyEdit(source, binding.ResolvedSourcePropertyName, previous, next);
             if (source is Chapter) RefreshChapterFilter();
+            if (source is Scene)
+            {
+                // Plotline/chapter changes affect both the Scenes list item template
+                // and the Timeline grouping. Rebuild after the binding has committed.
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    SceneList.Items.Refresh();
+                    BuildTimeline();
+                }), DispatcherPriority.Background);
+            }
         }
     }
 
