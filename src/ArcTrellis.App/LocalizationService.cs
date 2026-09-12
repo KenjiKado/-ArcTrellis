@@ -13,9 +13,8 @@ public static class Loc
     private static readonly Dictionary<string, string> Ru = new(StringComparer.Ordinal)
     {
         ["This action conflicts with newer changes in another editor."] = "Это действие затрагивает более новые изменения в другом редакторе.",
-        ["Tags"] = "Теги", ["Remove tag"] = "Удалить тег", ["Tag added"] = "Тег добавлен", ["Tag removed"] = "Тег удалён",
+        ["Tags"] = "Теги", ["Remove tag"] = "Удалить тег", ["Tag added"] = "Тег добавлен", ["Tag removed"] = "Тег удалён", ["Remove character"] = "Удалить персонажа",
         ["Filter chapters"] = "Фильтр глав", ["Apply"] = "Применить", ["Clear filters"] = "Сбросить фильтры",
-        ["Any selected status and any selected tag"] = "Любой выбранный статус и любой выбранный тег",
         ["File"] = "Файл", ["New from Template…"] = "Создать из шаблона…", ["Open…"] = "Открыть…",
         ["Save As…"] = "Сохранить как…", ["Save as reusable Template…"] = "Сохранить как шаблон…",
         ["Import Markdown…"] = "Импортировать Markdown…", ["Export"] = "Экспорт", ["Microsoft Word (.docx)…"] = "Microsoft Word (.docx)…",
@@ -211,6 +210,30 @@ public sealed class ScenePlotlineConverter : IMultiValueConverter
             ? plots.FirstOrDefault(plot => plot.Id == id) : null;
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         => targetTypes.Select(_ => Binding.DoNothing).ToArray();
+}
+
+public sealed class ScenePlotlineColorConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length >= 2
+            && values[0] is Guid id
+            && values[1] is IEnumerable<ArcTrellis.Core.Models.Plotline> plots
+            && plots.FirstOrDefault(plot => plot.Id == id) is { } plotline)
+        {
+            try { return new SolidColorBrush((Color)ColorConverter.ConvertFromString(plotline.Color)); }
+            catch { }
+        }
+        return Brushes.Transparent;
+    }
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+        => targetTypes.Select(_ => Binding.DoNothing).ToArray();
+}
+
+public sealed class NullToBooleanConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object parameter, CultureInfo culture) => value is not null;
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Binding.DoNothing;
 }
 
 

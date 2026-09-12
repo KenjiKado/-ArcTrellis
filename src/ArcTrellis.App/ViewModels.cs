@@ -256,6 +256,34 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Project.Scenes.Add(scene); SelectedScene = scene; Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Dirty("Scene added");
     }
 
+    public void EditSceneCharacter(Scene scene, Guid? characterId, string? characterName, bool remove)
+    {
+        if (!Project.Scenes.Contains(scene)) return;
+        if (remove)
+        {
+            if (characterId is not Guid id || !scene.CharacterIds.Contains(id)) return;
+            Snapshot();
+            scene.CharacterIds.Remove(id);
+            Dirty("Character removed from scene");
+            return;
+        }
+
+        StoryEntity? character = characterId is Guid existingId
+            ? Project.Characters.FirstOrDefault(candidate => candidate.Id == existingId)
+            : Project.Characters.FirstOrDefault(candidate => string.Equals(candidate.Name, characterName?.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (character is null && string.IsNullOrWhiteSpace(characterName)) return;
+        if (character is not null && scene.CharacterIds.Contains(character.Id)) return;
+
+        Snapshot();
+        if (character is null)
+        {
+            character = new StoryEntity { Name = characterName!.Trim() };
+            Project.Characters.Add(character);
+        }
+        scene.CharacterIds.Add(character.Id);
+        Dirty("Character added to scene");
+    }
+
     public Scene? DuplicateScene(Scene original)
     {
         if (!Project.Scenes.Contains(original)) return null;

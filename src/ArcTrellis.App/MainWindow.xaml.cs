@@ -69,6 +69,23 @@ public partial class MainWindow : Window
         {
             if (e.Source is TagInput { Tags: { } tags }) { Vm.EditTag(tags, e.Tag, e.Remove); e.Handled = true; }
         }));
+        AddHandler(CharacterInput.CharacterEditRequestedEvent, new EventHandler<CharacterEditEventArgs>((_, e) =>
+        {
+            if (e.Source is CharacterInput input && input.DataContext is Scene scene)
+            {
+                Vm.EditSceneCharacter(scene, e.CharacterId, e.CharacterName, e.Remove);
+                e.Handled = true;
+            }
+        }));
+        AddHandler(CharacterInput.CharacterChipClickedEvent, new EventHandler<CharacterChipClickEventArgs>((_, e) =>
+        {
+            if (Vm.Project.Characters.FirstOrDefault(character => character.Id == e.CharacterId) is { } character)
+            {
+                Vm.SelectedCharacter = character;
+                WorkspaceTabs.SelectedIndex = 4;
+                e.Handled = true;
+            }
+        }));
         AddHandler(TextBox.TextChangedEvent, new TextChangedEventHandler(AnyTextChanged));
         AddHandler(ComboBox.SelectionChangedEvent, new SelectionChangedEventHandler(AnySelectionChanged));
     }
@@ -120,7 +137,7 @@ public partial class MainWindow : Window
     private void AnyTextChanged(object sender, TextChangedEventArgs e)
     {
         if (!_loaded || e.OriginalSource is not TextBox box || !box.IsKeyboardFocusWithin) return;
-        if (Equals(box.Tag, "TagDraft")) return;
+        if (Equals(box.Tag, "TagDraft") || Equals(box.Tag, "CharacterDraft")) return;
         if (IsNumericInput(box) && NormalizeNumericInput(box)) return;
         Vm.MarkDirty();
         Title = Vm.WindowTitle;
