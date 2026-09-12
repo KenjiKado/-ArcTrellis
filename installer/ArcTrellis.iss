@@ -2,7 +2,7 @@
   #define AppPublishDir "..\artifacts\publish\win-x64"
 #endif
 #define AppName "ArcTrellis"
-#define AppVersion "1.2.10"
+#define AppVersion "1.2.11"
 #define AppPublisher "ArcTrellis"
 #define AppExeName "ArcTrellis.exe"
 
