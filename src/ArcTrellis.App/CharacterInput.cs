@@ -121,7 +121,6 @@ public sealed class CharacterInput : UserControl
             var remove = new Button { Content = "×", Tag = id, Width = 20, Height = 20, MinHeight = 0, Padding = new Thickness(0), Margin = new Thickness(0), BorderThickness = new Thickness(0), Cursor = Cursors.Hand, ToolTip = Loc.T("Remove character") };
             AutomationProperties.SetName(remove, Loc.T("Remove character") + ": " + character.Name);
             remove.Click += (_, _) => { Request(id, null, true); Input.Focus(); };
-            remove.PreviewMouseLeftButtonDown += (_, e) => e.Handled = true;
             var chipRow = new StackPanel { Orientation = Orientation.Horizontal }; chipRow.Children.Add(label); chipRow.Children.Add(remove);
             var chip = new Border { Child = chipRow, CornerRadius = new CornerRadius(15), Padding = new Thickness(8, 4, 5, 4), Margin = new Thickness(2), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand };
             chip.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
