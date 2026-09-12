@@ -120,7 +120,12 @@ public partial class MainWindow : Window
         foreach (var selector in FindVisualChildren<Selector>(this))
         {
             var binding = selector.GetBindingExpression(Selector.SelectedValueProperty);
-            if (binding?.ParentBinding.Path?.Path is nameof(MainViewModel.SelectedBookId) or nameof(MainViewModel.SelectedChapterId) or nameof(MainViewModel.SelectedSceneId) or nameof(MainViewModel.SelectedCharacterId) or nameof(MainViewModel.SelectedPlaceId) or nameof(MainViewModel.SelectedNoteId) or nameof(MainViewModel.SelectedRelationshipId))
+            if (selector is ComboBox { Tag: "ScenePlotline" or "SceneChapter" })
+            {
+                selector.GetBindingExpression(ItemsControl.ItemsSourceProperty)?.UpdateTarget();
+                selector.GetBindingExpression(Selector.SelectedValueProperty)?.UpdateTarget();
+            }
+            else if (binding?.ParentBinding.Path?.Path is nameof(MainViewModel.SelectedBookId) or nameof(MainViewModel.SelectedChapterId) or nameof(MainViewModel.SelectedSceneId) or nameof(MainViewModel.SelectedCharacterId) or nameof(MainViewModel.SelectedPlaceId) or nameof(MainViewModel.SelectedNoteId) or nameof(MainViewModel.SelectedRelationshipId))
             {
                 selector.GetBindingExpression(ItemsControl.ItemsSourceProperty)?.UpdateTarget();
                 binding.UpdateTarget();
@@ -256,10 +261,13 @@ public partial class MainWindow : Window
             var header = new StackPanel { Margin = new Thickness(5) };
             var sectionText = new TextBlock { Foreground = FindBrush("MutedBrush"), FontSize = 11 };
             sectionText.SetBinding(TextBlock.TextProperty, new Binding(nameof(Chapter.Section)) { Source = chapters[c] });
-            var chapterText = new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+            sectionText.TextTrimming = TextTrimming.CharacterEllipsis;
+            var chapterText = new TextBlock { FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, MaxHeight = Math.Max(0, book.TimelineHeaderHeight - 35) };
             chapterText.SetBinding(TextBlock.TextProperty, new Binding(nameof(Chapter.Title)) { Source = chapters[c] });
             header.Children.Add(sectionText); header.Children.Add(chapterText);
-            AddTimelineCell(header, 0, c + 1, false);
+            var headerCell = AddTimelineCell(header, 0, c + 1, false);
+            headerCell.ClipToBounds = true;
+            headerCell.SizeChanged += (_, _) => chapterText.MaxHeight = Math.Max(0, headerCell.ActualHeight - sectionText.ActualHeight - 20);
         }
         for (int r = 0; r < plotlines.Count; r++)
         {
@@ -311,7 +319,7 @@ public partial class MainWindow : Window
         {
             int row = Grid.GetRow(cell), column = Grid.GetColumn(cell);
             cell.Measure(new Size(TimelineGrid.ColumnDefinitions[column].Width.Value, double.PositiveInfinity));
-            heights[row] = Math.Max(heights[row], cell.DesiredSize.Height);
+            if (row > 0) heights[row] = Math.Max(heights[row], cell.DesiredSize.Height);
         }
         foreach (var column in TimelineGrid.ColumnDefinitions)
             column.Width = new GridLength(column.Width.Value * _timelineZoom);
@@ -791,12 +799,12 @@ public partial class MainWindow : Window
         => (Keyboard.FocusedElement as TextBoxBase ?? FocusManager.GetFocusedElement(this) as TextBoxBase) is { IsVisible: true } editor ? editor : null;
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
-        if (FocusedTextEditor() is TextBox editor) { _textUndo.Apply(editor, false); return; }
+        if (FocusedTextEditor() is TextBox editor && !Equals(editor.Tag, "TagDraft")) { _textUndo.Apply(editor, false); return; }
         Vm.Undo(); RefreshAll();
     }
     private void Redo_Click(object sender, RoutedEventArgs e)
     {
-        if (FocusedTextEditor() is TextBox editor) { _textUndo.Apply(editor, true); return; }
+        if (FocusedTextEditor() is TextBox editor && !Equals(editor.Tag, "TagDraft")) { _textUndo.Apply(editor, true); return; }
         Vm.Redo(); RefreshAll();
     }
     private void ZoomIn_Click(object sender, RoutedEventArgs e) => SetTimelineZoom(_timelineZoom + 0.1);
@@ -1143,6 +1151,19 @@ public partial class MainWindow : Window
             Vm.AddScene();
             Scene secondScene = Vm.SelectedScene!;
             if (secondScene.BookId != secondBook.Id || secondScene.ChapterId != secondChapter.Id) failures.Add("A scene was assigned across book/chapter boundaries");
+            string shortChapterTitle = secondChapter.Title;
+            secondChapter.Title = string.Concat(Enumerable.Repeat("A very long chapter title that must fit inside the timeline header ", 12));
+            BuildTimeline(); UpdateLayout();
+            double headerHeight = TimelineGrid.RowDefinitions[0].ActualHeight;
+            if (Math.Abs(headerHeight - secondBook.TimelineHeaderHeight) > 1) failures.Add("Long chapter title expanded the timeline header");
+            var chapterHeader = FindVisualChildren<Border>(TimelineGrid).FirstOrDefault(border => Grid.GetRow(border) == 0 && Grid.GetColumn(border) == 1);
+            var chapterLabel = chapterHeader is null ? null : FindVisualChildren<TextBlock>(chapterHeader).FirstOrDefault(text => text.Text == secondChapter.Title);
+            if (chapterLabel?.TextTrimming != TextTrimming.CharacterEllipsis) failures.Add("Timeline chapter title is not ellipsized");
+            TimelineGrid.RowDefinitions[0].Height = new GridLength(headerHeight + 40);
+            UpdateLayout();
+            if (chapterLabel is not null && chapterLabel.MaxHeight <= headerHeight - 35) failures.Add("Timeline title clipping did not adapt to a resized header");
+            secondChapter.Title = shortChapterTitle;
+            BuildTimeline();
             Vm.SelectedBook = firstBook;
             if (!Vm.BookScenes.Contains(firstScene)) failures.Add("First-book scene disappeared after switching books");
             if (Vm.SelectedPlotline?.BookId != firstBook.Id || Vm.BookPlotlines.Any(plotline => plotline.BookId != firstBook.Id)) failures.Add("First-book plotline selection was not isolated");
@@ -1150,6 +1171,18 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             if (!Vm.BookScenes.Contains(secondScene) || !Vm.Project.Scenes.Contains(secondScene) || !FindVisualChildren<Border>(TimelineGrid).Any(border => ReferenceEquals(border.Tag, secondScene))) failures.Add("Second-book scene disappeared from the timeline after switching books");
+            WorkspaceTabs.SelectedIndex = 3; Vm.SelectedScene = secondScene; UpdateLayout();
+            var scenePlotlineSelector = FindVisualChildren<ComboBox>(SceneEditor).First(box => Equals(box.Tag, "ScenePlotline"));
+            Guid originalScenePlotline = secondScene.PlotlineId;
+            Guid alternateScenePlotline = Vm.BookPlotlines.Last().Id;
+            scenePlotlineSelector.SelectedValue = alternateScenePlotline;
+            ScenePlacement_DropDownClosed(scenePlotlineSelector, EventArgs.Empty);
+            if (secondScene.PlotlineId != alternateScenePlotline) failures.Add("Changing plotline did not move the selected scene");
+            Vm.Undo();
+            Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
+            scenePlotlineSelector = FindVisualChildren<ComboBox>(SceneEditor).First(box => Equals(box.Tag, "ScenePlotline"));
+            if (Vm.SelectedScene?.PlotlineId != originalScenePlotline || !Equals(scenePlotlineSelector.SelectedValue, originalScenePlotline)) failures.Add("Undo left the scene plotline selector blank or incorrect");
+            WorkspaceTabs.SelectedIndex = 1;
             Plotline selectedFromTimeline = Vm.BookPlotlines.Last();
             SelectTimelinePlotline(selectedFromTimeline);
             UpdateLayout();
@@ -1286,6 +1319,10 @@ public partial class MainWindow : Window
             tagInput.Input.Text = "Angular";
             tagInput.Input.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(tagInput.Input), 0, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
             if (!Vm.SelectedChapter!.Tags.Contains("Angular") || tagInput.Input.Text.Length != 0) failures.Add("Enter did not create a tag chip and clear the typing area");
+            tagInput.Input.Focus(); Undo_Click(this, new RoutedEventArgs());
+            if (Vm.SelectedChapter!.Tags.Contains("Angular")) failures.Add("Undo in the tag input did not remove the tag chip");
+            tagInput.Input.Focus(); Redo_Click(this, new RoutedEventArgs());
+            if (!Vm.SelectedChapter!.Tags.Contains("Angular")) failures.Add("Redo in the tag input did not restore the tag chip");
             Vm.EditTag(Vm.SelectedChapter.Tags, "jQuery", false); Vm.EditTag(Vm.SelectedChapter.Tags, "Polymer", false);
             UpdateLayout();
             var chips = FindVisualChildren<Button>(tagInput).Where(button => button.Tag is string).ToList();
@@ -1536,7 +1573,7 @@ public partial class MainWindow : Window
         string path = Path.Combine(AppContext.BaseDirectory, "Docs", Loc.IsRussian ? "USER_GUIDE.ru.md" : "USER_GUIDE.md");
         if (File.Exists(path)) Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
     }
-    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis 1.2.9\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
+    private void About_Click(object sender, RoutedEventArgs e) => MessageBox.Show("ArcTrellis " + typeof(MainWindow).Assembly.GetName().Version?.ToString(3) + "\n\n" + Loc.T("A private, local-first visual story planner for Windows.\nNo cloud account, tracking, or network connection required."), Loc.T("About ArcTrellis"), MessageBoxButton.OK, MessageBoxImage.Information);
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

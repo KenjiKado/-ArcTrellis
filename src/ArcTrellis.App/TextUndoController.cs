@@ -18,7 +18,7 @@ public sealed class TextUndoController
         window.AddHandler(CommandManager.PreviewExecutedEvent, new ExecutedRoutedEventHandler((_, e) =>
         {
             if (e.Command != ApplicationCommands.Undo && e.Command != ApplicationCommands.Redo) return;
-            if (Keyboard.FocusedElement is not TextBox box) return;
+            if (Keyboard.FocusedElement is not TextBox box || Equals(box.Tag, "TagDraft")) return;
             Apply(box, e.Command == ApplicationCommands.Redo); e.Handled = true;
         }), true);
         window.AddHandler(Keyboard.GotKeyboardFocusEvent, new KeyboardFocusChangedEventHandler((_, e) =>
