@@ -70,9 +70,11 @@ public partial class MainWindow
         cancel.Click += (_, _) => CloseSceneFilter();
         clear.Click += (_, _) => ClearSceneFilters();
         actions.Children.Add(apply); actions.Children.Add(cancel); actions.Children.Add(clear);
-        var root = new DockPanel { Width = 404 };
+        // Reserve the footer within a fixed, screen-bounded viewport. Popup
+        // windows can otherwise clip the menu when inline choices expand.
+        var root = new DockPanel { Width = 404, Height = Math.Max(220, Math.Min(620, SystemParameters.WorkArea.Height * 0.65)) };
         DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
-        root.Children.Add(new ScrollViewer { Content = fields, MaxHeight = Math.Max(220, Math.Min(580, SystemParameters.WorkArea.Height - 150)), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        root.Children.Add(new ScrollViewer { Content = fields, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
         _sceneFilter = new ContextMenu { PlacementTarget = SceneFilterButton, Placement = PlacementMode.Custom, StaysOpen = true, Padding = new Thickness(0) };
         _sceneFilter.SetResourceReference(ForegroundProperty, "TextBrush");
         var border = new FrameworkElementFactory(typeof(Border));

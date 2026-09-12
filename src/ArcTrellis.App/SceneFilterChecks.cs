@@ -68,6 +68,13 @@ public partial class MainWindow
             failures.Add("Scene filter menu did not retain multiple choices while staying open");
         if (Vm.HasSceneFilters || SceneList.Items.Count != 4) failures.Add("Editing a filter draft changed the scene list before Apply");
         _sceneChapterChoices.Input.Focus(); Drain();
+        foreach (var label in new[] { "Apply", "Cancel", "Clear filters" })
+        {
+            var action = FindVisualChildren<Button>(_sceneFilter!).First(button => Equals(button.Content, Loc.T(label)));
+            var bounds = action.TransformToAncestor(_sceneFilter!).TransformBounds(new Rect(action.RenderSize));
+            if (bounds.Top < 0 || bounds.Bottom > _sceneFilter!.ActualHeight || bounds.Right > _sceneFilter.ActualWidth || action.ActualHeight < 20)
+                failures.Add("Expanded scene filter clips the " + label + " button");
+        }
         SaveVisualPng(_sceneFilter!, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scenes-filter.png"));
         MenuButton("Apply"); Drain();
         if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, b.Id])) failures.Add("Applied scene filters did not combine categories correctly");
