@@ -74,7 +74,6 @@ public partial class MainWindow
         panel.Children.Add(new TextBlock { Text = Loc.T("Tags"), Margin = new Thickness(0, 12, 0, 5) });
         _filterTagsInput = new TagInput { Project = Vm.Project, Tags = _filterDraftTags, ExistingOnly = true, InlineSuggestions = true };
         panel.Children.Add(_filterTagsInput);
-        panel.Children.Add(new TextBlock { Text = Loc.T("Any selected status and any selected tag"), TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Margin = new Thickness(0, 6, 0, 10) });
         var actions = new WrapPanel();
         var apply = new Button { Content = Loc.T("Apply") };
         var cancel = new Button { Content = Loc.T("Cancel") };

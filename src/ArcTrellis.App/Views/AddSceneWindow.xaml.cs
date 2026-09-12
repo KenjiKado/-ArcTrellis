@@ -30,7 +30,7 @@ public partial class AddSceneWindow : Window
             ThemeChrome.Apply(this, Application.Current.Resources["PageBrush"] is SolidColorBrush brush && brush.Color.R < 64);
             ThemeChrome.HideIcon(this);
         };
-        Loaded += (_, _) => { Loc.Apply(this); TitleInput.Focus(); TitleInput.SelectAll(); };
+        Loaded += (_, _) => { Loc.Apply(this); TitleInput.Focus(); TitleInput.CaretIndex = TitleInput.Text.Length; TitleInput.SelectionLength = 0; };
     }
     private void UpdateSaveEnabled() => SaveButton.IsEnabled = !string.IsNullOrWhiteSpace(TitleInput.Text)
         && StatusInput.SelectedItem is SceneStatusOption && PlotlineInput.SelectedItem is Plotline;

@@ -973,13 +973,22 @@ public partial class MainWindow : Window
             if (duplicateVm.Project.Scenes.Count != 1) failures.Add("Undo failed for duplicate scene after reverting the later edit");
             foreach (Window titleEditor in new Window[] { new EditBookWindow(new Book()), new EditPlotlineWindow(new Plotline()) })
             {
+                titleEditor.Show();
+                titleEditor.UpdateLayout();
                 var input = (TextBox)titleEditor.FindName("TitleInput");
                 var save = (Button)titleEditor.FindName("SaveButton");
+                if (input.SelectionLength != 0) failures.Add("Popup first input selected all text");
                 foreach (string blank in new[] { "", "   " }) { input.Text = blank; if (save.IsEnabled) failures.Add("Save enabled for blank title"); }
                 input.Text = "Valid title";
                 if (!save.IsEnabled) failures.Add("Save did not enable for valid title");
                 titleEditor.Close();
             }
+            var sceneEditor = new AddSceneWindow("Scene 1", Vm.SceneStatuses, Vm.BookPlotlines, Vm.SelectedPlotline?.Id) { Owner = this };
+            sceneEditor.Show();
+            sceneEditor.UpdateLayout();
+            var sceneTitleInput = (TextBox)sceneEditor.FindName("TitleInput");
+            if (sceneTitleInput.SelectionLength != 0) failures.Add("Add Scene first input selected all text");
+            sceneEditor.Close();
 
             var editProject = new TemplateService().CreateBlank();
             var editVm = new MainViewModel(editProject);
