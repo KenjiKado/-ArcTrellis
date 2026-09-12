@@ -237,7 +237,9 @@ public partial class MainWindow : Window
     private void RefreshSceneList()
     {
         if (!ViewChanged(ref _sceneListState, SceneListState())) return;
-        SceneList.Items.Refresh();
+        // Refresh the filtered source view; ItemCollection.Refresh can only
+        // reset the displayed items when the source view is not marked dirty.
+        ((CollectionViewSource)Resources["SceneListView"]).View?.Refresh();
         if (Vm.SelectedScene is null || !Vm.BookScenes.Contains(Vm.SelectedScene) || !Vm.MatchesSceneFilter(Vm.SelectedScene))
             Vm.SelectedScene = Vm.BookScenes.FirstOrDefault(Vm.MatchesSceneFilter);
     }
@@ -1664,4 +1666,3 @@ public partial class MainWindow : Window
     private static SolidColorBrush BrushFrom(string color) => new(BrushColor(color));
     private static Color BrushColor(string color) { try { return (Color)ColorConverter.ConvertFromString(color); } catch { return Colors.SlateBlue; } }
 }
-
