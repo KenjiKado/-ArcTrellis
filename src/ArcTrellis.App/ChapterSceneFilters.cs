@@ -71,7 +71,7 @@ public partial class MainWindow
             _filterStatusChecks.Add(check); panel.Children.Add(check);
         }
         panel.Children.Add(new TextBlock { Text = Loc.T("Tags"), Margin = new Thickness(0, 12, 0, 5) });
-        _filterTagsInput = new TagInput { Project = Vm.Project, Tags = _filterDraftTags, ExistingOnly = true };
+        _filterTagsInput = new TagInput { Project = Vm.Project, Tags = _filterDraftTags, ExistingOnly = true, InlineSuggestions = true };
         panel.Children.Add(_filterTagsInput);
         panel.Children.Add(new TextBlock { Text = Loc.T("Any selected status and any selected tag"), TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Margin = new Thickness(0, 6, 0, 10) });
         var actions = new WrapPanel();
@@ -138,6 +138,31 @@ public partial class MainWindow
         if (Vm.HasChapterFilters) failures.Add("Canceling filters changed the active filters");
         ChapterFilter_Click(this, new RoutedEventArgs());
         if (_filterStatusChecks.Any(c => c.IsChecked == true)) failures.Add("Canceled filter draft remained selected");
+        var taggedChapter = Vm.SelectedChapter!;
+        taggedChapter.Tags.Add("__filter_alpha");
+        taggedChapter.Tags.Add("__filter_beta");
+        Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+        foreach (string tag in new[] { "__filter_alpha", "__filter_beta" })
+        {
+            _filterTagsInput!.Input.Focus();
+            _filterTagsInput.Input.Text = tag;
+            _chapterFilter!.UpdateLayout();
+            var list = _filterTagsInput.SuggestionList;
+            list.UpdateLayout();
+            var container = list.ItemContainerGenerator.ContainerFromIndex(0) as ListBoxItem;
+            if (!_filterTagsInput.SuggestionsOpen || container is null)
+                failures.Add("Filter tag suggestions did not open");
+            else
+                container.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
+                { RoutedEvent = Mouse.PreviewMouseUpEvent });
+            Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+            if (_chapterFilter.IsOpen != true || !_filterDraftTags.Contains(tag))
+                failures.Add("Choosing a tag closed the filter or did not select the tag");
+            if (Vm.HasChapterFilters) failures.Add("Selecting draft tags applied filters prematurely");
+        }
+        _filterDraftTags.Clear();
+        taggedChapter.Tags.Remove("__filter_alpha");
+        taggedChapter.Tags.Remove("__filter_beta");
         _filterStatusChecks[0].IsChecked = true; _filterStatusChecks[1].IsChecked = true;
         Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
         _chapterFilter!.UpdateLayout();
@@ -155,4 +180,5 @@ public partial class MainWindow
         if (ChapterList.Items.Count != chapterCount || Vm.SelectedChapter is null) failures.Add("Clearing chapter filters did not restore the list and selection");
     }
 }
+
 

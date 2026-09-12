@@ -120,7 +120,7 @@
         </TabItem>
 
         <TabItem Header="Chapters">
-          <Grid Margin="8"><Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <Grid Margin="8"><Grid.ColumnDefinitions><ColumnDefinition Width="350"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <Border Style="{StaticResource Card}"><DockPanel>
               <StackPanel DockPanel.Dock="Top">
                 <ComboBox ItemsSource="{Binding Project.Books}" SelectedValuePath="Id" SelectedValue="{Binding SelectedBookId}" DisplayMemberPath="Title"/>
@@ -238,6 +238,7 @@
   </DockPanel>
 
 </Window>
+
 
 
 

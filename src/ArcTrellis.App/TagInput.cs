@@ -27,6 +27,27 @@ public sealed class TagInput : UserControl
     public static readonly DependencyProperty TagsProperty = DependencyProperty.Register(nameof(Tags), typeof(ObservableCollection<string>), typeof(TagInput), new PropertyMetadata(null, TagsChanged));
     public static readonly RoutedEvent TagEditRequestedEvent = EventManager.RegisterRoutedEvent("TagEditRequested", RoutingStrategy.Bubble, typeof(EventHandler<TagEditEventArgs>), typeof(TagInput));
     public bool ExistingOnly { get; set; }
+    // Filter menus share one popup and mouse capture with their suggestions.
+    public bool InlineSuggestions
+    {
+        get => _inlineSuggestions;
+        set
+        {
+            if (_inlineSuggestions == value) return;
+            CloseSuggestions();
+            _inlineSuggestions = value;
+            if (value) { _dropdown.Visibility = Visibility.Collapsed; _popup.Child = null; _layout.Children.Add(_dropdown); }
+            else { _dropdown.Visibility = Visibility.Visible; _layout.Children.Remove(_dropdown); _popup.Child = _dropdown; }
+        }
+    }
+    private bool _inlineSuggestions;
+    private readonly StackPanel _layout = new();
+    private readonly Border _dropdown;
+    private void CloseSuggestions()
+    {
+        _popup.IsOpen = false;
+        if (_inlineSuggestions) _dropdown.Visibility = Visibility.Collapsed;
+    }
     public StoryProject? Project { get => (StoryProject?)GetValue(ProjectProperty); set => SetValue(ProjectProperty, value); }
     public ObservableCollection<string>? Tags { get => (ObservableCollection<string>?)GetValue(TagsProperty); set => SetValue(TagsProperty, value); }
     private readonly WrapPanel _row = new() { Orientation = Orientation.Horizontal };
@@ -35,17 +56,18 @@ public sealed class TagInput : UserControl
     private readonly ListBox _suggestions = new() { MaxHeight = 210, MinWidth = 180, BorderThickness = new Thickness(0) };
     private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Custom };
     internal bool IsSuggestionsMouseOver => _suggestions.IsMouseOver;
-    internal bool SuggestionsOpen => _popup.IsOpen;
+    internal bool SuggestionsOpen => InlineSuggestions ? _dropdown.Visibility == Visibility.Visible : _popup.IsOpen;
+    internal ListBox SuggestionList => _suggestions;
     internal IEnumerable<string> Suggestions => _suggestions.Items.Cast<string>();
 
     public TagInput()
     {
         _frame.SetResourceReference(Border.BackgroundProperty, "InputBrush");
         _frame.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
-        _frame.Child = _row; _row.Children.Add(Input); Content = _frame;
+        _frame.Child = _row; _row.Children.Add(Input); _layout.Children.Add(_frame); Content = _layout;
         _suggestions.SetResourceReference(BackgroundProperty, "ElevatedBrush");
         _suggestions.SetResourceReference(ForegroundProperty, "TextBrush");
-        var dropdown = new Border { Child = _suggestions, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), Padding = new Thickness(2) };
+        var dropdown = _dropdown = new Border { Child = _suggestions, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), Padding = new Thickness(2) };
         dropdown.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
         dropdown.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         _popup.Child = dropdown; _popup.PlacementTarget = _frame;
@@ -61,15 +83,15 @@ public sealed class TagInput : UserControl
             { Commit(tag); e.Handled = true; }
         };
         LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
-        { if (!IsKeyboardFocusWithin && !_suggestions.IsKeyboardFocusWithin) _popup.IsOpen = false; }), DispatcherPriority.Input);
+        { if (!IsKeyboardFocusWithin && !_suggestions.IsKeyboardFocusWithin) CloseSuggestions(); }), DispatcherPriority.Input);
         Loaded += (_, _) => { Subscribe(); RenderTags(); };
-        Unloaded += (_, _) => { if (Tags is not null) Tags.CollectionChanged -= CollectionChanged; _popup.IsOpen = false; Input.Clear(); };
+        Unloaded += (_, _) => { if (Tags is not null) Tags.CollectionChanged -= CollectionChanged; CloseSuggestions(); Input.Clear(); };
     }
     private static void TagsChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
     {
         var control = (TagInput)sender;
         if (e.OldValue is ObservableCollection<string> old) old.CollectionChanged -= control.CollectionChanged;
-        control.Input.Clear(); control._popup.IsOpen = false;
+        control.Input.Clear(); control.CloseSuggestions();
         if (control.IsLoaded) control.Subscribe();
         control.RenderTags();
     }
@@ -103,7 +125,9 @@ public sealed class TagInput : UserControl
     {
         IReadOnlyList<string> matches = Project is null || Tags is null ? [] : TagService.Suggest(Project, Tags, Input.Text);
         _suggestions.ItemsSource = matches; _suggestions.SelectedIndex = -1;
-        _popup.IsOpen = IsLoaded && Input.IsKeyboardFocusWithin && matches.Count > 0;
+        bool show = IsLoaded && Input.IsKeyboardFocusWithin && matches.Count > 0;
+        if (InlineSuggestions) _dropdown.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        else _popup.IsOpen = show;
     }
     private void InputKeyDown(object sender, KeyEventArgs e)
     {
@@ -112,9 +136,9 @@ public sealed class TagInput : UserControl
             if (Tags is { Count: > 0 }) Request(Tags[^1], true);
             e.Handled = true;
         }
-        else if (e.Key == Key.Enter) { Commit(_popup.IsOpen ? _suggestions.SelectedItem as string ?? Input.Text : Input.Text); e.Handled = true; }
-        else if (e.Key == Key.Escape) { _popup.IsOpen = false; Input.Focus(); e.Handled = true; }
-        else if (_popup.IsOpen && e.Key is Key.Down or Key.Up)
+        else if (e.Key == Key.Enter) { Commit(SuggestionsOpen ? _suggestions.SelectedItem as string ?? Input.Text : Input.Text); e.Handled = true; }
+        else if (e.Key == Key.Escape) { CloseSuggestions(); Input.Focus(); e.Handled = true; }
+        else if (SuggestionsOpen && e.Key is Key.Down or Key.Up)
         {
             int direction = e.Key == Key.Down ? 1 : -1;
             _suggestions.SelectedIndex = Math.Clamp(_suggestions.SelectedIndex + direction, 0, _suggestions.Items.Count - 1);
@@ -124,7 +148,7 @@ public sealed class TagInput : UserControl
     private void Commit(string value)
     {
         if (string.IsNullOrWhiteSpace(value)) return;
-        Request(value.Trim(), false); Input.Clear(); _popup.IsOpen = false; Input.Focus();
+        Request(value.Trim(), false); Input.Clear(); CloseSuggestions(); Input.Focus();
     }
     private void Request(string value, bool remove)
     {
@@ -142,5 +166,6 @@ public sealed class TagInput : UserControl
         RaiseEvent(new TagEditEventArgs(value, remove) { Source = this });
     }
 }
+
 
 
