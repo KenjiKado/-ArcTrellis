@@ -171,10 +171,30 @@ public partial class MainWindow : Window
         box.CaretIndex = 1;
         return true;
     }
+    private void ScenePlacement_DropDownClosed(object? sender, EventArgs e)
+    {
+        if (!_loaded || sender is not ComboBox box || box.DataContext is not Scene scene || box.SelectedValue is not Guid selectedId) return;
+
+        Guid chapterId = scene.ChapterId;
+        Guid plotlineId = scene.PlotlineId;
+        if (Equals(box.Tag, "ScenePlotline")) plotlineId = selectedId;
+        else if (Equals(box.Tag, "SceneChapter")) chapterId = selectedId;
+        else return;
+
+        if (chapterId == scene.ChapterId && plotlineId == scene.PlotlineId) return;
+        Vm.MoveScene(scene, chapterId, plotlineId);
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            SceneList.Items.Refresh();
+            BuildTimeline();
+        }), DispatcherPriority.Background);
+    }
+
     private void AnySelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_loaded) return;
         if (e.OriginalSource is not ComboBox box || !box.IsKeyboardFocusWithin) return;
+        if (box.Tag is "ScenePlotline" or "SceneChapter") return;
         if (box.SelectedItem is Book) Dispatcher.BeginInvoke(new Action(BuildTimeline), DispatcherPriority.Background);
         else if (e.RemovedItems.Count == 1 && e.AddedItems.Count == 1 && box.GetBindingExpression(Selector.SelectedValueProperty) is { } binding && binding.ResolvedSource is ObservableObject source)
         {
@@ -183,16 +203,6 @@ public partial class MainWindow : Window
             binding.UpdateSource();
             Vm.RecordPropertyEdit(source, binding.ResolvedSourcePropertyName, previous, next);
             if (source is Chapter) RefreshChapterFilter();
-            if (source is Scene)
-            {
-                // Plotline/chapter changes affect both the Scenes list item template
-                // and the Timeline grouping. Rebuild after the binding has committed.
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    SceneList.Items.Refresh();
-                    BuildTimeline();
-                }), DispatcherPriority.Background);
-            }
         }
     }
 
