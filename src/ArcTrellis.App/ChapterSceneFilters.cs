@@ -53,7 +53,8 @@ public partial class MainWindow
     }
     private void UpdateChapterFilterButton()
     {
-        ChapterFilterButton.SetResourceReference(BorderBrushProperty, Vm.HasChapterFilters ? "AccentBrush" : "BorderBrush");
+        // Filter state is intentionally not shown as a persistent focus/selection border.
+        ChapterFilterButton.SetResourceReference(BorderBrushProperty, "BorderBrush");
         RefreshChapterFilter();
     }
 

@@ -58,6 +58,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         set
         {
             if (_restoringHistory || !Set(ref _selectedBook, value)) return;
+            SetChapterFilters([], []);
             SelectedChapter = value?.Chapters.OrderBy(x => x.Order).FirstOrDefault();
             Raise(nameof(BookPlotlines));
             SelectedPlotline = value is null ? null : Project.Plotlines.Where(plotline => plotline.BookId == value.Id).OrderBy(plotline => plotline.Order).FirstOrDefault();
