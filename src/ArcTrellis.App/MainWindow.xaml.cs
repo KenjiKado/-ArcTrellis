@@ -114,9 +114,19 @@ public partial class MainWindow : Window
             ShowNewProjectDialog(firstRun: true);
     }
 
-    private void Vm_ProjectReplaced(object? sender, EventArgs e) => Dispatcher.BeginInvoke(new Action(() =>
+    private bool _refreshPending;
+    private StoryProject? _boundProject;
+    private void Vm_ProjectReplaced(object? sender, EventArgs e)
     {
+        if (_refreshPending) return;
+        _refreshPending = true;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+        _refreshPending = false;
         RefreshAll();
+        // History retains object identity; reselection is needed only when opening another project.
+        if (ReferenceEquals(_boundProject, Vm.Project)) return;
+        _boundProject = Vm.Project;
         // Reapply selection after WPF replaces the book instances in ItemsSource.
         foreach (var selector in FindVisualChildren<Selector>(this))
         {
@@ -132,7 +142,8 @@ public partial class MainWindow : Window
                 binding.UpdateTarget();
             }
         }
-    }), DispatcherPriority.Loaded);
+        }), DispatcherPriority.Loaded);
+    }
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.OriginalSource, WorkspaceTabs)) return;
@@ -142,7 +153,7 @@ public partial class MainWindow : Window
     }
     private void AnyTextChanged(object sender, TextChangedEventArgs e)
     {
-        if (!_loaded || e.OriginalSource is not TextBox box || !box.IsKeyboardFocusWithin) return;
+        if (!_loaded || Vm.IsRestoringHistory || e.OriginalSource is not TextBox box || !box.IsKeyboardFocusWithin) return;
         if (Equals(box.Tag, "TagDraft") || Equals(box.Tag, "CharacterDraft")) return;
         if (IsNumericInput(box) && NormalizeNumericInput(box)) return;
         Vm.MarkDirty();
@@ -200,7 +211,7 @@ public partial class MainWindow : Window
 
     private void AnySelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!_loaded) return;
+        if (!_loaded || Vm.IsRestoringHistory) return;
         if (e.OriginalSource is not ComboBox box || !box.IsKeyboardFocusWithin) return;
         if (box.Tag is "ScenePlotline" or "SceneChapter") return;
         if (box.SelectedItem is Book) Dispatcher.BeginInvoke(new Action(BuildTimeline), DispatcherPriority.Background);
@@ -216,6 +227,7 @@ public partial class MainWindow : Window
 
     private void RefreshSceneList()
     {
+        if (!ViewChanged(ref _sceneListState, SceneListState())) return;
         SceneList.Items.Refresh();
     }
 
@@ -246,6 +258,7 @@ public partial class MainWindow : Window
 
     private void BuildTimeline()
     {
+        if (!ViewChanged(ref _timelineState, TimelineState())) return;
         TimelineGrid.Children.Clear(); TimelineGrid.RowDefinitions.Clear(); TimelineGrid.ColumnDefinitions.Clear();
         var book = Vm.SelectedBook;
         if (book is null) return;
@@ -626,6 +639,7 @@ public partial class MainWindow : Window
     private void RefreshRelations()
     {
         var entities = Vm.Project.Characters.Concat(Vm.Project.Places).Concat(Vm.Project.Notes).ToList();
+        if (RelationFrom.ItemsSource is IEnumerable<StoryEntity> previous && previous.SequenceEqual(entities)) return;
         RelationFrom.ItemsSource = entities; RelationTo.ItemsSource = entities;
     }
 
@@ -1496,6 +1510,7 @@ public partial class MainWindow : Window
             scenePlotlineSelector = FindVisualChildren<ComboBox>(SceneEditor).First(box => Equals(box.Tag, "ScenePlotline"));
             if (Vm.SelectedScene?.PlotlineId != originalScenePlotline || !Equals(scenePlotlineSelector.SelectedValue, originalScenePlotline))
                 failures.Add($"Plotline undo mismatch: model={Vm.SelectedScene?.PlotlineId}, selector={scenePlotlineSelector.SelectedValue}, expected={originalScenePlotline}, status={Vm.Status}, tab={Vm.ActiveTab}");
+            CheckStableTagHistory(failures);
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
             File.WriteAllText(reportPath, failures.Count == 0 ? "PASS" : "FAIL: " + string.Join("; ", failures));
         }
@@ -1637,8 +1652,6 @@ public partial class MainWindow : Window
     private static SolidColorBrush BrushFrom(string color) => new(BrushColor(color));
     private static Color BrushColor(string color) { try { return (Color)ColorConverter.ConvertFromString(color); } catch { return Colors.SlateBlue; } }
 }
-
-
 
 
 

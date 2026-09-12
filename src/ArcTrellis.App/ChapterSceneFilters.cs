@@ -45,7 +45,7 @@ public partial class MainWindow
         _refreshingChapterFilter = true;
         try
         {
-            view.Refresh();
+            if (ViewChanged(ref _chapterFilterState, ChapterFilterState(view))) view.Refresh();
             if (Vm.SelectedChapter is null || !view.Contains(Vm.SelectedChapter))
                 Vm.SelectedChapter = view.Cast<Chapter>().FirstOrDefault();
         }
@@ -180,5 +180,4 @@ public partial class MainWindow
         if (ChapterList.Items.Count != chapterCount || Vm.SelectedChapter is null) failures.Add("Clearing chapter filters did not restore the list and selection");
     }
 }
-
 

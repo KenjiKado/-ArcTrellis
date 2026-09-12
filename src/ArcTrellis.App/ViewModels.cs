@@ -40,6 +40,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string? _filePath;
     private bool _isDirty;
     private bool _restoringHistory;
+    public bool IsRestoringHistory => _restoringHistory;
+    private List<Plotline> _bookPlotlines = [];
+    private List<Scene> _bookScenes = [], _chapterScenes = [];
     private string _status = Loc.T("Ready");
 
     public MainViewModel(StoryProject project)
@@ -123,12 +126,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool IsDirty { get => _isDirty; set { if (Set(ref _isDirty, value)) Raise(nameof(WindowTitle)); } }
     public string Status { get => _status; set => Set(ref _status, value); }
     public string WindowTitle => $"{Project.Title}{(IsDirty ? " *" : "")} — ArcTrellis";
-    public IEnumerable<Plotline> BookPlotlines => SelectedBook is null ? [] : Project.Plotlines.Where(plotline => plotline.BookId == SelectedBook.Id).OrderBy(plotline => plotline.Order);
-    public IEnumerable<Scene> BookScenes => SelectedBook is null ? [] : Project.Scenes
+    private static List<T> StableItems<T>(ref List<T> previous, IEnumerable<T> items)
+    {
+        var next = items.ToList();
+        if (!previous.SequenceEqual(next)) previous = next;
+        return previous;
+    }
+    public IEnumerable<Plotline> BookPlotlines => StableItems(ref _bookPlotlines, SelectedBook is null ? [] : Project.Plotlines.Where(plotline => plotline.BookId == SelectedBook.Id).OrderBy(plotline => plotline.Order));
+    public IEnumerable<Scene> BookScenes => StableItems(ref _bookScenes, SelectedBook is null ? [] : Project.Scenes
         .Where(scene => scene.BookId == SelectedBook.Id)
         .OrderBy(scene => SelectedBook.Chapters.FirstOrDefault(chapter => chapter.Id == scene.ChapterId)?.Order ?? int.MaxValue)
         .ThenBy(scene => Project.Plotlines.FirstOrDefault(plotline => plotline.Id == scene.PlotlineId)?.Order ?? int.MaxValue)
-        .ThenBy(scene => scene.Order);
+        .ThenBy(scene => scene.Order));
     public HashSet<string> ChapterStatusFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> ChapterTagFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool HasChapterFilters => ChapterStatusFilter.Count > 0 || ChapterTagFilter.Count > 0;
@@ -141,7 +150,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool MatchesChapterFilter(Chapter chapter) =>
         (ChapterStatusFilter.Count == 0 || ChapterStatusFilter.Contains(chapter.Status))
         && (ChapterTagFilter.Count == 0 || chapter.Tags.Any(ChapterTagFilter.Contains));
-    public IEnumerable<Scene> ChapterScenes => SelectedChapter is null ? [] : Project.Scenes.Where(s => s.ChapterId == SelectedChapter.Id).OrderBy(s => Project.Plotlines.FirstOrDefault(p => p.Id == s.PlotlineId)?.Order ?? int.MaxValue).ThenBy(s => s.Order);
+    public IEnumerable<Scene> ChapterScenes => StableItems(ref _chapterScenes, SelectedChapter is null ? [] : Project.Scenes.Where(s => s.ChapterId == SelectedChapter.Id).OrderBy(s => Project.Plotlines.FirstOrDefault(p => p.Id == s.PlotlineId)?.Order ?? int.MaxValue).ThenBy(s => s.Order));
     public ObservableCollection<SearchResult> SearchResults { get; } = [];
     public IReadOnlyList<SceneStatusOption> SceneStatuses { get; } = [new("Planned", Loc.T("Planned")), new("Drafted", Loc.T("Drafted")), new("Revised", Loc.T("Revised")), new("Final", Loc.T("Final")), new("Cut", Loc.T("Cut"))];
     public void RefreshLocalization() { foreach (var option in SceneStatuses) option.RefreshLocalization(); Raise(nameof(BookPlotlines)); Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Status = Loc.T("Ready"); }
@@ -439,13 +448,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void RestoreHistory(string json)
     {
+        var previousBindings = ViewBindingNames.ToDictionary(name => name, name => GetType().GetProperty(name)!.GetValue(this));
         var bookId = _selectedBook?.Id; var chapterId = _selectedChapter?.Id;
         var plotlineId = _selectedPlotline?.Id; var sceneId = _selectedScene?.Id;
         var characterId = _selectedCharacter?.Id; var placeId = _selectedPlace?.Id;
         var noteId = _selectedNote?.Id; var relationshipId = _selectedRelationship?.Id;
         int bookIndex = _selectedBook is null ? 0 : Project.Books.IndexOf(_selectedBook);
-        // Rebind selections to the restored objects before notifying the UI.
-        _project = _projects.Deserialize(json);
+        _restoringHistory = true;
+        try
+        {
+        ProjectReconciler.Apply(_project, _projects.Deserialize(json));
         TagService.Synchronize(Project);
         _selectedBook = Project.Books.FirstOrDefault(b => b.Id == bookId)
             ?? Project.Books.ElementAtOrDefault(Math.Clamp(bookIndex, 0, Math.Max(0, Project.Books.Count - 1)));
@@ -456,8 +468,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _selectedPlace = Project.Places.FirstOrDefault(p => p.Id == placeId) ?? Project.Places.FirstOrDefault();
         _selectedNote = Project.Notes.FirstOrDefault(n => n.Id == noteId) ?? Project.Notes.FirstOrDefault();
         _selectedRelationship = Project.Relationships.FirstOrDefault(r => r.Id == relationshipId);
-        _restoringHistory = true;
-        try { RaiseAll(); Raise(nameof(SelectedRelationship)); Raise(nameof(SelectedRelationshipId)); }
+        foreach (string name in ViewBindingNames)
+            if (!Equals(previousBindings[name], GetType().GetProperty(name)!.GetValue(this))) Raise(name);
+        }
         finally { _restoringHistory = false; }
     }
 
@@ -506,12 +519,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         field = value; Raise(name); return true;
     }
     private void Raise([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-    private void RaiseAll()
-    {
-        foreach (string name in new[] { nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedChapterId), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedSceneId), nameof(SelectedCharacter), nameof(SelectedCharacterId), nameof(SelectedPlace), nameof(SelectedPlaceId), nameof(SelectedNote), nameof(SelectedNoteId), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle) }) Raise(name);
-    }
+    private static readonly string[] ViewBindingNames = [nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedChapterId), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedSceneId), nameof(SelectedCharacter), nameof(SelectedCharacterId), nameof(SelectedPlace), nameof(SelectedPlaceId), nameof(SelectedNote), nameof(SelectedNoteId), nameof(SelectedRelationship), nameof(SelectedRelationshipId), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle)];
+    private void RaiseAll() { foreach (string name in ViewBindingNames) Raise(name); }
 }
-
 
 
 

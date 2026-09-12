@@ -89,6 +89,7 @@ public sealed class Chapter : ObservableObject
 
 public sealed class Plotline : ObservableObject
 {
+    private Guid _bookId;
     private double _timelineHeight = 0;
     public double TimelineHeight { get => _timelineHeight; set => Set(ref _timelineHeight, double.IsFinite(value) ? Math.Clamp(value, 0, 4000) : 0); }
     private string _name = "Main Plot";
@@ -96,7 +97,7 @@ public sealed class Plotline : ObservableObject
     private string _color = "#5B7CFA";
     private int _order;
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid BookId { get; set; }
+    public Guid BookId { get => _bookId; set => Set(ref _bookId, value); }
     public string Name { get => _name; set => Set(ref _name, value); }
     public string Description { get => _description; set => Set(ref _description, value); }
     public string Color { get => _color; set => Set(ref _color, value); }
@@ -105,6 +106,7 @@ public sealed class Plotline : ObservableObject
 
 public sealed class Scene : ObservableObject
 {
+    private Guid _bookId, _chapterId, _plotlineId;
     private string _title = "New Scene";
     private string _summary = "";
     private string _content = "";
@@ -115,9 +117,9 @@ public sealed class Scene : ObservableObject
     private int _order;
     private int _wordCount;
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid BookId { get; set; }
-    public Guid ChapterId { get; set; }
-    public Guid PlotlineId { get; set; }
+    public Guid BookId { get => _bookId; set => Set(ref _bookId, value); }
+    public Guid ChapterId { get => _chapterId; set => Set(ref _chapterId, value); }
+    public Guid PlotlineId { get => _plotlineId; set => Set(ref _plotlineId, value); }
     public string Title { get => _title; set => Set(ref _title, value); }
     public string Summary { get => _summary; set => Set(ref _summary, value); }
     public string Content { get => _content; set => Set(ref _content, value); }
@@ -175,11 +177,12 @@ public sealed class CustomField : ObservableObject
 
 public sealed class Relationship : ObservableObject
 {
+    private Guid _fromEntityId, _toEntityId;
     private string _type = "Related to";
     private string _description = "";
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid FromEntityId { get; set; }
-    public Guid ToEntityId { get; set; }
+    public Guid FromEntityId { get => _fromEntityId; set => Set(ref _fromEntityId, value); }
+    public Guid ToEntityId { get => _toEntityId; set => Set(ref _toEntityId, value); }
     public string Type { get => _type; set => Set(ref _type, value); }
     public string Description { get => _description; set => Set(ref _description, value); }
 }

@@ -34,6 +34,36 @@ foreach (var template in list)
 var example = templates.CreateFromTemplate(list.First(x => x.Name.Contains("Glass Horizon")));
 string serialized = projectService.Serialize(example);
 var roundTrip = projectService.Deserialize(serialized);
+var stableProject = projectService.Deserialize(serialized);
+var stableBook = stableProject.Books[0];
+var stableChapter = stableBook.Chapters[0];
+var stableScene = stableProject.Scenes[0];
+var stableCharacter = stableProject.Characters[0];
+var stableScenes = stableProject.Scenes;
+var stableTags = stableScene.Tags;
+var stableSnapshot = projectService.Deserialize(projectService.Serialize(stableProject));
+stableSnapshot.Scenes[0].Tags.Add("History probe");
+stableSnapshot.Books[0].Chapters[0].Tags.Add("Chapter history probe");
+stableSnapshot.Characters[0].Tags.Add("Character history probe");
+int resets = 0;
+stableScenes.CollectionChanged += (_, e) => { if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset) resets++; };
+stableTags.CollectionChanged += (_, e) => { if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset) resets++; };
+ProjectReconciler.Apply(stableProject, stableSnapshot);
+Check(ReferenceEquals(stableBook, stableProject.Books[0]) && ReferenceEquals(stableChapter, stableBook.Chapters[0])
+    && ReferenceEquals(stableScene, stableProject.Scenes[0]) && ReferenceEquals(stableCharacter, stableProject.Characters[0])
+    && ReferenceEquals(stableScenes, stableProject.Scenes) && ReferenceEquals(stableTags, stableScene.Tags), "history retains bound objects and collections across editors");
+Check(resets == 0 && stableTags.Contains("History probe") && stableChapter.Tags.Contains("Chapter history probe")
+    && stableCharacter.Tags.Contains("Character history probe"), "tag history applies collection deltas without reset notifications");
+ProjectReconciler.Apply(stableProject, roundTrip);
+Check(projectService.Serialize(stableProject) == projectService.Serialize(roundTrip), "in-place history restores the complete serialized state");
+stableSnapshot.Scenes.Move(0, stableSnapshot.Scenes.Count - 1);
+ProjectReconciler.Apply(stableProject, stableSnapshot);
+Check(ReferenceEquals(stableProject.Scenes[^1], stableScene) && resets == 0, "history reorders retained scenes without replacing them");
+stableSnapshot.Scenes.RemoveAt(stableSnapshot.Scenes.Count - 1);
+ProjectReconciler.Apply(stableProject, stableSnapshot);
+Check(stableProject.Scenes.All(scene => scene.Id != stableScene.Id), "history removes only deleted scenes");
+ProjectReconciler.Apply(stableProject, roundTrip);
+Check(projectService.Serialize(stableProject) == projectService.Serialize(roundTrip), "history restores deleted objects and original ordering");
 Check(roundTrip.Title == example.Title && roundTrip.Scenes.Count == example.Scenes.Count, "project JSON round-trip preserves content");
 Check(SearchService.Search(roundTrip, "compass").Count >= 2, "full-project search finds matching story data");
 
@@ -177,4 +207,3 @@ if (failures.Count > 0)
 }
 Console.WriteLine("All ArcTrellis smoke tests passed.");
 return 0;
-

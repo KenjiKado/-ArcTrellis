@@ -53,6 +53,7 @@ public sealed class TagInput : UserControl
     private readonly WrapPanel _row = new() { Orientation = Orientation.Horizontal };
     internal TextBox Input { get; } = new() { Tag = "TagDraft", MinWidth = 110, Width = 150, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Padding = new Thickness(5, 4, 5, 4), Margin = new Thickness(2), VerticalContentAlignment = VerticalAlignment.Center };
     private readonly Border _frame = new() { CornerRadius = new CornerRadius(5), BorderThickness = new Thickness(1), Padding = new Thickness(4), MinHeight = 40 };
+    internal Border ClickSurface => _frame;
     private readonly ListBox _suggestions = new() { MaxHeight = 210, MinWidth = 180, BorderThickness = new Thickness(0) };
     private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Custom };
     internal bool IsSuggestionsMouseOver => _suggestions.IsMouseOver;
@@ -65,6 +66,13 @@ public sealed class TagInput : UserControl
         _frame.SetResourceReference(Border.BackgroundProperty, "InputBrush");
         _frame.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         _frame.Child = _row; _row.Children.Add(Input); _layout.Children.Add(_frame); Content = _layout;
+        _frame.Cursor = Cursors.IBeam;
+        _frame.MouseDown += (_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left) return;
+            // TextBox and chip buttons handle their own clicks. Empty space forwards focus.
+            Input.Focus(); Input.CaretIndex = Input.Text.Length; e.Handled = true;
+        };
         _suggestions.SetResourceReference(BackgroundProperty, "ElevatedBrush");
         _suggestions.SetResourceReference(ForegroundProperty, "TextBrush");
         var dropdown = _dropdown = new Border { Child = _suggestions, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(4), Padding = new Thickness(2) };
@@ -103,9 +111,17 @@ public sealed class TagInput : UserControl
     private void CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) { RenderTags(); RefreshSuggestions(); }
     private void RenderTags()
     {
-        while (_row.Children.Count > 1) _row.Children.RemoveAt(0);
+        var existing = _row.Children.OfType<Border>().ToDictionary(chip => (string)chip.Tag);
+        foreach (var old in existing.Where(pair => Tags?.Contains(pair.Key) != true).ToList())
+        { _row.Children.Remove(old.Value); existing.Remove(old.Key); }
+        int index = 0;
         foreach (string tag in Tags ?? [])
         {
+            if (existing.TryGetValue(tag, out var retained))
+            {
+                if (_row.Children.IndexOf(retained) != index) { _row.Children.Remove(retained); _row.Children.Insert(index, retained); }
+                index++; continue;
+            }
             var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 7, 0), TextWrapping = TextWrapping.Wrap, MaxWidth = 240 };
             label.SetBinding(TextBlock.TextProperty, new Binding { Source = tag });
             label.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
@@ -116,15 +132,15 @@ public sealed class TagInput : UserControl
             remove.Template = new ControlTemplate(typeof(Button)) { VisualTree = circle };
             remove.Click += (_, _) => { Request(tag, true); Input.Focus(); };
             var chipRow = new StackPanel { Orientation = Orientation.Horizontal }; chipRow.Children.Add(label); chipRow.Children.Add(remove);
-            var chip = new Border { Child = chipRow, CornerRadius = new CornerRadius(15), Padding = new Thickness(8, 4, 5, 4), Margin = new Thickness(2), VerticalAlignment = VerticalAlignment.Center };
+            var chip = new Border { Tag = tag, Child = chipRow, CornerRadius = new CornerRadius(15), Padding = new Thickness(8, 4, 5, 4), Margin = new Thickness(2), VerticalAlignment = VerticalAlignment.Center };
             chip.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
-            _row.Children.Insert(_row.Children.Count - 1, chip);
+            _row.Children.Insert(index++, chip);
         }
     }
     private void RefreshSuggestions()
     {
         IReadOnlyList<string> matches = Project is null || Tags is null ? [] : TagService.Suggest(Project, Tags, Input.Text);
-        _suggestions.ItemsSource = matches; _suggestions.SelectedIndex = -1;
+        if (!Suggestions.SequenceEqual(matches)) { _suggestions.ItemsSource = matches; _suggestions.SelectedIndex = -1; }
         bool show = IsLoaded && Input.IsKeyboardFocusWithin && matches.Count > 0;
         if (InlineSuggestions) _dropdown.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         else _popup.IsOpen = show;
@@ -166,6 +182,4 @@ public sealed class TagInput : UserControl
         RaiseEvent(new TagEditEventArgs(value, remove) { Source = this });
     }
 }
-
-
 

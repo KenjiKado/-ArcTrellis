@@ -110,11 +110,19 @@ public sealed class CharacterInput : UserControl
 
     private void RenderCharacters()
     {
-        while (_row.Children.Count > 1) _row.Children.RemoveAt(0);
+        var existing = _row.Children.OfType<Border>().ToDictionary(chip => (StoryEntity)chip.Tag);
+        foreach (var old in existing.Where(pair => CharacterIds?.Contains(pair.Key.Id) != true || Project?.Characters.Contains(pair.Key) != true).ToList())
+        { _row.Children.Remove(old.Value); existing.Remove(old.Key); }
+        int index = 0;
         foreach (Guid id in CharacterIds ?? [])
         {
             var character = Project?.Characters.FirstOrDefault(candidate => candidate.Id == id);
             if (character is null) continue;
+            if (existing.TryGetValue(character, out var retained))
+            {
+                if (_row.Children.IndexOf(retained) != index) { _row.Children.Remove(retained); _row.Children.Insert(index, retained); }
+                index++; continue;
+            }
             var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 7, 0), TextWrapping = TextWrapping.Wrap, MaxWidth = 240 };
             label.SetBinding(TextBlock.TextProperty, new Binding(nameof(StoryEntity.Name)) { Source = character });
             label.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
@@ -122,10 +130,10 @@ public sealed class CharacterInput : UserControl
             AutomationProperties.SetName(remove, Loc.T("Remove character") + ": " + character.Name);
             remove.Click += (_, _) => { Request(id, null, true); Input.Focus(); };
             var chipRow = new StackPanel { Orientation = Orientation.Horizontal }; chipRow.Children.Add(label); chipRow.Children.Add(remove);
-            var chip = new Border { Child = chipRow, CornerRadius = new CornerRadius(15), Padding = new Thickness(8, 4, 5, 4), Margin = new Thickness(2), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand };
+            var chip = new Border { Tag = character, Child = chipRow, CornerRadius = new CornerRadius(15), Padding = new Thickness(8, 4, 5, 4), Margin = new Thickness(2), VerticalAlignment = VerticalAlignment.Center, Cursor = Cursors.Hand };
             chip.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
             chip.MouseLeftButtonUp += (_, e) => { if (e.OriginalSource is Button) return; RaiseEvent(new CharacterChipClickEventArgs(id) { Source = this }); e.Handled = true; };
-            _row.Children.Insert(_row.Children.Count - 1, chip);
+            _row.Children.Insert(index++, chip);
         }
     }
 
@@ -135,7 +143,7 @@ public sealed class CharacterInput : UserControl
         var matches = Project is null || CharacterIds is null || prefix.Length < 3
             ? []
             : Project.Characters.Where(character => !CharacterIds.Contains(character.Id) && character.Name.Contains(prefix, StringComparison.OrdinalIgnoreCase)).OrderBy(character => character.Name).ToList();
-        _suggestions.ItemsSource = matches; _suggestions.SelectedIndex = -1;
+        if (!Suggestions.SequenceEqual(matches)) { _suggestions.ItemsSource = matches; _suggestions.SelectedIndex = -1; }
         _popup.IsOpen = IsLoaded && Input.IsKeyboardFocusWithin && matches.Count > 0;
     }
 
