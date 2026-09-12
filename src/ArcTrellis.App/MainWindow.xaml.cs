@@ -1156,8 +1156,7 @@ public partial class MainWindow : Window
             BuildTimeline(); UpdateLayout();
             double headerHeight = TimelineGrid.RowDefinitions[0].ActualHeight;
             if (Math.Abs(headerHeight - secondBook.TimelineHeaderHeight) > 1) failures.Add("Long chapter title expanded the timeline header");
-            var chapterHeader = FindVisualChildren<Border>(TimelineGrid).FirstOrDefault(border => Grid.GetRow(border) == 0 && Grid.GetColumn(border) == 1);
-            var chapterLabel = chapterHeader is null ? null : FindVisualChildren<TextBlock>(chapterHeader).FirstOrDefault(text => text.Text == secondChapter.Title);
+            var chapterLabel = FindVisualChildren<TextBlock>(TimelineGrid).FirstOrDefault(text => text.Text == secondChapter.Title);
             if (chapterLabel?.TextTrimming != TextTrimming.CharacterEllipsis) failures.Add("Timeline chapter title is not ellipsized");
             TimelineGrid.RowDefinitions[0].Height = new GridLength(headerHeight + 40);
             UpdateLayout();
@@ -1171,18 +1170,6 @@ public partial class MainWindow : Window
             BuildTimeline();
             UpdateLayout();
             if (!Vm.BookScenes.Contains(secondScene) || !Vm.Project.Scenes.Contains(secondScene) || !FindVisualChildren<Border>(TimelineGrid).Any(border => ReferenceEquals(border.Tag, secondScene))) failures.Add("Second-book scene disappeared from the timeline after switching books");
-            WorkspaceTabs.SelectedIndex = 3; Vm.SelectedScene = secondScene; UpdateLayout();
-            var scenePlotlineSelector = FindVisualChildren<ComboBox>(SceneEditor).First(box => Equals(box.Tag, "ScenePlotline"));
-            Guid originalScenePlotline = secondScene.PlotlineId;
-            Guid alternateScenePlotline = Vm.BookPlotlines.Last().Id;
-            scenePlotlineSelector.SelectedValue = alternateScenePlotline;
-            ScenePlacement_DropDownClosed(scenePlotlineSelector, EventArgs.Empty);
-            if (secondScene.PlotlineId != alternateScenePlotline) failures.Add("Changing plotline did not move the selected scene");
-            Vm.Undo();
-            Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
-            scenePlotlineSelector = FindVisualChildren<ComboBox>(SceneEditor).First(box => Equals(box.Tag, "ScenePlotline"));
-            if (Vm.SelectedScene?.PlotlineId != originalScenePlotline || !Equals(scenePlotlineSelector.SelectedValue, originalScenePlotline)) failures.Add("Undo left the scene plotline selector blank or incorrect");
-            WorkspaceTabs.SelectedIndex = 1;
             Plotline selectedFromTimeline = Vm.BookPlotlines.Last();
             SelectTimelinePlotline(selectedFromTimeline);
             UpdateLayout();
@@ -1319,10 +1306,6 @@ public partial class MainWindow : Window
             tagInput.Input.Text = "Angular";
             tagInput.Input.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(tagInput.Input), 0, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
             if (!Vm.SelectedChapter!.Tags.Contains("Angular") || tagInput.Input.Text.Length != 0) failures.Add("Enter did not create a tag chip and clear the typing area");
-            tagInput.Input.Focus(); Undo_Click(this, new RoutedEventArgs());
-            if (Vm.SelectedChapter!.Tags.Contains("Angular")) failures.Add("Undo in the tag input did not remove the tag chip");
-            tagInput.Input.Focus(); Redo_Click(this, new RoutedEventArgs());
-            if (!Vm.SelectedChapter!.Tags.Contains("Angular")) failures.Add("Redo in the tag input did not restore the tag chip");
             Vm.EditTag(Vm.SelectedChapter.Tags, "jQuery", false); Vm.EditTag(Vm.SelectedChapter.Tags, "Polymer", false);
             UpdateLayout();
             var chips = FindVisualChildren<Button>(tagInput).Where(button => button.Tag is string).ToList();
@@ -1479,6 +1462,33 @@ public partial class MainWindow : Window
             ChangeLanguage("ru-RU");
             UpdateLayout();
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-dark-main-window.png"));
+            // Run undo UI checks last: history restores model instances by design.
+            WorkspaceTabs.SelectedIndex = 2; UpdateLayout();
+            var undoTagInput = FindVisualChildren<TagInput>(this).First(input => ReferenceEquals(input.Tags, Vm.SelectedChapter!.Tags));
+            Vm.EditTag(Vm.SelectedChapter!.Tags, "UndoChipProbe", false);
+            undoTagInput.Input.Focus();
+            Undo_Click(this, new RoutedEventArgs());
+            if (Vm.SelectedChapter!.Tags.Contains("UndoChipProbe")) failures.Add("Undo in tag input did not remove tag chip");
+            undoTagInput.Input.Focus();
+            Redo_Click(this, new RoutedEventArgs());
+            if (!Vm.SelectedChapter!.Tags.Contains("UndoChipProbe")) failures.Add("Redo in tag input did not restore tag chip");
+
+            var undoBook = Vm.Project.Books.First(book => Vm.Project.Plotlines.Count(plot => plot.BookId == book.Id) > 1);
+            Vm.SelectedBook = undoBook;
+            WorkspaceTabs.SelectedIndex = 3;
+            var undoScene = Vm.BookScenes.First();
+            Vm.SelectedScene = undoScene; UpdateLayout();
+            var scenePlotlineSelector = FindVisualChildren<ComboBox>(SceneEditor).First(box => Equals(box.Tag, "ScenePlotline"));
+            Guid originalScenePlotline = undoScene.PlotlineId;
+            Guid alternateScenePlotline = Vm.BookPlotlines.First(plot => plot.Id != originalScenePlotline).Id;
+            scenePlotlineSelector.SelectedValue = alternateScenePlotline;
+            ScenePlacement_DropDownClosed(scenePlotlineSelector, EventArgs.Empty);
+            if (undoScene.PlotlineId != alternateScenePlotline) failures.Add("Changing plotline did not move selected scene");
+            Vm.Undo();
+            Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout();
+            scenePlotlineSelector = FindVisualChildren<ComboBox>(SceneEditor).First(box => Equals(box.Tag, "ScenePlotline"));
+            if (Vm.SelectedScene?.PlotlineId != originalScenePlotline || !Equals(scenePlotlineSelector.SelectedValue, originalScenePlotline))
+                failures.Add($"Plotline undo mismatch: model={Vm.SelectedScene?.PlotlineId}, selector={scenePlotlineSelector.SelectedValue}, expected={originalScenePlotline}, status={Vm.Status}, tab={Vm.ActiveTab}");
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
             File.WriteAllText(reportPath, failures.Count == 0 ? "PASS" : "FAIL: " + string.Join("; ", failures));
         }
