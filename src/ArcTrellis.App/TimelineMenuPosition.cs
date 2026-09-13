@@ -64,14 +64,16 @@ internal static class TimelineMenuPosition
         };
         content.SizeChanged += resized;
         menu.Closed += (_, _) => content.SizeChanged -= resized;
-        Open(target, Fit());
+        // RelativePoint limits measurement to one side of the anchor. Relative
+        // lets the content use the work area while Fit supplies its top-left.
+        Open(target, Fit(), PlacementMode.Relative);
     }
 
-    internal static void Open(FrameworkElement target, Point screenPoint)
+    internal static void Open(FrameworkElement target, Point screenPoint, PlacementMode placement = PlacementMode.RelativePoint)
     {
         if (target.ContextMenu is not { } menu) return;
         menu.PlacementTarget = target;
-        menu.Placement = PlacementMode.RelativePoint;
+        menu.Placement = placement;
         var local = target.PointFromScreen(screenPoint);
         menu.HorizontalOffset = local.X; menu.VerticalOffset = local.Y;
         RoutedEventHandler? opened = null;
