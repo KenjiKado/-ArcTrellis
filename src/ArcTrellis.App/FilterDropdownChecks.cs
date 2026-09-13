@@ -13,6 +13,8 @@ public partial class MainWindow
     {
         void Drain() { Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); SceneFilterSurface.UpdateLayout(); }
         double menuHeight = SceneFilterSurface.ActualHeight;
+        var menuCapture = Mouse.Captured;
+        if (menuCapture?.GetType().Name != "PopupRoot") failures.Add("The filter host did not capture mouse input as a popup");
         foreach (var choice in new[] { _sceneChapterChoices!, _scenePlotlineChoices!, _sceneCharacterChoices! })
         {
             double tagsTop = _sceneFilterTagsInput!.TranslatePoint(new Point(), SceneFilterSurface).Y;
@@ -21,6 +23,8 @@ public partial class MainWindow
                 failures.Add("Autocomplete suggestions are not in a floating popup");
             if (Math.Abs(menuHeight - SceneFilterSurface.ActualHeight) > 1 || Math.Abs(tagsTop - _sceneFilterTagsInput.TranslatePoint(new Point(), SceneFilterSurface).Y) > 1)
                 failures.Add("Opening autocomplete moves filter fields or changes the menu height");
+            if (Mouse.Captured is null || ReferenceEquals(menuCapture, Mouse.Captured))
+                failures.Add("Autocomplete did not take capture from the filter popup");
             var check = choice.Choices.Values.First();
             check.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent });
             if (!_sceneFilter.IsOpen) failures.Add("Clicking a floating autocomplete closed the filter menu");
@@ -38,6 +42,8 @@ public partial class MainWindow
         if (!tags.SuggestionsOpen || ReferenceEquals(PresentationSource.FromVisual(tags.DropdownSurface), PresentationSource.FromVisual(SceneFilterSurface))
             || Math.Abs(menuHeight - SceneFilterSurface.ActualHeight) > 1)
             failures.Add("Tag suggestions do not float independently of the filter layout");
+        if (Mouse.Captured is null || ReferenceEquals(menuCapture, Mouse.Captured))
+            failures.Add("Tag suggestions did not take capture from the filter popup");
         var tagList = FindVisualChildren<ScrollViewer>(tags.SuggestionList).Single();
         tagList.ScrollToEnd(); Drain();
         var tagBar = FindVisualChildren<ScrollBar>(tagList).FirstOrDefault(bar => bar.Orientation == Orientation.Vertical && bar.IsVisible);
