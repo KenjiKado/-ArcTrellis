@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -16,12 +17,16 @@ internal sealed class MultiChoiceInput : UserControl
     private readonly Dictionary<Guid, CheckBox> _checks = [];
     private readonly Dictionary<Guid, Border> _chips = [];
     private readonly WrapPanel _row = new();
-    private readonly Border _dropdown = new() { Visibility = Visibility.Collapsed, BorderThickness = new Thickness(1), Padding = new Thickness(4), CornerRadius = new CornerRadius(4) };
+    private readonly Border _dropdown = new() { BorderThickness = new Thickness(1), Padding = new Thickness(4), CornerRadius = new CornerRadius(4) };
+    private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = true, Placement = PlacementMode.Bottom, Focusable = false };
     private readonly TextBlock _empty = new() { Text = Loc.T("No matches"), Margin = new Thickness(6), Visibility = Visibility.Collapsed };
     internal TextBox Input { get; } = new() { Tag = "FilterDraft", Width = 145, MinHeight = 28, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Margin = new Thickness(2) };
     internal IReadOnlyCollection<Guid> SelectedIds => _selected;
     internal IReadOnlyDictionary<Guid, CheckBox> Choices => _checks;
-    internal bool IsOpen => _dropdown.Visibility == Visibility.Visible;
+    internal bool IsOpen => _popup.IsOpen;
+    internal bool IsDropdownMouseOver => _dropdown.IsMouseOver;
+    internal Border DropdownSurface => _dropdown;
+    internal void CloseDropdown() => _popup.IsOpen = false;
 
     internal MultiChoiceInput(string label, IEnumerable<(Guid Id, string Title)> options, IEnumerable<Guid> selected)
     {
@@ -48,7 +53,10 @@ internal sealed class MultiChoiceInput : UserControl
         AutomationProperties.SetName(arrow, Loc.T(label));
         DockPanel.SetDock(arrow, Dock.Right); content.Children.Add(arrow);
         _row.Children.Add(Input); content.Children.Add(_row); frame.Child = content;
-        layout.Children.Add(frame); layout.Children.Add(_dropdown); Content = layout;
+        _popup.PlacementTarget = frame; _popup.Child = _dropdown;
+        _dropdown.SetBinding(WidthProperty, new Binding(nameof(ActualWidth)) { Source = frame });
+        DropdownChrome.SetCompact(_dropdown, true);
+        layout.Children.Add(frame); layout.Children.Add(_popup); Content = layout;
         var rows = new StackPanel();
         foreach (var option in _options)
         {
@@ -64,9 +72,9 @@ internal sealed class MultiChoiceInput : UserControl
         _empty.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
         _dropdown.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
         _dropdown.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
-        _dropdown.Child = new ScrollViewer { Content = rows, MaxHeight = 140, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        _dropdown.Child = new ScrollViewer { Content = rows, MaxHeight = 210, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         Input.TextChanged += (_, _) => FilterChoices();
-        Input.GotKeyboardFocus += (_, _) => { FilterChoices(); _dropdown.Visibility = Visibility.Visible; };
+        Input.GotKeyboardFocus += (_, _) => { FilterChoices(); _popup.IsOpen = true; };
         Input.PreviewKeyDown += (_, e) =>
         {
             var first = _checks.Values.FirstOrDefault(check => check.Visibility == Visibility.Visible);
@@ -77,20 +85,21 @@ internal sealed class MultiChoiceInput : UserControl
                 if (unselected is not null) unselected.IsChecked = true;
                 e.Handled = true;
             }
-            else if (e.Key == Key.Escape) { _dropdown.Visibility = Visibility.Collapsed; e.Handled = true; }
+            else if (e.Key == Key.Escape) { CloseDropdown(); e.Handled = true; }
         };
         frame.MouseDown += (_, e) =>
         {
             if (e.ChangedButton != MouseButton.Left) return;
-            Input.Focus(); Input.CaretIndex = Input.Text.Length; _dropdown.Visibility = Visibility.Visible; e.Handled = true;
+            Input.Focus(); Input.CaretIndex = Input.Text.Length; _popup.IsOpen = true; e.Handled = true;
         };
         arrow.Click += (_, _) =>
         {
-            if (IsOpen) _dropdown.Visibility = Visibility.Collapsed;
-            else { Input.Focus(); FilterChoices(); _dropdown.Visibility = Visibility.Visible; }
+            if (IsOpen) CloseDropdown();
+            else { Input.Focus(); FilterChoices(); _popup.IsOpen = true; }
         };
         LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
-        { if (!IsKeyboardFocusWithin) _dropdown.Visibility = Visibility.Collapsed; }), DispatcherPriority.Input);
+        { if (!IsKeyboardFocusWithin && !_dropdown.IsKeyboardFocusWithin) CloseDropdown(); }), DispatcherPriority.Input);
+        Unloaded += (_, _) => CloseDropdown();
         RenderChips();
     }
 

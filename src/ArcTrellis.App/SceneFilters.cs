@@ -20,10 +20,20 @@ public partial class MainWindow
     private void SceneList_Filter(object sender, FilterEventArgs e)
         => e.Accepted = e.Item is Scene scene && (DataContext is not MainViewModel vm || vm.MatchesSceneFilter(scene));
 
-    private void CloseSceneFilter() { if (_sceneFilter is not null) _sceneFilter.IsOpen = false; }
+    private void CloseSceneDropdowns()
+    {
+        _sceneChapterChoices?.CloseDropdown(); _scenePlotlineChoices?.CloseDropdown(); _sceneCharacterChoices?.CloseDropdown();
+        _sceneFilterTagsInput?.CloseSuggestions();
+    }
+    private void CloseSceneFilter() { CloseSceneDropdowns(); if (_sceneFilter is not null) _sceneFilter.IsOpen = false; }
+    private bool IsSceneDropdownInteraction(DependencyObject? source) =>
+        _sceneChapterChoices?.IsDropdownMouseOver == true || _scenePlotlineChoices?.IsDropdownMouseOver == true || _sceneCharacterChoices?.IsDropdownMouseOver == true || _sceneFilterTagsInput?.IsSuggestionsMouseOver == true
+        || DropdownChrome.Contains(_sceneChapterChoices?.DropdownSurface, source) || DropdownChrome.Contains(_scenePlotlineChoices?.DropdownSurface, source)
+        || DropdownChrome.Contains(_sceneCharacterChoices?.DropdownSurface, source) || DropdownChrome.Contains(_sceneFilterTagsInput?.DropdownSurface, source);
 
     private bool IsSceneFilterInteraction(DependencyObject? source)
     {
+        if (IsSceneDropdownInteraction(source)) return true;
         var visited = new HashSet<DependencyObject>();
         while (source is not null && visited.Add(source))
         {
@@ -41,7 +51,7 @@ public partial class MainWindow
         CloseChapterFilter();
         _sceneFilterStatusChecks.Clear();
         _sceneFilterDraftTags = new(Vm.SceneTagFilter);
-        var fields = new StackPanel { Margin = new Thickness(12) };
+        var fields = new StackPanel { Margin = new Thickness(12, 12, 12, 6) };
         fields.Children.Add(new TextBlock { Text = Loc.T("Filter scenes"), FontWeight = FontWeights.SemiBold, FontSize = 16 });
         void Label(string value) => fields.Children.Add(new TextBlock { Text = Loc.T(value), Margin = new Thickness(0, 12, 0, 5) });
         Label("Status");
@@ -62,7 +72,7 @@ public partial class MainWindow
         _sceneCharacterChoices = new MultiChoiceInput("Characters", Vm.Project.Characters.OrderBy(character => character.Name, StringComparer.CurrentCultureIgnoreCase).Select(character => (character.Id, character.Name)), Vm.SceneCharacterFilter);
         fields.Children.Add(_sceneCharacterChoices);
         Label("Tags");
-        _sceneFilterTagsInput = new TagInput { Project = Vm.Project, Tags = _sceneFilterDraftTags, ExistingOnly = true, InlineSuggestions = true };
+        _sceneFilterTagsInput = new TagInput { Project = Vm.Project, Tags = _sceneFilterDraftTags, ExistingOnly = true };
         fields.Children.Add(_sceneFilterTagsInput);
 
         var actions = new WrapPanel { Margin = new Thickness(9, 0, 9, 9) };
@@ -73,20 +83,10 @@ public partial class MainWindow
         cancel.Click += (_, _) => CloseSceneFilter();
         clear.Click += (_, _) => ClearSceneFilters();
         actions.Children.Add(apply); actions.Children.Add(cancel); actions.Children.Add(clear);
-        // Reserve the footer within a fixed, screen-bounded viewport. Popup
-        // windows can otherwise clip the menu when inline choices expand.
-        var root = new DockPanel { Width = 404, Height = Math.Max(220, Math.Min(620, SystemParameters.WorkArea.Height * 0.65)) };
-        DockPanel.SetDock(actions, Dock.Bottom); root.Children.Add(actions);
-        root.Children.Add(new ScrollViewer { Content = fields, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        var root = new StackPanel { Width = 404 };
+        root.Children.Add(fields); root.Children.Add(actions);
         _sceneFilter = new ContextMenu { PlacementTarget = SceneFilterButton, Placement = PlacementMode.Custom, StaysOpen = true, Padding = new Thickness(0) };
-        _sceneFilter.SizeChanged += (_, size) =>
-        {
-            // WPF may constrain a popup to the space beside its anchor even
-            // before native placement moves it into the monitor work area.
-            // Let the fields scroll within that actual size, retaining the footer.
-            if (size.NewSize.Height > 100 && root.Height > size.NewSize.Height - 2)
-                root.Height = size.NewSize.Height - 2;
-        };
+        _sceneFilter.Closed += (_, _) => CloseSceneDropdowns();
         _sceneFilter.SetResourceReference(ForegroundProperty, "TextBrush");
         var border = new FrameworkElementFactory(typeof(Border));
         border.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
@@ -101,14 +101,20 @@ public partial class MainWindow
         _sceneFilter.PreviewMouseDown += (_, click) =>
         {
             Point point = click.GetPosition(_sceneFilter);
-            if ((point.X < 0 || point.Y < 0 || point.X > _sceneFilter.ActualWidth || point.Y > _sceneFilter.ActualHeight) && !SceneFilterButton.IsMouseOver)
+            if ((point.X < 0 || point.Y < 0 || point.X > _sceneFilter.ActualWidth || point.Y > _sceneFilter.ActualHeight) && !SceneFilterButton.IsMouseOver && !IsSceneDropdownInteraction(click.OriginalSource as DependencyObject))
                 CloseSceneFilter();
         };
-        _sceneFilter.AddHandler(Mouse.PreviewMouseDownOutsideCapturedElementEvent, new MouseButtonEventHandler((_, _) =>
-        { if (!SceneFilterButton.IsMouseOver) CloseSceneFilter(); }));
-        _sceneFilter.PreviewKeyDown += (_, key) => { if (key.Key == Key.Escape) { CloseSceneFilter(); key.Handled = true; } };
+        _sceneFilter.AddHandler(Mouse.PreviewMouseDownOutsideCapturedElementEvent, new MouseButtonEventHandler((_, click) =>
+        { if (!SceneFilterButton.IsMouseOver && !IsSceneDropdownInteraction(click.OriginalSource as DependencyObject)) CloseSceneFilter(); }));
+        _sceneFilter.PreviewKeyDown += (_, key) =>
+        {
+            if (key.Key != Key.Escape) return;
+            if (_sceneChapterChoices?.IsOpen == true || _scenePlotlineChoices?.IsOpen == true || _sceneCharacterChoices?.IsOpen == true || _sceneFilterTagsInput?.SuggestionsOpen == true) CloseSceneDropdowns();
+            else CloseSceneFilter();
+            key.Handled = true;
+        };
         SceneFilterButton.ContextMenu = _sceneFilter;
-        TimelineMenuPosition.Open(SceneFilterButton, SceneFilterButton.PointToScreen(new Point(0, SceneFilterButton.ActualHeight)));
+        TimelineMenuPosition.OpenFitted(SceneFilterButton, root);
     }
 
     private void ApplySceneFilter()

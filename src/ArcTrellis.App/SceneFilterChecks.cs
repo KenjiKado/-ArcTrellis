@@ -35,6 +35,11 @@ public partial class MainWindow
         var bob = new StoryEntity { Name = "Filter Bob" };
         var unassigned = new StoryEntity { Name = "Filter Unassigned" };
         Vm.Project.Characters.Add(alice); Vm.Project.Characters.Add(bob); Vm.Project.Characters.Add(unassigned);
+        for (int index = 0; index < 24; index++)
+        {
+            Vm.Project.Characters.Add(new StoryEntity { Name = $"Overlay Character {index + 1:00}" });
+            a.Tags.Add($"Overlay tag {index + 1:00}");
+        }
         a.CharacterIds.Add(alice.Id); b.CharacterIds.Add(bob.Id); c.CharacterIds.Add(alice.Id);
         int characterCount = Vm.Project.Characters.Count;
         RefreshAll(); Drain();
@@ -52,6 +57,7 @@ public partial class MainWindow
             failures.Add("Scene filter button is clipped");
         Vm.IsDirty = false;
         SceneFilter_Click(this, new RoutedEventArgs()); Drain();
+        CheckFilterDropdownLayout(failures, reportPath);
         _sceneChapterChoices!.Input.Focus(); Drain();
         if (!_sceneChapterChoices.IsOpen || _sceneChapterChoices.Choices.Count != 2 || _sceneChapterChoices.Choices.Values.Any(check => check.Visibility != Visibility.Visible))
             failures.Add("Chapter filter does not initially show all current-book chapters");
@@ -103,10 +109,10 @@ public partial class MainWindow
                 failures.Add($"Expanded scene filter clips the {label} button: {bounds} inside {_sceneFilter!.RenderSize}");
         }
         SaveVisualPng(_sceneFilter!, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scenes-filter.png"));
-        SaveVisualPng(_sceneChapterChoices, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-filter-autocomplete.png"));
+        SaveVisualPng(_sceneCharacterChoices.DropdownSurface, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-filter-autocomplete.png"));
         MenuButton("Apply"); Drain();
         if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, b.Id])) failures.Add("Applied scene filters did not combine categories correctly");
-        if (_sceneFilter?.IsOpen == true || Vm.BookScenes.Count() != 4) failures.Add("Applying scene filters changed the underlying book scenes or left menu open");
+        if (_sceneFilter?.IsOpen == true || _sceneCharacterChoices.IsOpen || Vm.BookScenes.Count() != 4) failures.Add("Applying scene filters changed the underlying book scenes or left a popup open");
         if (!Vm.SceneCharacterFilter.SetEquals([alice.Id, bob.Id])) failures.Add("Apply did not retain multiple character filters");
         // Each category must independently narrow results, using OR within a category.
         Vm.SetSceneFilters([], [south.Id], [], []); RefreshSceneList();
@@ -131,8 +137,9 @@ public partial class MainWindow
         ClearSceneFilters(); Drain();
         Vm.SetSceneFilters(["Planned"], [north.Id], [journey.Id], ["FilterRed"], [alice.Id]); RefreshSceneList();
         SceneFilter_Click(this, new RoutedEventArgs()); Drain();
+        _sceneChapterChoices!.Input.Focus(); Drain();
         Vm.SelectedBook = previousBook; Drain();
-        if (Vm.HasSceneFilters || _sceneFilter?.IsOpen == true) failures.Add("Switching books did not clear and close all scene filters");
+        if (Vm.HasSceneFilters || _sceneFilter?.IsOpen == true || _sceneChapterChoices.IsOpen) failures.Add("Switching books did not clear and close all scene filters");
         Vm.SelectedBook = book; Drain();
         if (SceneList.Items.Count != 4) failures.Add("Returning to a book restored stale scene filters");
     }
