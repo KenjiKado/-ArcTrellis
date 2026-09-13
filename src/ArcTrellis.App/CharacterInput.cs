@@ -76,6 +76,8 @@ public sealed class CharacterInput : UserControl
         _dropdown.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
         _dropdown.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         _popup.Child = _dropdown; _popup.PlacementTarget = _frame;
+        _dropdown.SetBinding(WidthProperty, new Binding(nameof(ActualWidth)) { Source = _frame });
+        DropdownChrome.SetCompact(_dropdown, true);
         _popup.CustomPopupPlacementCallback = (_, target, _) => [new CustomPopupPlacement(new Point(0, target.Height + 2), PopupPrimaryAxis.Vertical)];
         AutomationProperties.SetName(Input, Loc.T("Characters"));
         Input.TextChanged += (_, _) => RefreshSuggestions();

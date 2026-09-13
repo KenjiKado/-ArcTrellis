@@ -20,10 +20,12 @@ public partial class MainWindow
 
     private void CloseChapterFilter()
     {
+        _filterTagsInput?.CloseSuggestions();
         if (_chapterFilter is not null) _chapterFilter.IsOpen = false;
     }
     private bool IsChapterFilterInteraction(DependencyObject? source)
     {
+        if (_filterTagsInput?.IsSuggestionsMouseOver == true || DropdownChrome.Contains(_filterTagsInput?.DropdownSurface, source)) return true;
         var visited = new HashSet<DependencyObject>();
         while (source is not null && visited.Add(source))
         {
@@ -72,7 +74,7 @@ public partial class MainWindow
             _filterStatusChecks.Add(check); panel.Children.Add(check);
         }
         panel.Children.Add(new TextBlock { Text = Loc.T("Tags"), Margin = new Thickness(0, 12, 0, 5) });
-        _filterTagsInput = new TagInput { Project = Vm.Project, Tags = _filterDraftTags, ExistingOnly = true, InlineSuggestions = true };
+        _filterTagsInput = new TagInput { Project = Vm.Project, Tags = _filterDraftTags, ExistingOnly = true };
         panel.Children.Add(_filterTagsInput);
         var actions = new WrapPanel();
         var apply = new Button { Content = Loc.T("Apply") };
@@ -85,6 +87,7 @@ public partial class MainWindow
 
         // A dropdown menu attached to the toolbar, with no dialog window or modal state.
         _chapterFilter = new ContextMenu { PlacementTarget = ChapterFilterButton, Placement = PlacementMode.Custom, StaysOpen = true, Padding = new Thickness(0) };
+        _chapterFilter.Closed += (_, _) => _filterTagsInput?.CloseSuggestions();
         _chapterFilter.SetResourceReference(ForegroundProperty, "TextBrush");
         var menuBorder = new FrameworkElementFactory(typeof(Border));
         menuBorder.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
@@ -102,15 +105,20 @@ public partial class MainWindow
         {
             Point point = click.GetPosition(_chapterFilter);
             if ((point.X < 0 || point.Y < 0 || point.X > _chapterFilter.ActualWidth || point.Y > _chapterFilter.ActualHeight)
-                && _filterTagsInput?.IsSuggestionsMouseOver != true && !ChapterFilterButton.IsMouseOver) CloseChapterFilter();
+                && _filterTagsInput?.IsSuggestionsMouseOver != true && !DropdownChrome.Contains(_filterTagsInput?.DropdownSurface, click.OriginalSource as DependencyObject) && !ChapterFilterButton.IsMouseOver) CloseChapterFilter();
         };
-        _chapterFilter.AddHandler(Mouse.PreviewMouseDownOutsideCapturedElementEvent, new MouseButtonEventHandler((_, _) =>
+        _chapterFilter.AddHandler(Mouse.PreviewMouseDownOutsideCapturedElementEvent, new MouseButtonEventHandler((_, click) =>
         {
-            if (_filterTagsInput?.IsSuggestionsMouseOver != true && !ChapterFilterButton.IsMouseOver) CloseChapterFilter();
+            if (_filterTagsInput?.IsSuggestionsMouseOver != true && !DropdownChrome.Contains(_filterTagsInput?.DropdownSurface, click.OriginalSource as DependencyObject) && !ChapterFilterButton.IsMouseOver) CloseChapterFilter();
         }));
-        _chapterFilter.PreviewKeyDown += (_, key) => { if (key.Key == Key.Escape) { CloseChapterFilter(); key.Handled = true; } };
+        _chapterFilter.PreviewKeyDown += (_, key) =>
+        {
+            if (key.Key != Key.Escape) return;
+            if (_filterTagsInput?.SuggestionsOpen == true) _filterTagsInput.CloseSuggestions(); else CloseChapterFilter();
+            key.Handled = true;
+        };
         ChapterFilterButton.ContextMenu = _chapterFilter;
-        TimelineMenuPosition.Open(ChapterFilterButton, ChapterFilterButton.PointToScreen(new Point(0, ChapterFilterButton.ActualHeight)));
+        TimelineMenuPosition.OpenFitted(ChapterFilterButton, panel);
     }
     private void ApplyChapterFilter()
     {
@@ -180,4 +188,3 @@ public partial class MainWindow
         if (ChapterList.Items.Count != chapterCount || Vm.SelectedChapter is null) failures.Add("Clearing chapter filters did not restore the list and selection");
     }
 }
-

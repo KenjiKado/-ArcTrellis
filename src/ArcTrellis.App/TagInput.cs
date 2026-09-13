@@ -27,27 +27,9 @@ public sealed class TagInput : UserControl
     public static readonly DependencyProperty TagsProperty = DependencyProperty.Register(nameof(Tags), typeof(ObservableCollection<string>), typeof(TagInput), new PropertyMetadata(null, TagsChanged));
     public static readonly RoutedEvent TagEditRequestedEvent = EventManager.RegisterRoutedEvent("TagEditRequested", RoutingStrategy.Bubble, typeof(EventHandler<TagEditEventArgs>), typeof(TagInput));
     public bool ExistingOnly { get; set; }
-    // Filter menus share one popup and mouse capture with their suggestions.
-    public bool InlineSuggestions
-    {
-        get => _inlineSuggestions;
-        set
-        {
-            if (_inlineSuggestions == value) return;
-            CloseSuggestions();
-            _inlineSuggestions = value;
-            if (value) { _dropdown.Visibility = Visibility.Collapsed; _popup.Child = null; _layout.Children.Add(_dropdown); }
-            else { _dropdown.Visibility = Visibility.Visible; _layout.Children.Remove(_dropdown); _popup.Child = _dropdown; }
-        }
-    }
-    private bool _inlineSuggestions;
     private readonly StackPanel _layout = new();
     private readonly Border _dropdown;
-    private void CloseSuggestions()
-    {
-        _popup.IsOpen = false;
-        if (_inlineSuggestions) _dropdown.Visibility = Visibility.Collapsed;
-    }
+    internal void CloseSuggestions() => _popup.IsOpen = false;
     public StoryProject? Project { get => (StoryProject?)GetValue(ProjectProperty); set => SetValue(ProjectProperty, value); }
     public ObservableCollection<string>? Tags { get => (ObservableCollection<string>?)GetValue(TagsProperty); set => SetValue(TagsProperty, value); }
     private readonly WrapPanel _row = new() { Orientation = Orientation.Horizontal };
@@ -55,9 +37,10 @@ public sealed class TagInput : UserControl
     private readonly Border _frame = new() { CornerRadius = new CornerRadius(5), BorderThickness = new Thickness(1), Padding = new Thickness(4), MinHeight = 40 };
     internal Border ClickSurface => _frame;
     private readonly ListBox _suggestions = new() { MaxHeight = 210, MinWidth = 180, BorderThickness = new Thickness(0) };
-    private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Custom };
+    private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Bottom, Focusable = false };
     internal bool IsSuggestionsMouseOver => _suggestions.IsMouseOver;
-    internal bool SuggestionsOpen => InlineSuggestions ? _dropdown.Visibility == Visibility.Visible : _popup.IsOpen;
+    internal bool SuggestionsOpen => _popup.IsOpen;
+    internal Border DropdownSurface => _dropdown;
     internal ListBox SuggestionList => _suggestions;
     internal IEnumerable<string> Suggestions => _suggestions.Items.Cast<string>();
 
@@ -79,7 +62,9 @@ public sealed class TagInput : UserControl
         dropdown.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
         dropdown.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         _popup.Child = dropdown; _popup.PlacementTarget = _frame;
-        _popup.CustomPopupPlacementCallback = (_, target, _) => [new CustomPopupPlacement(new Point(0, target.Height + 2), PopupPrimaryAxis.Vertical)];
+        _layout.Children.Add(_popup);
+        dropdown.SetBinding(WidthProperty, new Binding(nameof(ActualWidth)) { Source = _frame });
+        DropdownChrome.SetCompact(dropdown, true);
         AutomationProperties.SetName(Input, Loc.T("Tags"));
         Input.TextChanged += (_, _) => RefreshSuggestions();
         Input.GotKeyboardFocus += (_, _) => RefreshSuggestions();
@@ -142,8 +127,9 @@ public sealed class TagInput : UserControl
         IReadOnlyList<string> matches = Project is null || Tags is null ? [] : TagService.Suggest(Project, Tags, Input.Text);
         if (!Suggestions.SequenceEqual(matches)) { _suggestions.ItemsSource = matches; _suggestions.SelectedIndex = -1; }
         bool show = IsLoaded && Input.IsKeyboardFocusWithin && matches.Count > 0;
-        if (InlineSuggestions) _dropdown.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        else _popup.IsOpen = show;
+        // A filter menu owns capture. Its child popup must not take capture away.
+        _popup.StaysOpen = ExistingOnly;
+        _popup.IsOpen = show;
     }
     private void InputKeyDown(object sender, KeyEventArgs e)
     {
@@ -182,4 +168,3 @@ public sealed class TagInput : UserControl
         RaiseEvent(new TagEditEventArgs(value, remove) { Source = this });
     }
 }
-

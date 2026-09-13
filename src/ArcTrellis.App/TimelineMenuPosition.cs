@@ -23,11 +23,57 @@ internal static class TimelineMenuPosition
         };
     }
 
-    internal static void Open(FrameworkElement target, Point screenPoint)
+    internal static void OpenFitted(FrameworkElement target, FrameworkElement content)
+    {
+        // Fit the requested position before opening. WPF otherwise measures a
+        // tall filter only against the space below its anchor and clips it.
+        content.Measure(new Size(content.Width, double.PositiveInfinity));
+        if (target.ContextMenu is not { } menu) return;
+        Point Fit()
+        {
+        var transform = PresentationSource.FromVisual(target)!.CompositionTarget.TransformToDevice;
+        // DesiredSize is capped by the popup's current available space. A
+        // StackPanel still arranges its children at their natural size, so use
+        // that size when chips wrap and require the menu to move upward.
+        var size = transform.Transform(new Vector(Math.Max(content.DesiredSize.Width, content.ActualWidth) + 2,
+            Math.Max(content.DesiredSize.Height, content.ActualHeight) + 2));
+        var screen = target.PointToScreen(new Point(0, target.ActualHeight));
+        var point = new NativePoint { X = (int)Math.Round(screen.X), Y = (int)Math.Round(screen.Y) };
+        var monitor = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (GetMonitorInfo(MonitorFromPoint(point, 2), ref monitor))
+        {
+            screen.X = Math.Max(monitor.Work.Left, Math.Min(screen.X, monitor.Work.Right - size.X));
+            screen.Y = Math.Max(monitor.Work.Top, Math.Min(screen.Y, monitor.Work.Bottom - size.Y));
+        }
+        return screen;
+        }
+        bool queued = false;
+        SizeChangedEventHandler resized = (_, _) =>
+        {
+            if (!menu.IsOpen || queued) return;
+            queued = true;
+            menu.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                queued = false;
+                if (!menu.IsOpen) return;
+                var local = target.PointFromScreen(Fit());
+                if (Math.Abs(menu.HorizontalOffset - local.X) > 0.5) menu.HorizontalOffset = local.X;
+                if (Math.Abs(menu.VerticalOffset - local.Y) > 0.5) menu.VerticalOffset = local.Y;
+                menu.InvalidateMeasure();
+            }));
+        };
+        content.SizeChanged += resized;
+        menu.Closed += (_, _) => content.SizeChanged -= resized;
+        // RelativePoint limits measurement to one side of the anchor. Relative
+        // lets the content use the work area while Fit supplies its top-left.
+        Open(target, Fit(), PlacementMode.Relative);
+    }
+
+    internal static void Open(FrameworkElement target, Point screenPoint, PlacementMode placement = PlacementMode.RelativePoint)
     {
         if (target.ContextMenu is not { } menu) return;
         menu.PlacementTarget = target;
-        menu.Placement = PlacementMode.RelativePoint;
+        menu.Placement = placement;
         var local = target.PointFromScreen(screenPoint);
         menu.HorizontalOffset = local.X; menu.VerticalOffset = local.Y;
         RoutedEventHandler? opened = null;
