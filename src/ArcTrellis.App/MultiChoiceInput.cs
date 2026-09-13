@@ -18,7 +18,9 @@ internal sealed class MultiChoiceInput : UserControl
     private readonly Dictionary<Guid, Border> _chips = [];
     private readonly WrapPanel _row = new();
     private readonly Border _dropdown = new() { BorderThickness = new Thickness(1), Padding = new Thickness(4), CornerRadius = new CornerRadius(4) };
-    private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = true, Placement = PlacementMode.Bottom, Focusable = false };
+    // Nested popups take capture from the context menu and restore it on close.
+    // Without capture, WPF treats clicks on this separate HWND as click-through.
+    private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Bottom, Focusable = false };
     private readonly TextBlock _empty = new() { Text = Loc.T("No matches"), Margin = new Thickness(6), Visibility = Visibility.Collapsed };
     internal TextBox Input { get; } = new() { Tag = "FilterDraft", Width = 145, MinHeight = 28, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Margin = new Thickness(2) };
     internal IReadOnlyCollection<Guid> SelectedIds => _selected;

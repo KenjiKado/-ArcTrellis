@@ -127,8 +127,9 @@ public sealed class TagInput : UserControl
         IReadOnlyList<string> matches = Project is null || Tags is null ? [] : TagService.Suggest(Project, Tags, Input.Text);
         if (!Suggestions.SequenceEqual(matches)) { _suggestions.ItemsSource = matches; _suggestions.SelectedIndex = -1; }
         bool show = IsLoaded && Input.IsKeyboardFocusWithin && matches.Count > 0;
-        // A filter menu owns capture. Its child popup must not take capture away.
-        _popup.StaysOpen = ExistingOnly;
+        // The nested popup takes capture from a filter menu so a click on a
+        // suggestion is not mistaken for an outside click by WPF's MenuBase.
+        _popup.StaysOpen = false;
         _popup.IsOpen = show;
     }
     private void InputKeyDown(object sender, KeyEventArgs e)
