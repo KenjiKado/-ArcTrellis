@@ -33,7 +33,18 @@ internal sealed class MultiChoiceInput : UserControl
         frame.SetResourceReference(Border.BackgroundProperty, "InputBrush");
         frame.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         var content = new DockPanel();
-        var arrow = new Button { Content = "▾", Width = 24, Height = 24, MinHeight = 0, Padding = new Thickness(2), Margin = new Thickness(2), Focusable = false, Cursor = Cursors.Hand };
+        var arrow = new Button { Width = 24, Height = 28, MinHeight = 0, Padding = new Thickness(0), Margin = new Thickness(0), Background = Brushes.Transparent, BorderThickness = new Thickness(0), Focusable = false, Cursor = Cursors.Hand };
+        var arrowSurface = new FrameworkElementFactory(typeof(Border));
+        arrowSurface.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        var glyph = new FrameworkElementFactory(typeof(System.Windows.Shapes.Path));
+        glyph.SetValue(FrameworkElement.WidthProperty, 8d);
+        glyph.SetValue(FrameworkElement.HeightProperty, 5d);
+        glyph.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        glyph.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        glyph.SetValue(System.Windows.Shapes.Path.DataProperty, Geometry.Parse("M 0 0 L 4 4 L 8 0 Z"));
+        glyph.SetResourceReference(System.Windows.Shapes.Path.FillProperty, "MutedBrush");
+        arrowSurface.AppendChild(glyph);
+        arrow.Template = new ControlTemplate(typeof(Button)) { VisualTree = arrowSurface };
         AutomationProperties.SetName(arrow, Loc.T(label));
         DockPanel.SetDock(arrow, Dock.Right); content.Children.Add(arrow);
         _row.Children.Add(Input); content.Children.Add(_row); frame.Child = content;
@@ -45,7 +56,7 @@ internal sealed class MultiChoiceInput : UserControl
             var text = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = 320 };
             text.SetBinding(TextBlock.TextProperty, new Binding { Source = option.Title });
             var check = new CheckBox { Tag = id, IsChecked = _selected.Contains(id), Margin = new Thickness(3), Cursor = Cursors.Hand, Content = text };
-            check.Checked += (_, _) => { _selected.Add(id); RenderChips(); };
+            check.Checked += (_, _) => { _selected.Add(id); RenderChips(); Input.Clear(); };
             check.Unchecked += (_, _) => { _selected.Remove(id); RenderChips(); };
             _checks.Add(id, check); rows.Children.Add(check);
         }

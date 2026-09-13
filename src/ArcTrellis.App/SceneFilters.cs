@@ -13,7 +13,7 @@ public partial class MainWindow
 {
     private ContextMenu? _sceneFilter;
     private readonly List<CheckBox> _sceneFilterStatusChecks = [];
-    private MultiChoiceInput? _sceneChapterChoices, _scenePlotlineChoices;
+    private MultiChoiceInput? _sceneChapterChoices, _scenePlotlineChoices, _sceneCharacterChoices;
     private TagInput? _sceneFilterTagsInput;
     private ObservableCollection<string> _sceneFilterDraftTags = [];
 
@@ -58,6 +58,9 @@ public partial class MainWindow
         Label("Plotlines");
         _scenePlotlineChoices = new MultiChoiceInput("Plotlines", Vm.BookPlotlines.Select(plot => (plot.Id, plot.Name)), Vm.ScenePlotlineFilter);
         fields.Children.Add(_scenePlotlineChoices);
+        Label("Characters");
+        _sceneCharacterChoices = new MultiChoiceInput("Characters", Vm.Project.Characters.OrderBy(character => character.Name, StringComparer.CurrentCultureIgnoreCase).Select(character => (character.Id, character.Name)), Vm.SceneCharacterFilter);
+        fields.Children.Add(_sceneCharacterChoices);
         Label("Tags");
         _sceneFilterTagsInput = new TagInput { Project = Vm.Project, Tags = _sceneFilterDraftTags, ExistingOnly = true, InlineSuggestions = true };
         fields.Children.Add(_sceneFilterTagsInput);
@@ -110,9 +113,9 @@ public partial class MainWindow
 
     private void ApplySceneFilter()
     {
-        if (_sceneChapterChoices is null || _scenePlotlineChoices is null) return;
+        if (_sceneChapterChoices is null || _scenePlotlineChoices is null || _sceneCharacterChoices is null) return;
         Vm.SetSceneFilters(_sceneFilterStatusChecks.Where(check => check.IsChecked == true).Select(check => (string)check.Tag),
-            _sceneChapterChoices.SelectedIds, _scenePlotlineChoices.SelectedIds, _sceneFilterDraftTags);
+            _sceneChapterChoices.SelectedIds, _scenePlotlineChoices.SelectedIds, _sceneFilterDraftTags, _sceneCharacterChoices.SelectedIds);
         CloseSceneFilter(); RefreshSceneList();
     }
 

@@ -31,6 +31,12 @@ public partial class MainWindow
         Vm.AddScene(south.Id, mystery.Id, "Filter B", "Drafted"); var b = Vm.SelectedScene!; Vm.EditTag(b.Tags, "FilterBlue", false);
         Vm.AddScene(south.Id, journey.Id, "Filter C", "Final"); var c = Vm.SelectedScene!; Vm.EditTag(c.Tags, "FilterRed", false);
         Vm.AddScene(north.Id, mystery.Id, "Filter D", "Revised");
+        var alice = new StoryEntity { Name = "Filter Alice" };
+        var bob = new StoryEntity { Name = "Filter Bob" };
+        var unassigned = new StoryEntity { Name = "Filter Unassigned" };
+        Vm.Project.Characters.Add(alice); Vm.Project.Characters.Add(bob); Vm.Project.Characters.Add(unassigned);
+        a.CharacterIds.Add(alice.Id); b.CharacterIds.Add(bob.Id); c.CharacterIds.Add(alice.Id);
+        int characterCount = Vm.Project.Characters.Count;
         RefreshAll(); Drain();
         var characters = FindVisualChildren<CharacterInput>(SceneEditor).Single();
         SceneList.Focus();
@@ -53,21 +59,42 @@ public partial class MainWindow
         if (_sceneChapterChoices.Choices[north.Id].Visibility != Visibility.Visible || _sceneChapterChoices.Choices[south.Id].Visibility != Visibility.Collapsed)
             failures.Add("Chapter autocomplete does not filter typed text case-insensitively");
         _sceneChapterChoices.Choices[north.Id].IsChecked = true;
-        _sceneChapterChoices.Input.Clear(); _sceneChapterChoices.Choices[south.Id].IsChecked = true;
+        if (_sceneChapterChoices.Input.Text.Length != 0 || _sceneChapterChoices.Choices.Values.Any(check => check.Visibility != Visibility.Visible))
+            failures.Add("Choosing a chapter did not clear autocomplete text and restore all choices");
+        _sceneChapterChoices.Choices[south.Id].IsChecked = true;
         _scenePlotlineChoices!.Input.Focus(); Drain();
         if (!_scenePlotlineChoices.IsOpen || _scenePlotlineChoices.Choices.Count != 2 || _scenePlotlineChoices.Choices.Values.Any(check => check.Visibility != Visibility.Visible))
             failures.Add("Plotline filter does not initially show all current-book plotlines");
         _scenePlotlineChoices.Input.Text = "yst";
         if (_scenePlotlineChoices.Choices[mystery.Id].Visibility != Visibility.Visible || _scenePlotlineChoices.Choices[journey.Id].Visibility != Visibility.Collapsed)
             failures.Add("Plotline autocomplete does not match text inside the name");
-        _scenePlotlineChoices.Choices[mystery.Id].IsChecked = true;
-        _scenePlotlineChoices.Input.Clear(); _scenePlotlineChoices.Choices[journey.Id].IsChecked = true;
+        var plotInput = _scenePlotlineChoices.Input;
+        plotInput.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(plotInput), 0, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+        if (!_scenePlotlineChoices.SelectedIds.Contains(mystery.Id) || plotInput.Text.Length != 0 || _scenePlotlineChoices.Choices.Values.Any(check => check.Visibility != Visibility.Visible))
+            failures.Add("Choosing a plotline with Enter did not clear the autocomplete search");
+        _scenePlotlineChoices.Choices[journey.Id].IsChecked = true;
+        _sceneCharacterChoices!.Input.Focus(); Drain();
+        if (!_sceneCharacterChoices.IsOpen || !_sceneCharacterChoices.Choices.Keys.ToHashSet().SetEquals(Vm.Project.Characters.Select(character => character.Id))
+            || _sceneCharacterChoices.Choices.Values.Any(check => check.Visibility != Visibility.Visible))
+            failures.Add("Character filter does not initially show every character in the project");
+        _sceneCharacterChoices.Input.Text = "aLi";
+        if (_sceneCharacterChoices.Choices[alice.Id].Visibility != Visibility.Visible || _sceneCharacterChoices.Choices[bob.Id].Visibility != Visibility.Collapsed)
+            failures.Add("Character autocomplete does not filter names case-insensitively");
+        _sceneCharacterChoices.Choices[alice.Id].IsChecked = true;
+        if (_sceneCharacterChoices.Input.Text.Length != 0 || _sceneCharacterChoices.Choices.Values.Any(check => check.Visibility != Visibility.Visible))
+            failures.Add("Choosing a character did not clear autocomplete text and restore all choices");
+        _sceneCharacterChoices.Choices[bob.Id].IsChecked = true;
+        var removeBob = FindVisualChildren<Button>(_sceneCharacterChoices).Single(button => Equals(button.Tag, bob.Id));
+        removeBob.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        if (_sceneCharacterChoices.SelectedIds.Contains(bob.Id) || !Vm.Project.Characters.Contains(bob) || Vm.Project.Characters.Count != characterCount)
+            failures.Add("Removing a character filter chip changed project characters or left the selection active");
+        _sceneCharacterChoices.Choices[bob.Id].IsChecked = true;
         foreach (var check in _sceneFilterStatusChecks) check.IsChecked = check.Tag is "Planned" or "Drafted";
         TypeTag("FilterRed"); TypeTag("FilterBlue"); Drain();
-        if (_sceneFilterDraftTags.Count != 2 || _sceneChapterChoices.SelectedIds.Count != 2 || _scenePlotlineChoices.SelectedIds.Count != 2 || _sceneFilter?.IsOpen != true)
+        if (_sceneFilterDraftTags.Count != 2 || _sceneChapterChoices.SelectedIds.Count != 2 || _scenePlotlineChoices.SelectedIds.Count != 2 || _sceneCharacterChoices.SelectedIds.Count != 2 || _sceneFilter?.IsOpen != true)
             failures.Add("Scene filter menu did not retain multiple choices while staying open");
         if (Vm.HasSceneFilters || SceneList.Items.Count != 4) failures.Add("Editing a filter draft changed the scene list before Apply");
-        _sceneChapterChoices.Input.Focus(); Drain();
+        _sceneCharacterChoices.Input.Focus(); Drain();
         foreach (var label in new[] { "Apply", "Cancel", "Clear filters" })
         {
             var action = FindVisualChildren<Button>(_sceneFilter!).First(button => Equals(button.Content, Loc.T(label)));
@@ -76,26 +103,33 @@ public partial class MainWindow
                 failures.Add($"Expanded scene filter clips the {label} button: {bounds} inside {_sceneFilter!.RenderSize}");
         }
         SaveVisualPng(_sceneFilter!, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scenes-filter.png"));
+        SaveVisualPng(_sceneChapterChoices, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-filter-autocomplete.png"));
         MenuButton("Apply"); Drain();
         if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, b.Id])) failures.Add("Applied scene filters did not combine categories correctly");
         if (_sceneFilter?.IsOpen == true || Vm.BookScenes.Count() != 4) failures.Add("Applying scene filters changed the underlying book scenes or left menu open");
+        if (!Vm.SceneCharacterFilter.SetEquals([alice.Id, bob.Id])) failures.Add("Apply did not retain multiple character filters");
         // Each category must independently narrow results, using OR within a category.
         Vm.SetSceneFilters([], [south.Id], [], []); RefreshSceneList();
         if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([b.Id, c.Id])) failures.Add("Chapter-only scene filter failed");
-        Vm.SetSceneFilters([], [], [journey.Id], ["filterred"]); RefreshSceneList();
+        Vm.SetSceneFilters([], [], [], [], [bob.Id]); RefreshSceneList();
+        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([b.Id])) failures.Add("Character-only scene filter failed");
+        Vm.SetSceneFilters([], [], [], [], [alice.Id, bob.Id]); RefreshSceneList();
+        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, b.Id, c.Id])) failures.Add("Multiple characters were not combined with OR");
+        Vm.SetSceneFilters([], [], [journey.Id], ["filterred"], [alice.Id]); RefreshSceneList();
         if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, c.Id])) failures.Add("Plotline and tag scene filters failed");
         SceneFilter_Click(this, new RoutedEventArgs()); Drain();
         _sceneFilterStatusChecks[0].IsChecked = true;
+        _sceneCharacterChoices!.Choices[alice.Id].IsChecked = false;
         MenuButton("Cancel"); Drain();
-        if (Vm.SceneStatusFilter.Count != 0 || !SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, c.Id]))
+        if (Vm.SceneStatusFilter.Count != 0 || !Vm.SceneCharacterFilter.SetEquals([alice.Id]) || !SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, c.Id]))
             failures.Add("Cancel changed the active scene filters");
         SceneFilter_Click(this, new RoutedEventArgs()); Drain(); MenuButton("Clear filters"); Drain();
         if (Vm.HasSceneFilters || SceneList.Items.Count != 4) failures.Add("Clear scene filters did not restore all scenes");
         if (Vm.IsDirty) failures.Add("Using scene filters marked the story data as edited");
-        Vm.SetSceneFilters(["Cut"], [], [], []); RefreshSceneList(); Drain();
+        Vm.SetSceneFilters([], [], [], [], [unassigned.Id]); RefreshSceneList(); Drain();
         if (SceneList.Items.Count != 0 || Vm.SelectedScene is not null || SceneEditor.IsEnabled) failures.Add("No-match scene filter left an active scene editor");
         ClearSceneFilters(); Drain();
-        Vm.SetSceneFilters(["Planned"], [north.Id], [journey.Id], ["FilterRed"]); RefreshSceneList();
+        Vm.SetSceneFilters(["Planned"], [north.Id], [journey.Id], ["FilterRed"], [alice.Id]); RefreshSceneList();
         SceneFilter_Click(this, new RoutedEventArgs()); Drain();
         Vm.SelectedBook = previousBook; Drain();
         if (Vm.HasSceneFilters || _sceneFilter?.IsOpen == true) failures.Add("Switching books did not clear and close all scene filters");
