@@ -23,12 +23,11 @@ internal static class TimelineMenuPosition
         };
     }
 
-    internal static void OpenFitted(FrameworkElement target, FrameworkElement content)
+    internal static void OpenFitted(FrameworkElement target, FrameworkElement content, Popup menu)
     {
         // Fit the requested position before opening. WPF otherwise measures a
         // tall filter only against the space below its anchor and clips it.
         content.Measure(new Size(content.Width, double.PositiveInfinity));
-        if (target.ContextMenu is not { } menu) return;
         Point Fit()
         {
         var transform = PresentationSource.FromVisual(target)!.CompositionTarget.TransformToDevice;
@@ -64,9 +63,14 @@ internal static class TimelineMenuPosition
         };
         content.SizeChanged += resized;
         menu.Closed += (_, _) => content.SizeChanged -= resized;
-        // RelativePoint limits measurement to one side of the anchor. Relative
-        // lets the content use the work area while Fit supplies its top-left.
-        Open(target, Fit(), PlacementMode.Relative);
+        // Relative uses the full work area to measure the filter's natural
+        // height; nested dropdowns can then take and restore popup capture.
+        menu.PlacementTarget = target;
+        menu.Placement = PlacementMode.Relative;
+        var initial = target.PointFromScreen(Fit());
+        menu.HorizontalOffset = initial.X;
+        menu.VerticalOffset = initial.Y;
+        menu.IsOpen = true;
     }
 
     internal static void Open(FrameworkElement target, Point screenPoint, PlacementMode placement = PlacementMode.RelativePoint)

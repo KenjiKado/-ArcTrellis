@@ -70,13 +70,13 @@ public sealed class TagInput : UserControl
         Input.GotKeyboardFocus += (_, _) => RefreshSuggestions();
         Input.PreviewKeyDown += InputKeyDown;
         _suggestions.PreviewKeyDown += InputKeyDown;
-        _suggestions.PreviewMouseLeftButtonUp += (_, e) =>
+        _suggestions.PreviewMouseLeftButtonDown += (_, e) =>
         {
             if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(_suggestions, source) is ListBoxItem { Content: string tag })
             { Commit(tag); e.Handled = true; }
         };
         LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
-        { if (!IsKeyboardFocusWithin && !_suggestions.IsKeyboardFocusWithin) CloseSuggestions(); }), DispatcherPriority.Input);
+        { if (!IsKeyboardFocusWithin && !_suggestions.IsKeyboardFocusWithin && !DropdownChrome.PointerWithin(_dropdown)) CloseSuggestions(); }), DispatcherPriority.Input);
         Loaded += (_, _) => { Subscribe(); RenderTags(); };
         Unloaded += (_, _) => { if (Tags is not null) Tags.CollectionChanged -= CollectionChanged; CloseSuggestions(); Input.Clear(); };
     }
@@ -127,8 +127,9 @@ public sealed class TagInput : UserControl
         IReadOnlyList<string> matches = Project is null || Tags is null ? [] : TagService.Suggest(Project, Tags, Input.Text);
         if (!Suggestions.SequenceEqual(matches)) { _suggestions.ItemsSource = matches; _suggestions.SelectedIndex = -1; }
         bool show = IsLoaded && Input.IsKeyboardFocusWithin && matches.Count > 0;
-        // A filter menu owns capture. Its child popup must not take capture away.
-        _popup.StaysOpen = ExistingOnly;
+        // The nested popup takes capture from a filter menu so a click on a
+        // suggestion is not mistaken for an outside click by WPF's MenuBase.
+        _popup.StaysOpen = false;
         _popup.IsOpen = show;
     }
     private void InputKeyDown(object sender, KeyEventArgs e)

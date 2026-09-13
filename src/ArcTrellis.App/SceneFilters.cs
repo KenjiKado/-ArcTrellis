@@ -11,7 +11,8 @@ namespace ArcTrellis.App;
 
 public partial class MainWindow
 {
-    private ContextMenu? _sceneFilter;
+    private Popup? _sceneFilter;
+    private FrameworkElement SceneFilterSurface => (FrameworkElement)_sceneFilter!.Child;
     private readonly List<CheckBox> _sceneFilterStatusChecks = [];
     private MultiChoiceInput? _sceneChapterChoices, _scenePlotlineChoices, _sceneCharacterChoices;
     private TagInput? _sceneFilterTagsInput;
@@ -29,11 +30,13 @@ public partial class MainWindow
     private bool IsSceneDropdownInteraction(DependencyObject? source) =>
         _sceneChapterChoices?.IsDropdownMouseOver == true || _scenePlotlineChoices?.IsDropdownMouseOver == true || _sceneCharacterChoices?.IsDropdownMouseOver == true || _sceneFilterTagsInput?.IsSuggestionsMouseOver == true
         || DropdownChrome.Contains(_sceneChapterChoices?.DropdownSurface, source) || DropdownChrome.Contains(_scenePlotlineChoices?.DropdownSurface, source)
-        || DropdownChrome.Contains(_sceneCharacterChoices?.DropdownSurface, source) || DropdownChrome.Contains(_sceneFilterTagsInput?.DropdownSurface, source);
+        || DropdownChrome.Contains(_sceneCharacterChoices?.DropdownSurface, source) || DropdownChrome.Contains(_sceneFilterTagsInput?.DropdownSurface, source)
+        || DropdownChrome.PointerWithin(_sceneChapterChoices?.DropdownSurface) || DropdownChrome.PointerWithin(_scenePlotlineChoices?.DropdownSurface)
+        || DropdownChrome.PointerWithin(_sceneCharacterChoices?.DropdownSurface) || DropdownChrome.PointerWithin(_sceneFilterTagsInput?.DropdownSurface);
 
     private bool IsSceneFilterInteraction(DependencyObject? source)
     {
-        if (IsSceneDropdownInteraction(source)) return true;
+        if ((_sceneFilter is not null && DropdownChrome.Contains(SceneFilterSurface, source)) || IsSceneDropdownInteraction(source)) return true;
         var visited = new HashSet<DependencyObject>();
         while (source is not null && visited.Add(source))
         {
@@ -85,36 +88,21 @@ public partial class MainWindow
         actions.Children.Add(apply); actions.Children.Add(cancel); actions.Children.Add(clear);
         var root = new StackPanel { Width = 404 };
         root.Children.Add(fields); root.Children.Add(actions);
-        _sceneFilter = new ContextMenu { PlacementTarget = SceneFilterButton, Placement = PlacementMode.Custom, StaysOpen = true, Padding = new Thickness(0) };
+        _sceneFilter = new Popup { PlacementTarget = SceneFilterButton, Placement = PlacementMode.Relative, StaysOpen = false, AllowsTransparency = true };
         _sceneFilter.Closed += (_, _) => CloseSceneDropdowns();
-        _sceneFilter.SetResourceReference(ForegroundProperty, "TextBrush");
-        var border = new FrameworkElementFactory(typeof(Border));
-        border.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
-        border.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
-        border.SetValue(Border.BorderThicknessProperty, new Thickness(1));
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
-        border.AppendChild(new FrameworkElementFactory(typeof(ItemsPresenter)));
-        _sceneFilter.Template = new ControlTemplate(typeof(ContextMenu)) { VisualTree = border };
-        _sceneFilter.CustomPopupPlacementCallback = (_, size, _) => [new CustomPopupPlacement(new Point(0, size.Height), PopupPrimaryAxis.Vertical)];
-        var presenter = new FrameworkElementFactory(typeof(ContentPresenter)); presenter.SetValue(ContentPresenter.ContentSourceProperty, "Header");
-        _sceneFilter.Items.Add(new MenuItem { Header = root, StaysOpenOnClick = true, Focusable = false, Template = new ControlTemplate(typeof(MenuItem)) { VisualTree = presenter } });
-        _sceneFilter.PreviewMouseDown += (_, click) =>
-        {
-            Point point = click.GetPosition(_sceneFilter);
-            if ((point.X < 0 || point.Y < 0 || point.X > _sceneFilter.ActualWidth || point.Y > _sceneFilter.ActualHeight) && !SceneFilterButton.IsMouseOver && !IsSceneDropdownInteraction(click.OriginalSource as DependencyObject))
-                CloseSceneFilter();
-        };
-        _sceneFilter.AddHandler(Mouse.PreviewMouseDownOutsideCapturedElementEvent, new MouseButtonEventHandler((_, click) =>
-        { if (!SceneFilterButton.IsMouseOver && !IsSceneDropdownInteraction(click.OriginalSource as DependencyObject)) CloseSceneFilter(); }));
-        _sceneFilter.PreviewKeyDown += (_, key) =>
+        var surface = new Border { Child = root, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5) };
+        surface.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
+        surface.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        surface.SetResourceReference(ForegroundProperty, "TextBrush");
+        _sceneFilter.Child = surface;
+        root.PreviewKeyDown += (_, key) =>
         {
             if (key.Key != Key.Escape) return;
             if (_sceneChapterChoices?.IsOpen == true || _scenePlotlineChoices?.IsOpen == true || _sceneCharacterChoices?.IsOpen == true || _sceneFilterTagsInput?.SuggestionsOpen == true) CloseSceneDropdowns();
             else CloseSceneFilter();
             key.Handled = true;
         };
-        SceneFilterButton.ContextMenu = _sceneFilter;
-        TimelineMenuPosition.OpenFitted(SceneFilterButton, root);
+        TimelineMenuPosition.OpenFitted(SceneFilterButton, root, _sceneFilter);
     }
 
     private void ApplySceneFilter()

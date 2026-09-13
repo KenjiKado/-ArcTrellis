@@ -61,7 +61,12 @@ public partial class MainWindow : Window
             if (!IsChapterFilterInteraction(e.OriginalSource as DependencyObject)) CloseChapterFilter();
             if (!IsSceneFilterInteraction(e.OriginalSource as DependencyObject)) CloseSceneFilter();
         };
-        Deactivated += (_, _) => { CloseChapterFilter(); CloseSceneFilter(); };
+        Deactivated += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
+        {
+            // Clicking a floating suggestion can activate its own popup HWND.
+            if (DropdownChrome.ForegroundBelongsToApp()) return;
+            CloseChapterFilter(); CloseSceneFilter();
+        }), DispatcherPriority.Input);
         Vm.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(MainViewModel.SelectedBook) or nameof(MainViewModel.SelectedChapter)) CloseChapterFilter();

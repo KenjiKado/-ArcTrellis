@@ -1,11 +1,31 @@
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using System.Runtime.InteropServices;
 
 namespace ArcTrellis.App;
 
 public static class DropdownChrome
 {
+    [StructLayout(LayoutKind.Sequential)] private struct ScreenPoint { public int X, Y; }
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out ScreenPoint point);
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+    internal static bool ForegroundBelongsToApp()
+    {
+        var window = GetForegroundWindow();
+        return window != IntPtr.Zero && GetWindowThreadProcessId(window, out uint processId) != 0 && processId == Environment.ProcessId;
+    }
+
+    // A captured context menu can report itself as the event source even when
+    // the pointer is over a separate popup HWND. Test screen coordinates too.
+    internal static bool PointerWithin(FrameworkElement? surface)
+    {
+        if (surface is not { IsVisible: true } || PresentationSource.FromVisual(surface) is null || !GetCursorPos(out var cursor)) return false;
+        var local = surface.PointFromScreen(new Point(cursor.X, cursor.Y));
+        return local.X >= 0 && local.Y >= 0 && local.X <= surface.ActualWidth && local.Y <= surface.ActualHeight;
+    }
     internal static bool Contains(DependencyObject? root, DependencyObject? source)
     {
         if (root is null) return false;
