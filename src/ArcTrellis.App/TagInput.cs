@@ -70,13 +70,13 @@ public sealed class TagInput : UserControl
         Input.GotKeyboardFocus += (_, _) => RefreshSuggestions();
         Input.PreviewKeyDown += InputKeyDown;
         _suggestions.PreviewKeyDown += InputKeyDown;
-        _suggestions.PreviewMouseLeftButtonUp += (_, e) =>
+        _suggestions.PreviewMouseLeftButtonDown += (_, e) =>
         {
             if (e.OriginalSource is DependencyObject source && ItemsControl.ContainerFromElement(_suggestions, source) is ListBoxItem { Content: string tag })
             { Commit(tag); e.Handled = true; }
         };
         LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
-        { if (!IsKeyboardFocusWithin && !_suggestions.IsKeyboardFocusWithin) CloseSuggestions(); }), DispatcherPriority.Input);
+        { if (!IsKeyboardFocusWithin && !_suggestions.IsKeyboardFocusWithin && !DropdownChrome.PointerWithin(_dropdown)) CloseSuggestions(); }), DispatcherPriority.Input);
         Loaded += (_, _) => { Subscribe(); RenderTags(); };
         Unloaded += (_, _) => { if (Tags is not null) Tags.CollectionChanged -= CollectionChanged; CloseSuggestions(); Input.Clear(); };
     }

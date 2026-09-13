@@ -29,7 +29,9 @@ public partial class MainWindow
     private bool IsSceneDropdownInteraction(DependencyObject? source) =>
         _sceneChapterChoices?.IsDropdownMouseOver == true || _scenePlotlineChoices?.IsDropdownMouseOver == true || _sceneCharacterChoices?.IsDropdownMouseOver == true || _sceneFilterTagsInput?.IsSuggestionsMouseOver == true
         || DropdownChrome.Contains(_sceneChapterChoices?.DropdownSurface, source) || DropdownChrome.Contains(_scenePlotlineChoices?.DropdownSurface, source)
-        || DropdownChrome.Contains(_sceneCharacterChoices?.DropdownSurface, source) || DropdownChrome.Contains(_sceneFilterTagsInput?.DropdownSurface, source);
+        || DropdownChrome.Contains(_sceneCharacterChoices?.DropdownSurface, source) || DropdownChrome.Contains(_sceneFilterTagsInput?.DropdownSurface, source)
+        || DropdownChrome.PointerWithin(_sceneChapterChoices?.DropdownSurface) || DropdownChrome.PointerWithin(_scenePlotlineChoices?.DropdownSurface)
+        || DropdownChrome.PointerWithin(_sceneCharacterChoices?.DropdownSurface) || DropdownChrome.PointerWithin(_sceneFilterTagsInput?.DropdownSurface);
 
     private bool IsSceneFilterInteraction(DependencyObject? source)
     {

@@ -142,5 +142,6 @@ public partial class MainWindow
         if (Vm.HasSceneFilters || _sceneFilter?.IsOpen == true || _sceneChapterChoices.IsOpen) failures.Add("Switching books did not clear and close all scene filters");
         Vm.SelectedBook = book; Drain();
         if (SceneList.Items.Count != 4) failures.Add("Returning to a book restored stale scene filters");
+        CheckPhysicalFilterClicks(failures, south.Id);
     }
 }

@@ -98,7 +98,7 @@ internal sealed class MultiChoiceInput : UserControl
             else { Input.Focus(); FilterChoices(); _popup.IsOpen = true; }
         };
         LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
-        { if (!IsKeyboardFocusWithin && !_dropdown.IsKeyboardFocusWithin) CloseDropdown(); }), DispatcherPriority.Input);
+        { if (!IsKeyboardFocusWithin && !_dropdown.IsKeyboardFocusWithin && !DropdownChrome.PointerWithin(_dropdown)) CloseDropdown(); }), DispatcherPriority.Input);
         Unloaded += (_, _) => CloseDropdown();
         RenderChips();
     }

@@ -53,7 +53,7 @@ public partial class MainWindow
         else
         {
             item.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent });
-            item.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseUpEvent });
+            item.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent });
             Drain();
             if (!_sceneFilter.IsOpen || _sceneFilterDraftTags.Count != 1 || tags.Input.Text.Length != 0)
                 failures.Add("Choosing a floating tag did not retain the filter menu and commit the chip");

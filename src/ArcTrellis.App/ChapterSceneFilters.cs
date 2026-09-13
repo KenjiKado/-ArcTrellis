@@ -25,7 +25,7 @@ public partial class MainWindow
     }
     private bool IsChapterFilterInteraction(DependencyObject? source)
     {
-        if (_filterTagsInput?.IsSuggestionsMouseOver == true || DropdownChrome.Contains(_filterTagsInput?.DropdownSurface, source)) return true;
+        if (_filterTagsInput?.IsSuggestionsMouseOver == true || DropdownChrome.Contains(_filterTagsInput?.DropdownSurface, source) || DropdownChrome.PointerWithin(_filterTagsInput?.DropdownSurface)) return true;
         var visited = new HashSet<DependencyObject>();
         while (source is not null && visited.Add(source))
         {
@@ -105,11 +105,11 @@ public partial class MainWindow
         {
             Point point = click.GetPosition(_chapterFilter);
             if ((point.X < 0 || point.Y < 0 || point.X > _chapterFilter.ActualWidth || point.Y > _chapterFilter.ActualHeight)
-                && _filterTagsInput?.IsSuggestionsMouseOver != true && !DropdownChrome.Contains(_filterTagsInput?.DropdownSurface, click.OriginalSource as DependencyObject) && !ChapterFilterButton.IsMouseOver) CloseChapterFilter();
+                && !IsChapterFilterInteraction(click.OriginalSource as DependencyObject)) CloseChapterFilter();
         };
         _chapterFilter.AddHandler(Mouse.PreviewMouseDownOutsideCapturedElementEvent, new MouseButtonEventHandler((_, click) =>
         {
-            if (_filterTagsInput?.IsSuggestionsMouseOver != true && !DropdownChrome.Contains(_filterTagsInput?.DropdownSurface, click.OriginalSource as DependencyObject) && !ChapterFilterButton.IsMouseOver) CloseChapterFilter();
+            if (!IsChapterFilterInteraction(click.OriginalSource as DependencyObject)) CloseChapterFilter();
         }));
         _chapterFilter.PreviewKeyDown += (_, key) =>
         {
@@ -162,7 +162,7 @@ public partial class MainWindow
                 failures.Add("Filter tag suggestions did not open");
             else
                 container.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
-                { RoutedEvent = Mouse.PreviewMouseUpEvent });
+                { RoutedEvent = Mouse.PreviewMouseDownEvent });
             Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
             if (_chapterFilter.IsOpen != true || !_filterDraftTags.Contains(tag))
                 failures.Add("Choosing a tag closed the filter or did not select the tag");
