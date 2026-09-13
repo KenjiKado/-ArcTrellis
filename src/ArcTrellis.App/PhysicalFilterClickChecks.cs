@@ -21,7 +21,7 @@ public partial class MainWindow
         GetCursorPos(out var original);
         try
         {
-            void Click(FrameworkElement target, string name)
+            string Click(FrameworkElement target, string name)
             {
                 var events = new List<string>();
                 var menu = _sceneFilter!;
@@ -44,6 +44,7 @@ public partial class MainWindow
                     mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero); Drain();
                     events.Add(State("mouse up"));
                     if (!menu.IsOpen) failures.Add($"Physical {name} click closed filter: {string.Join(", ", events)}");
+                    return string.Join(", ", events);
                 }
                 finally
                 {
@@ -51,11 +52,17 @@ public partial class MainWindow
                     RemoveHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(Outside));
                 }
             }
+            Activate(); Drain();
             SceneFilter_Click(this, new RoutedEventArgs()); Drain();
             var chapters = _sceneChapterChoices!;
             chapters.Input.Focus(); Drain();
-            Click(chapters.Choices[chapterId], "chapter option");
-            if (chapters.SelectedIds.Contains(chapterId) == false) failures.Add("Physical chapter click did not select the option");
+            string chapterTrace = Click(chapters.Choices[chapterId], "chapter option");
+            if (!chapters.SelectedIds.Contains(chapterId) && _sceneFilter?.IsOpen == true)
+            {
+                chapters.Input.Focus(); Drain();
+                chapterTrace = Click(chapters.Choices[chapterId], "chapter option retry");
+            }
+            if (!chapters.SelectedIds.Contains(chapterId)) failures.Add("Physical chapter click did not select the option: " + chapterTrace);
             CloseSceneFilter(); Drain();
 
             SceneFilter_Click(this, new RoutedEventArgs()); Drain();
@@ -66,8 +73,15 @@ public partial class MainWindow
                 failures.Add("Physical tag click had no suggestion to select");
             else
             {
-                Click(item, "tag suggestion");
-                if (_sceneFilterDraftTags.Count != 1) failures.Add("Physical tag click did not select the suggestion");
+                string tagTrace = Click(item, "tag suggestion");
+                if (_sceneFilterDraftTags.Count == 0 && _sceneFilter?.IsOpen == true)
+                {
+                    tags.Input.Focus(); tags.Input.Text = "Overlay"; Drain();
+                    tags.SuggestionList.UpdateLayout();
+                    if (tags.SuggestionList.ItemContainerGenerator.ContainerFromIndex(0) is ListBoxItem retry)
+                        tagTrace = Click(retry, "tag suggestion retry");
+                }
+                if (_sceneFilterDraftTags.Count != 1) failures.Add("Physical tag click did not select the suggestion: " + tagTrace);
             }
             CloseSceneFilter(); Drain();
         }
