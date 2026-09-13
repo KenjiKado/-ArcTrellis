@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 namespace ArcTrellis.App;
@@ -11,6 +12,7 @@ public partial class MainWindow
     [StructLayout(LayoutKind.Sequential)] private struct CursorPoint { public int X, Y; }
     [DllImport("user32.dll")] private static extern bool GetCursorPos(out CursorPoint point);
     [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(CursorPoint point);
     [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
 
     private void CheckPhysicalFilterClicks(List<string> failures, Guid chapterId)
@@ -23,7 +25,8 @@ public partial class MainWindow
             {
                 var events = new List<string>();
                 var menu = _sceneFilter!;
-                void Closed(object? sender, RoutedEventArgs e) => events.Add("menu closed");
+                string State(string phase) => $"{phase}: open={menu.IsOpen}, capture={Mouse.Captured?.GetType().Name ?? "none"}, focus={Keyboard.FocusedElement?.GetType().Name ?? "none"}";
+                void Closed(object? sender, RoutedEventArgs e) => events.Add(State("menu closed"));
                 void Inactive(object? sender, EventArgs e) => events.Add("window deactivated");
                 void Outside(object sender, MouseButtonEventArgs e) => events.Add("window mouse: " + e.OriginalSource.GetType().Name);
                 menu.Closed += Closed; Deactivated += Inactive;
@@ -31,9 +34,15 @@ public partial class MainWindow
                 try
                 {
                     var point = target.PointToScreen(new Point(target.ActualWidth / 2, target.ActualHeight / 2));
+                    events.Add(State("before move"));
                     SetCursorPos((int)point.X, (int)point.Y); Drain();
+                    GetCursorPos(out var current);
+                    var targetWindow = (PresentationSource.FromVisual(target) as HwndSource)?.Handle;
+                    events.Add(State($"hover target={targetWindow} hit={WindowFromPoint(current)} position={current.X},{current.Y} expected={point.X:0},{point.Y:0}"));
                     mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero); Drain();
+                    events.Add(State("mouse down"));
                     mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero); Drain();
+                    events.Add(State("mouse up"));
                     if (!menu.IsOpen) failures.Add($"Physical {name} click closed filter: {string.Join(", ", events)}");
                 }
                 finally
