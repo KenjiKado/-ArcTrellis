@@ -37,6 +37,7 @@ public sealed class CharacterInput : UserControl
 
     private readonly WrapPanel _row = new() { Orientation = Orientation.Horizontal };
     private readonly Border _frame = new() { CornerRadius = new CornerRadius(5), BorderThickness = new Thickness(1), Padding = new Thickness(4), MinHeight = 40 };
+    internal Border ClickSurface => _frame;
     private readonly ListBox _suggestions = new() { MaxHeight = 210, MinWidth = 220, BorderThickness = new Thickness(0) };
     private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Custom };
     private readonly Border _dropdown;
@@ -59,6 +60,12 @@ public sealed class CharacterInput : UserControl
         _frame.SetResourceReference(Border.BackgroundProperty, "InputBrush");
         _frame.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         _frame.Child = _row; _row.Children.Add(Input); Content = _frame;
+        _frame.Cursor = Cursors.IBeam;
+        _frame.MouseDown += (_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left) return;
+            Input.Focus(); Input.CaretIndex = Input.Text.Length; e.Handled = true;
+        };
         _suggestions.SetResourceReference(BackgroundProperty, "ElevatedBrush");
         _suggestions.SetResourceReference(ForegroundProperty, "TextBrush");
         var itemText = new FrameworkElementFactory(typeof(TextBlock));

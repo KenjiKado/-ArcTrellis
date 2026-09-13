@@ -33,7 +33,7 @@ public partial class MainWindow
         if (Vm.SelectedBook is not { } book) yield break;
         foreach (var chapter in book.Chapters) yield return (chapter, chapter.Title, chapter.Order);
         foreach (var plot in Vm.BookPlotlines) yield return (plot, plot.Color, plot.Order);
-        foreach (var scene in Vm.BookScenes) yield return (scene, scene.ChapterId, scene.PlotlineId, scene.Order);
+        foreach (var scene in Vm.BookScenes) yield return (scene, scene.ChapterId, scene.PlotlineId, scene.Order, Vm.MatchesSceneFilter(scene));
     }
 
     private IEnumerable<object?> ChapterFilterState(object view)

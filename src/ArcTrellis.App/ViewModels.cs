@@ -62,6 +62,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (_restoringHistory || !Set(ref _selectedBook, value)) return;
             SetChapterFilters([], []);
+            SetSceneFilters([], [], [], []);
             SelectedChapter = value?.Chapters.OrderBy(x => x.Order).FirstOrDefault();
             Raise(nameof(BookPlotlines));
             SelectedPlotline = value is null ? null : Project.Plotlines.Where(plotline => plotline.BookId == value.Id).OrderBy(plotline => plotline.Order).FirstOrDefault();
@@ -141,6 +142,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public HashSet<string> ChapterStatusFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> ChapterTagFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool HasChapterFilters => ChapterStatusFilter.Count > 0 || ChapterTagFilter.Count > 0;
+    public HashSet<string> SceneStatusFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<Guid> SceneChapterFilter { get; private set; } = [];
+    public HashSet<Guid> ScenePlotlineFilter { get; private set; } = [];
+    public HashSet<string> SceneTagFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public bool HasSceneFilters => SceneStatusFilter.Count > 0 || SceneChapterFilter.Count > 0 || ScenePlotlineFilter.Count > 0 || SceneTagFilter.Count > 0;
+    public void SetSceneFilters(IEnumerable<string> statuses, IEnumerable<Guid> chapters, IEnumerable<Guid> plotlines, IEnumerable<string> tags)
+    {
+        SceneStatusFilter = statuses.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SceneChapterFilter = chapters.ToHashSet();
+        ScenePlotlineFilter = plotlines.ToHashSet();
+        SceneTagFilter = tags.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Raise(nameof(HasSceneFilters));
+    }
+    public bool MatchesSceneFilter(Scene scene) =>
+        (SceneStatusFilter.Count == 0 || SceneStatusFilter.Contains(scene.Status))
+        && (SceneChapterFilter.Count == 0 || SceneChapterFilter.Contains(scene.ChapterId))
+        && (ScenePlotlineFilter.Count == 0 || ScenePlotlineFilter.Contains(scene.PlotlineId))
+        && (SceneTagFilter.Count == 0 || scene.Tags.Any(SceneTagFilter.Contains));
     public void SetChapterFilters(IEnumerable<string> statuses, IEnumerable<string> tags)
     {
         ChapterStatusFilter = statuses.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -162,6 +181,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         FilePath = path;
         _history.Clear(); _pendingSnapshot = _pendingScope = _pinnedScope = _pinnedSelection = null;
         SetChapterFilters([], []);
+        SetSceneFilters([], [], [], []);
         SelectDefaults();
         IsDirty = false;
         HistoryReset?.Invoke(this, EventArgs.Empty);
@@ -468,6 +488,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _selectedPlace = Project.Places.FirstOrDefault(p => p.Id == placeId) ?? Project.Places.FirstOrDefault();
         _selectedNote = Project.Notes.FirstOrDefault(n => n.Id == noteId) ?? Project.Notes.FirstOrDefault();
         _selectedRelationship = Project.Relationships.FirstOrDefault(r => r.Id == relationshipId);
+        if (!ReferenceEquals(previousBindings[nameof(SelectedBook)], _selectedBook)) SetSceneFilters([], [], [], []);
         foreach (string name in ViewBindingNames)
             if (!Equals(previousBindings[name], GetType().GetProperty(name)!.GetValue(this))) Raise(name);
         }
@@ -522,7 +543,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private static readonly string[] ViewBindingNames = [nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedChapterId), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedSceneId), nameof(SelectedCharacter), nameof(SelectedCharacterId), nameof(SelectedPlace), nameof(SelectedPlaceId), nameof(SelectedNote), nameof(SelectedNoteId), nameof(SelectedRelationship), nameof(SelectedRelationshipId), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle)];
     private void RaiseAll() { foreach (string name in ViewBindingNames) Raise(name); }
 }
-
 
 
 
