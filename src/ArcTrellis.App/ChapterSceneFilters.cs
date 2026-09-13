@@ -13,7 +13,8 @@ namespace ArcTrellis.App;
 
 public partial class MainWindow
 {
-    private ContextMenu? _chapterFilter;
+    private Popup? _chapterFilter;
+    private FrameworkElement ChapterFilterSurface => (FrameworkElement)_chapterFilter!.Child;
     private TagInput? _filterTagsInput;
     private readonly List<CheckBox> _filterStatusChecks = [];
     private ObservableCollection<string> _filterDraftTags = [];
@@ -25,7 +26,7 @@ public partial class MainWindow
     }
     private bool IsChapterFilterInteraction(DependencyObject? source)
     {
-        if (_filterTagsInput?.IsSuggestionsMouseOver == true || DropdownChrome.Contains(_filterTagsInput?.DropdownSurface, source) || DropdownChrome.PointerWithin(_filterTagsInput?.DropdownSurface)) return true;
+        if ((_chapterFilter is not null && DropdownChrome.Contains(ChapterFilterSurface, source)) || _filterTagsInput?.IsSuggestionsMouseOver == true || DropdownChrome.Contains(_filterTagsInput?.DropdownSurface, source) || DropdownChrome.PointerWithin(_filterTagsInput?.DropdownSurface)) return true;
         var visited = new HashSet<DependencyObject>();
         while (source is not null && visited.Add(source))
         {
@@ -86,39 +87,20 @@ public partial class MainWindow
         actions.Children.Add(apply); actions.Children.Add(cancel); actions.Children.Add(clear); panel.Children.Add(actions);
 
         // A dropdown menu attached to the toolbar, with no dialog window or modal state.
-        _chapterFilter = new ContextMenu { PlacementTarget = ChapterFilterButton, Placement = PlacementMode.Custom, StaysOpen = true, Padding = new Thickness(0) };
+        _chapterFilter = new Popup { PlacementTarget = ChapterFilterButton, Placement = PlacementMode.Relative, StaysOpen = false, AllowsTransparency = true };
         _chapterFilter.Closed += (_, _) => _filterTagsInput?.CloseSuggestions();
-        _chapterFilter.SetResourceReference(ForegroundProperty, "TextBrush");
-        var menuBorder = new FrameworkElementFactory(typeof(Border));
-        menuBorder.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
-        menuBorder.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
-        menuBorder.SetValue(Border.BorderThicknessProperty, new Thickness(1));
-        menuBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
-        menuBorder.AppendChild(new FrameworkElementFactory(typeof(ItemsPresenter)));
-        _chapterFilter.Template = new ControlTemplate(typeof(ContextMenu)) { VisualTree = menuBorder };
-        _chapterFilter.CustomPopupPlacementCallback = (_, size, _) => [new CustomPopupPlacement(new Point(0, size.Height), PopupPrimaryAxis.Vertical)];
-        var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
-        presenter.SetValue(ContentPresenter.ContentSourceProperty, "Header");
-        var item = new MenuItem { Header = panel, StaysOpenOnClick = true, Focusable = false, Template = new ControlTemplate(typeof(MenuItem)) { VisualTree = presenter } };
-        _chapterFilter.Items.Add(item);
-        _chapterFilter.PreviewMouseDown += (_, click) =>
-        {
-            Point point = click.GetPosition(_chapterFilter);
-            if ((point.X < 0 || point.Y < 0 || point.X > _chapterFilter.ActualWidth || point.Y > _chapterFilter.ActualHeight)
-                && !IsChapterFilterInteraction(click.OriginalSource as DependencyObject)) CloseChapterFilter();
-        };
-        _chapterFilter.AddHandler(Mouse.PreviewMouseDownOutsideCapturedElementEvent, new MouseButtonEventHandler((_, click) =>
-        {
-            if (!IsChapterFilterInteraction(click.OriginalSource as DependencyObject)) CloseChapterFilter();
-        }));
-        _chapterFilter.PreviewKeyDown += (_, key) =>
+        var surface = new Border { Child = panel, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(5) };
+        surface.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
+        surface.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        surface.SetResourceReference(ForegroundProperty, "TextBrush");
+        _chapterFilter.Child = surface;
+        panel.PreviewKeyDown += (_, key) =>
         {
             if (key.Key != Key.Escape) return;
             if (_filterTagsInput?.SuggestionsOpen == true) _filterTagsInput.CloseSuggestions(); else CloseChapterFilter();
             key.Handled = true;
         };
-        ChapterFilterButton.ContextMenu = _chapterFilter;
-        TimelineMenuPosition.OpenFitted(ChapterFilterButton, panel);
+        TimelineMenuPosition.OpenFitted(ChapterFilterButton, panel, _chapterFilter);
     }
     private void ApplyChapterFilter()
     {
@@ -154,7 +136,7 @@ public partial class MainWindow
         {
             _filterTagsInput!.Input.Focus();
             _filterTagsInput.Input.Text = tag;
-            _chapterFilter!.UpdateLayout();
+            ChapterFilterSurface.UpdateLayout();
             var list = _filterTagsInput.SuggestionList;
             list.UpdateLayout();
             var container = list.ItemContainerGenerator.ContainerFromIndex(0) as ListBoxItem;
@@ -173,8 +155,8 @@ public partial class MainWindow
         taggedChapter.Tags.Remove("__filter_beta");
         _filterStatusChecks[0].IsChecked = true; _filterStatusChecks[1].IsChecked = true;
         Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
-        _chapterFilter!.UpdateLayout();
-        SaveVisualPng(_chapterFilter, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-chapter-filter.png"));
+        ChapterFilterSurface.UpdateLayout();
+        SaveVisualPng(ChapterFilterSurface, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-chapter-filter.png"));
         ApplyChapterFilter();
         if (Vm.ChapterStatusFilter.Count != 2) failures.Add("Apply did not save multiple filter statuses");
         ChapterFilter_Click(this, new RoutedEventArgs());

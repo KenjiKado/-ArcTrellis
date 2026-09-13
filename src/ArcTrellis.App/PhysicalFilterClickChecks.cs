@@ -17,7 +17,7 @@ public partial class MainWindow
 
     private void CheckPhysicalFilterClicks(List<string> failures, Guid chapterId)
     {
-        void Drain() { Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); _sceneFilter?.UpdateLayout(); }
+        void Drain() { Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); if (_sceneFilter?.IsOpen == true) SceneFilterSurface.UpdateLayout(); }
         GetCursorPos(out var original);
         try
         {
@@ -26,7 +26,7 @@ public partial class MainWindow
                 var events = new List<string>();
                 var menu = _sceneFilter!;
                 string State(string phase) => $"{phase}: open={menu.IsOpen}, capture={Mouse.Captured?.GetType().Name ?? "none"}, focus={Keyboard.FocusedElement?.GetType().Name ?? "none"}";
-                void Closed(object? sender, RoutedEventArgs e) => events.Add(State("menu closed"));
+                void Closed(object? sender, EventArgs e) => events.Add(State("menu closed"));
                 void Inactive(object? sender, EventArgs e) => events.Add("window deactivated");
                 void Outside(object sender, MouseButtonEventArgs e) => events.Add("window mouse: " + e.OriginalSource.GetType().Name);
                 menu.Closed += Closed; Deactivated += Inactive;

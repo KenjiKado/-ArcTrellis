@@ -11,8 +11,8 @@ public partial class MainWindow
 {
     private void CheckSceneFilters(List<string> failures, string reportPath)
     {
-        void Drain() { Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout(); _sceneFilter?.UpdateLayout(); }
-        void MenuButton(string text) => FindVisualChildren<Button>(_sceneFilter!).First(button => Equals(button.Content, Loc.T(text))).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        void Drain() { Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); UpdateLayout(); if (_sceneFilter?.IsOpen == true) SceneFilterSurface.UpdateLayout(); }
+        void MenuButton(string text) => FindVisualChildren<Button>(SceneFilterSurface).First(button => Equals(button.Content, Loc.T(text))).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         void TypeTag(string tag)
         {
             var input = _sceneFilterTagsInput!.Input;
@@ -103,12 +103,12 @@ public partial class MainWindow
         _sceneCharacterChoices.Input.Focus(); Drain();
         foreach (var label in new[] { "Apply", "Cancel", "Clear filters" })
         {
-            var action = FindVisualChildren<Button>(_sceneFilter!).First(button => Equals(button.Content, Loc.T(label)));
-            var bounds = action.TransformToAncestor(_sceneFilter!).TransformBounds(new Rect(action.RenderSize));
-            if (bounds.Top < 0 || bounds.Bottom > _sceneFilter!.ActualHeight || bounds.Right > _sceneFilter.ActualWidth || action.ActualHeight < 20)
-                failures.Add($"Expanded scene filter clips the {label} button: {bounds} inside {_sceneFilter!.RenderSize}");
+            var action = FindVisualChildren<Button>(SceneFilterSurface).First(button => Equals(button.Content, Loc.T(label)));
+            var bounds = action.TransformToAncestor(SceneFilterSurface).TransformBounds(new Rect(action.RenderSize));
+            if (bounds.Top < 0 || bounds.Bottom > SceneFilterSurface.ActualHeight || bounds.Right > SceneFilterSurface.ActualWidth || action.ActualHeight < 20)
+                failures.Add($"Expanded scene filter clips the {label} button: {bounds} inside {SceneFilterSurface.RenderSize}");
         }
-        SaveVisualPng(_sceneFilter!, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scenes-filter.png"));
+        SaveVisualPng(SceneFilterSurface, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scenes-filter.png"));
         SaveVisualPng(_sceneCharacterChoices.DropdownSurface, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-filter-autocomplete.png"));
         MenuButton("Apply"); Drain();
         if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, b.Id])) failures.Add("Applied scene filters did not combine categories correctly");

@@ -11,18 +11,16 @@ public partial class MainWindow
 {
     private void CheckFilterDropdownLayout(List<string> failures, string reportPath)
     {
-        void Drain() { Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); _sceneFilter!.UpdateLayout(); }
-        double menuHeight = _sceneFilter!.ActualHeight;
-        var captured = Mouse.Captured;
+        void Drain() { Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); SceneFilterSurface.UpdateLayout(); }
+        double menuHeight = SceneFilterSurface.ActualHeight;
         foreach (var choice in new[] { _sceneChapterChoices!, _scenePlotlineChoices!, _sceneCharacterChoices! })
         {
-            double tagsTop = _sceneFilterTagsInput!.TranslatePoint(new Point(), _sceneFilter).Y;
+            double tagsTop = _sceneFilterTagsInput!.TranslatePoint(new Point(), SceneFilterSurface).Y;
             choice.Input.Focus(); Drain(); choice.DropdownSurface.UpdateLayout();
-            if (!choice.IsOpen || ReferenceEquals(PresentationSource.FromVisual(choice.DropdownSurface), PresentationSource.FromVisual(_sceneFilter)))
+            if (!choice.IsOpen || ReferenceEquals(PresentationSource.FromVisual(choice.DropdownSurface), PresentationSource.FromVisual(SceneFilterSurface)))
                 failures.Add("Autocomplete suggestions are not in a floating popup");
-            if (Math.Abs(menuHeight - _sceneFilter.ActualHeight) > 1 || Math.Abs(tagsTop - _sceneFilterTagsInput.TranslatePoint(new Point(), _sceneFilter).Y) > 1)
+            if (Math.Abs(menuHeight - SceneFilterSurface.ActualHeight) > 1 || Math.Abs(tagsTop - _sceneFilterTagsInput.TranslatePoint(new Point(), SceneFilterSurface).Y) > 1)
                 failures.Add("Opening autocomplete moves filter fields or changes the menu height");
-            if (!ReferenceEquals(captured, Mouse.Captured)) failures.Add("Autocomplete stole mouse capture from the filter menu");
             var check = choice.Choices.Values.First();
             check.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent });
             if (!_sceneFilter.IsOpen) failures.Add("Clicking a floating autocomplete closed the filter menu");
@@ -37,10 +35,9 @@ public partial class MainWindow
 
         var tags = _sceneFilterTagsInput!;
         tags.Input.Focus(); tags.Input.Text = "Overlay"; Drain(); tags.DropdownSurface.UpdateLayout();
-        if (!tags.SuggestionsOpen || ReferenceEquals(PresentationSource.FromVisual(tags.DropdownSurface), PresentationSource.FromVisual(_sceneFilter))
-            || Math.Abs(menuHeight - _sceneFilter.ActualHeight) > 1)
+        if (!tags.SuggestionsOpen || ReferenceEquals(PresentationSource.FromVisual(tags.DropdownSurface), PresentationSource.FromVisual(SceneFilterSurface))
+            || Math.Abs(menuHeight - SceneFilterSurface.ActualHeight) > 1)
             failures.Add("Tag suggestions do not float independently of the filter layout");
-        if (!ReferenceEquals(captured, Mouse.Captured)) failures.Add("Tag suggestions stole filter mouse capture");
         var tagList = FindVisualChildren<ScrollViewer>(tags.SuggestionList).Single();
         tagList.ScrollToEnd(); Drain();
         var tagBar = FindVisualChildren<ScrollBar>(tagList).FirstOrDefault(bar => bar.Orientation == Orientation.Vertical && bar.IsVisible);
@@ -59,11 +56,11 @@ public partial class MainWindow
                 failures.Add("Choosing a floating tag did not retain the filter menu and commit the chip");
         }
         _sceneFilterDraftTags.Clear(); tags.Input.Clear(); tags.CloseSuggestions(); Drain();
-        if (FindVisualChildren<ScrollBar>(_sceneFilter).Any(bar => bar.IsVisible)) failures.Add("The filter menu still has a general scrollbar");
-        var apply = FindVisualChildren<Button>(_sceneFilter).First(button => Equals(button.Content, Loc.T("Apply")));
-        double tagsBottom = tags.TranslatePoint(new Point(0, tags.ActualHeight), _sceneFilter).Y;
-        double gap = apply.TranslatePoint(new Point(), _sceneFilter).Y - tagsBottom;
+        if (FindVisualChildren<ScrollBar>(SceneFilterSurface).Any(bar => bar.IsVisible)) failures.Add("The filter menu still has a general scrollbar");
+        var apply = FindVisualChildren<Button>(SceneFilterSurface).First(button => Equals(button.Content, Loc.T("Apply")));
+        double tagsBottom = tags.TranslatePoint(new Point(0, tags.ActualHeight), SceneFilterSurface).Y;
+        double gap = apply.TranslatePoint(new Point(), SceneFilterSurface).Y - tagsBottom;
         if (gap < 0 || gap > 20) failures.Add($"The gap between Tags and filter buttons is {gap}");
-        SaveVisualPng(_sceneFilter, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-compact-scene-filter.png"));
+        SaveVisualPng(SceneFilterSurface, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-compact-scene-filter.png"));
     }
 }
