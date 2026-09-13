@@ -25,26 +25,36 @@ internal static class TimelineMenuPosition
 
     internal static void OpenFitted(FrameworkElement target, FrameworkElement content, Popup menu)
     {
-        // Fit the requested position before opening. WPF otherwise measures a
-        // tall filter only against the space below its anchor and clips it.
         content.Measure(new Size(content.Width, double.PositiveInfinity));
         Point Fit()
         {
-        var transform = PresentationSource.FromVisual(target)!.CompositionTarget.TransformToDevice;
-        // DesiredSize is capped by the popup's current available space. A
-        // StackPanel still arranges its children at their natural size, so use
-        // that size when chips wrap and require the menu to move upward.
-        var size = transform.Transform(new Vector(Math.Max(content.DesiredSize.Width, content.ActualWidth) + 2,
-            Math.Max(content.DesiredSize.Height, content.ActualHeight) + 2));
-        var screen = target.PointToScreen(new Point(0, target.ActualHeight));
-        var point = new NativePoint { X = (int)Math.Round(screen.X), Y = (int)Math.Round(screen.Y) };
-        var monitor = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-        if (GetMonitorInfo(MonitorFromPoint(point, 2), ref monitor))
-        {
-            screen.X = Math.Max(monitor.Work.Left, Math.Min(screen.X, monitor.Work.Right - size.X));
-            screen.Y = Math.Max(monitor.Work.Top, Math.Min(screen.Y, monitor.Work.Bottom - size.Y));
+            var transform = PresentationSource.FromVisual(target)!.CompositionTarget.TransformToDevice;
+            // DesiredSize can be capped by the popup; arranged content includes
+            // chip rows added after it opens.
+            var size = transform.Transform(new Vector(Math.Max(content.DesiredSize.Width, content.ActualWidth) + 2,
+                Math.Max(content.DesiredSize.Height, content.ActualHeight) + 2));
+            var screen = target.PointToScreen(new Point(0, target.ActualHeight));
+            var point = new NativePoint { X = (int)Math.Round(screen.X), Y = (int)Math.Round(screen.Y) };
+            var monitor = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+            if (GetMonitorInfo(MonitorFromPoint(point, 2), ref monitor))
+            {
+                screen.X = Math.Max(monitor.Work.Left, Math.Min(screen.X, monitor.Work.Right - size.X));
+                screen.Y = Math.Max(monitor.Work.Top, Math.Min(screen.Y, monitor.Work.Bottom - size.Y));
+            }
+            return screen;
         }
-        return screen;
+        void Place()
+        {
+            if (!menu.IsOpen) return;
+            var screen = Fit();
+            var local = target.PointFromScreen(screen);
+            if (Math.Abs(menu.HorizontalOffset - local.X) > 0.5) menu.HorizontalOffset = local.X;
+            if (Math.Abs(menu.VerticalOffset - local.Y) > 0.5) menu.VerticalOffset = local.Y;
+            menu.UpdateLayout();
+            // Relative placement can center the popup around a narrow button.
+            // Position its HWND from the button's left edge after WPF places it.
+            if (PresentationSource.FromVisual(content) is HwndSource source)
+                SetWindowPos(source.Handle, IntPtr.Zero, (int)Math.Round(screen.X), (int)Math.Round(screen.Y), 0, 0, 0x0015);
         }
         bool queued = false;
         SizeChangedEventHandler resized = (_, _) =>
@@ -54,15 +64,12 @@ internal static class TimelineMenuPosition
             menu.Dispatcher.BeginInvoke(new Action(() =>
             {
                 queued = false;
-                if (!menu.IsOpen) return;
-                var local = target.PointFromScreen(Fit());
-                if (Math.Abs(menu.HorizontalOffset - local.X) > 0.5) menu.HorizontalOffset = local.X;
-                if (Math.Abs(menu.VerticalOffset - local.Y) > 0.5) menu.VerticalOffset = local.Y;
-                menu.InvalidateMeasure();
-            }));
+                Place();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         };
         content.SizeChanged += resized;
         menu.Closed += (_, _) => content.SizeChanged -= resized;
+        menu.Opened += (_, _) => menu.Dispatcher.BeginInvoke(new Action(Place), System.Windows.Threading.DispatcherPriority.Loaded);
         // Relative uses the full work area to measure the filter's natural
         // height; nested dropdowns can then take and restore popup capture.
         menu.PlacementTarget = target;
