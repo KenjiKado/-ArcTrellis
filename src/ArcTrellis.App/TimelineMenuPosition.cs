@@ -32,7 +32,11 @@ internal static class TimelineMenuPosition
         Point Fit()
         {
         var transform = PresentationSource.FromVisual(target)!.CompositionTarget.TransformToDevice;
-        var size = transform.Transform(new Vector(content.DesiredSize.Width + 2, content.DesiredSize.Height + 2));
+        // DesiredSize is capped by the popup's current available space. A
+        // StackPanel still arranges its children at their natural size, so use
+        // that size when chips wrap and require the menu to move upward.
+        var size = transform.Transform(new Vector(Math.Max(content.DesiredSize.Width, content.ActualWidth) + 2,
+            Math.Max(content.DesiredSize.Height, content.ActualHeight) + 2));
         var screen = target.PointToScreen(new Point(0, target.ActualHeight));
         var point = new NativePoint { X = (int)Math.Round(screen.X), Y = (int)Math.Round(screen.Y) };
         var monitor = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
@@ -55,6 +59,7 @@ internal static class TimelineMenuPosition
                 var local = target.PointFromScreen(Fit());
                 if (Math.Abs(menu.HorizontalOffset - local.X) > 0.5) menu.HorizontalOffset = local.X;
                 if (Math.Abs(menu.VerticalOffset - local.Y) > 0.5) menu.VerticalOffset = local.Y;
+                menu.InvalidateMeasure();
             }));
         };
         content.SizeChanged += resized;
