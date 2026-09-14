@@ -13,6 +13,9 @@ public partial class MainWindow
     {
         void Drain() { Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); SceneFilterSurface.UpdateLayout(); }
         double menuHeight = SceneFilterSurface.ActualHeight;
+        double buttonLeft = SceneFilterButton.PointToScreen(new Point()).X;
+        double menuLeft = SceneFilterSurface.PointToScreen(new Point()).X;
+        if (Math.Abs(buttonLeft - menuLeft) > 2) failures.Add($"Scene filter left edge is {menuLeft}, button left edge is {buttonLeft}");
         var menuCapture = Mouse.Captured;
         if (menuCapture?.GetType().Name != "PopupRoot") failures.Add("The filter host did not capture mouse input as a popup");
         foreach (var choice in new[] { _sceneChapterChoices!, _scenePlotlineChoices!, _sceneCharacterChoices! })
@@ -25,6 +28,11 @@ public partial class MainWindow
                 failures.Add("Opening autocomplete moves filter fields or changes the menu height");
             if (Mouse.Captured is null || ReferenceEquals(menuCapture, Mouse.Captured))
                 failures.Add("Autocomplete did not take capture from the filter popup");
+            var arrow = FindVisualChildren<Button>(choice).First();
+            arrow.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Drain();
+            if (choice.IsOpen) failures.Add("Autocomplete arrow did not close the dropdown");
+            arrow.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Drain();
+            if (!choice.IsOpen) failures.Add("Autocomplete arrow did not reopen the dropdown");
             var check = choice.Choices.Values.First();
             check.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent });
             if (!_sceneFilter.IsOpen) failures.Add("Clicking a floating autocomplete closed the filter menu");

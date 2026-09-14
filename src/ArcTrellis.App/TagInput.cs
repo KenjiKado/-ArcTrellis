@@ -67,7 +67,19 @@ public sealed class TagInput : UserControl
         DropdownChrome.SetCompact(dropdown, true);
         AutomationProperties.SetName(Input, Loc.T("Tags"));
         Input.TextChanged += (_, _) => RefreshSuggestions();
-        Input.GotKeyboardFocus += (_, _) => RefreshSuggestions();
+        Input.GotKeyboardFocus += (_, _) =>
+        {
+            if (Mouse.LeftButton != MouseButtonState.Pressed) RefreshSuggestions();
+        };
+        _frame.AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left ||
+                (!DropdownChrome.Contains(Input, e.OriginalSource as DependencyObject) && !ReferenceEquals(_frame, e.OriginalSource))) return;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (Input.IsKeyboardFocusWithin) RefreshSuggestions();
+            }), DispatcherPriority.Background);
+        }), true);
         Input.PreviewKeyDown += InputKeyDown;
         _suggestions.PreviewKeyDown += InputKeyDown;
         _suggestions.PreviewMouseLeftButtonDown += (_, e) =>

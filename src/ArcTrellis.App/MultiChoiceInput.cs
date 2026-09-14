@@ -76,7 +76,22 @@ internal sealed class MultiChoiceInput : UserControl
         _dropdown.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         _dropdown.Child = new ScrollViewer { Content = rows, MaxHeight = 210, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         Input.TextChanged += (_, _) => FilterChoices();
-        Input.GotKeyboardFocus += (_, _) => { FilterChoices(); _popup.IsOpen = true; };
+        Input.GotKeyboardFocus += (_, _) =>
+        {
+            FilterChoices();
+            // A popup opened during mouse-down sees that same click's release
+            // outside its HWND and closes immediately. Mouse clicks open on up.
+            if (Mouse.LeftButton != MouseButtonState.Pressed) _popup.IsOpen = true;
+        };
+        frame.AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left || DropdownChrome.Contains(arrow, e.OriginalSource as DependencyObject)) return;
+            if (!DropdownChrome.Contains(Input, e.OriginalSource as DependencyObject) && !ReferenceEquals(frame, e.OriginalSource)) return;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (Input.IsKeyboardFocusWithin) { FilterChoices(); _popup.IsOpen = true; }
+            }), DispatcherPriority.Background);
+        }), true);
         Input.PreviewKeyDown += (_, e) =>
         {
             var first = _checks.Values.FirstOrDefault(check => check.Visibility == Visibility.Visible);
@@ -91,12 +106,20 @@ internal sealed class MultiChoiceInput : UserControl
         };
         frame.MouseDown += (_, e) =>
         {
-            if (e.ChangedButton != MouseButton.Left) return;
-            Input.Focus(); Input.CaretIndex = Input.Text.Length; _popup.IsOpen = true; e.Handled = true;
+            if (e.ChangedButton != MouseButton.Left || DropdownChrome.Contains(arrow, e.OriginalSource as DependencyObject)) return;
+            Input.Focus(); Input.CaretIndex = Input.Text.Length; e.Handled = true;
+        };
+        bool arrowWasOpenOnPress = false, closedOnArrowPress = false;
+        arrow.PreviewMouseLeftButtonDown += (_, _) => arrowWasOpenOnPress = IsOpen;
+        _popup.Closed += (_, _) =>
+        {
+            if (Mouse.LeftButton == MouseButtonState.Pressed && DropdownChrome.PointerWithin(arrow)) closedOnArrowPress = true;
         };
         arrow.Click += (_, _) =>
         {
-            if (IsOpen) CloseDropdown();
+            bool close = IsOpen || arrowWasOpenOnPress || closedOnArrowPress;
+            arrowWasOpenOnPress = closedOnArrowPress = false;
+            if (close) CloseDropdown();
             else { Input.Focus(); FilterChoices(); _popup.IsOpen = true; }
         };
         LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(new Action(() =>

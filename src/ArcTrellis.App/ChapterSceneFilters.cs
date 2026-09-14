@@ -123,6 +123,10 @@ public partial class MainWindow
         vm.SetChapterFilters([], []);
         if (vm.SelectedBook.Chapters.Count(vm.MatchesChapterFilter) != 3) failures.Add("Clearing filters did not restore all chapters");
         ChapterFilter_Click(this, new RoutedEventArgs());
+        Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+        double menuLeft = ChapterFilterSurface.PointToScreen(new Point()).X;
+        double buttonLeft = ChapterFilterButton.PointToScreen(new Point()).X;
+        if (Math.Abs(menuLeft - buttonLeft) > 2) failures.Add($"Chapter filter left edge is {menuLeft}, button left edge is {buttonLeft}");
         _filterStatusChecks[0].IsChecked = true;
         CloseChapterFilter();
         if (Vm.HasChapterFilters) failures.Add("Canceling filters changed the active filters");
