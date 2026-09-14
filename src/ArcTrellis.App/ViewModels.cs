@@ -161,8 +161,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         (SceneStatusFilter.Count == 0 || SceneStatusFilter.Contains(scene.Status))
         && (SceneChapterFilter.Count == 0 || SceneChapterFilter.Contains(scene.ChapterId))
         && (ScenePlotlineFilter.Count == 0 || ScenePlotlineFilter.Contains(scene.PlotlineId))
-        && (SceneTagFilter.Count == 0 || scene.Tags.Any(SceneTagFilter.Contains))
-        && (SceneCharacterFilter.Count == 0 || scene.CharacterIds.Any(SceneCharacterFilter.Contains));
+        && SceneTagFilter.IsSubsetOf(scene.Tags)
+        && SceneCharacterFilter.IsSubsetOf(scene.CharacterIds);
     public void SetChapterFilters(IEnumerable<string> statuses, IEnumerable<string> tags)
     {
         ChapterStatusFilter = statuses.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -546,5 +546,3 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private static readonly string[] ViewBindingNames = [nameof(Project), nameof(SelectedBook), nameof(SelectedBookId), nameof(SelectedChapter), nameof(SelectedChapterId), nameof(SelectedPlotline), nameof(SelectedScene), nameof(SelectedSceneId), nameof(SelectedCharacter), nameof(SelectedCharacterId), nameof(SelectedPlace), nameof(SelectedPlaceId), nameof(SelectedNote), nameof(SelectedNoteId), nameof(SelectedRelationship), nameof(SelectedRelationshipId), nameof(BookPlotlines), nameof(BookScenes), nameof(ChapterScenes), nameof(WindowTitle)];
     private void RaiseAll() { foreach (string name in ViewBindingNames) Raise(name); }
 }
-
-

@@ -27,7 +27,7 @@ public partial class MainWindow
         Vm.AddChapter(); var south = Vm.SelectedChapter!; south.Title = "South Chapter";
         var journey = Vm.BookPlotlines.First(); journey.Name = "Journey";
         Vm.AddPlotline(); var mystery = Vm.SelectedPlotline!; mystery.Name = "Mystery";
-        Vm.AddScene(north.Id, journey.Id, "Filter A", "Planned"); var a = Vm.SelectedScene!; Vm.EditTag(a.Tags, "FilterRed", false);
+        Vm.AddScene(north.Id, journey.Id, "Filter A", "Planned"); var a = Vm.SelectedScene!; Vm.EditTag(a.Tags, "FilterRed", false); Vm.EditTag(a.Tags, "FilterBlue", false);
         Vm.AddScene(south.Id, mystery.Id, "Filter B", "Drafted"); var b = Vm.SelectedScene!; Vm.EditTag(b.Tags, "FilterBlue", false);
         Vm.AddScene(south.Id, journey.Id, "Filter C", "Final"); var c = Vm.SelectedScene!; Vm.EditTag(c.Tags, "FilterRed", false);
         Vm.AddScene(north.Id, mystery.Id, "Filter D", "Revised");
@@ -40,7 +40,7 @@ public partial class MainWindow
             Vm.Project.Characters.Add(new StoryEntity { Name = $"Overlay Character {index + 1:00}" });
             a.Tags.Add($"Overlay tag {index + 1:00}");
         }
-        a.CharacterIds.Add(alice.Id); b.CharacterIds.Add(bob.Id); c.CharacterIds.Add(alice.Id);
+        a.CharacterIds.Add(alice.Id); a.CharacterIds.Add(bob.Id); b.CharacterIds.Add(bob.Id); c.CharacterIds.Add(alice.Id);
         int characterCount = Vm.Project.Characters.Count;
         RefreshAll(); Drain();
         var characters = FindVisualChildren<CharacterInput>(SceneEditor).Single();
@@ -111,16 +111,22 @@ public partial class MainWindow
         SaveVisualPng(SceneFilterSurface, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scenes-filter.png"));
         SaveVisualPng(_sceneCharacterChoices.DropdownSurface, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-filter-autocomplete.png"));
         MenuButton("Apply"); Drain();
-        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, b.Id])) failures.Add("Applied scene filters did not combine categories correctly");
+        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id])) failures.Add("Applied scene filters did not require both selected tags");
         if (_sceneFilter?.IsOpen == true || _sceneCharacterChoices.IsOpen || Vm.BookScenes.Count() != 4) failures.Add("Applying scene filters changed the underlying book scenes or left a popup open");
         if (!Vm.SceneCharacterFilter.SetEquals([alice.Id, bob.Id])) failures.Add("Apply did not retain multiple character filters");
-        // Each category must independently narrow results, using OR within a category.
+        // Chapters/plotlines/statuses use OR; scenes must have every selected tag and character.
+        Vm.SetSceneFilters([], [], [], ["filterred"]); RefreshSceneList();
+        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, c.Id])) failures.Add("A single tag did not match both scenes sharing it");
+        Vm.SetSceneFilters([], [], [], ["FILTERRED", "filterblue"]); RefreshSceneList();
+        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id])) failures.Add("Multiple selected tags did not narrow to the scene containing all of them");
         Vm.SetSceneFilters([], [south.Id], [], []); RefreshSceneList();
         if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([b.Id, c.Id])) failures.Add("Chapter-only scene filter failed");
-        Vm.SetSceneFilters([], [], [], [], [bob.Id]); RefreshSceneList();
-        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([b.Id])) failures.Add("Character-only scene filter failed");
+        Vm.SetSceneFilters([], [], [], [], [alice.Id]); RefreshSceneList();
+        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, c.Id])) failures.Add("A single character did not match both scenes containing that character");
         Vm.SetSceneFilters([], [], [], [], [alice.Id, bob.Id]); RefreshSceneList();
-        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, b.Id, c.Id])) failures.Add("Multiple characters were not combined with OR");
+        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id])) failures.Add("Multiple selected characters did not narrow to the scene containing all of them");
+        Vm.SetSceneFilters([], [], [], [], [bob.Id]); RefreshSceneList();
+        if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, b.Id])) failures.Add("Bob-only scene filter failed");
         Vm.SetSceneFilters([], [], [journey.Id], ["filterred"], [alice.Id]); RefreshSceneList();
         if (!SceneList.Items.Cast<Scene>().Select(scene => scene.Id).ToHashSet().SetEquals([a.Id, c.Id])) failures.Add("Plotline and tag scene filters failed");
         SceneFilter_Click(this, new RoutedEventArgs()); Drain();

@@ -12,6 +12,14 @@ public partial class MainWindow
     private void CheckFilterDropdownLayout(List<string> failures, string reportPath)
     {
         void Drain() { Dispatcher.Invoke(() => { }, DispatcherPriority.ContextIdle); SceneFilterSurface.UpdateLayout(); }
+        void FieldClick(MultiChoiceInput choice, bool dismissDuringPress = false)
+        {
+            var input = choice.Input;
+            input.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent });
+            if (dismissDuringPress) choice.CloseDropdown();
+            input.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseUpEvent });
+            Drain();
+        }
         double menuHeight = SceneFilterSurface.ActualHeight;
         double buttonLeft = SceneFilterButton.PointToScreen(new Point()).X;
         double menuLeft = SceneFilterSurface.PointToScreen(new Point()).X;
@@ -33,6 +41,18 @@ public partial class MainWindow
             if (choice.IsOpen) failures.Add("Autocomplete arrow did not close the dropdown");
             arrow.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Drain();
             if (!choice.IsOpen) failures.Add("Autocomplete arrow did not reopen the dropdown");
+            FieldClick(choice, dismissDuringPress: true);
+            if (choice.IsOpen) failures.Add("Clicking an open autocomplete field reopened the dismissed dropdown");
+            FieldClick(choice);
+            if (!choice.IsOpen) failures.Add("Clicking a closed autocomplete field did not open the dropdown");
+            choice.CloseDropdown(); Drain();
+            var firstChoice = choice.Choices.First();
+            firstChoice.Value.IsChecked = true;
+            var remove = FindVisualChildren<Button>(choice).Single(button => Equals(button.Tag, firstChoice.Key));
+            remove.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Drain();
+            if (choice.IsOpen || choice.SelectedIds.Contains(firstChoice.Key))
+                failures.Add("Removing an autocomplete chip reopened the dropdown or retained the selection");
+            arrow.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Drain();
             var check = choice.Choices.Values.First();
             check.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) { RoutedEvent = Mouse.PreviewMouseDownEvent });
             if (!_sceneFilter.IsOpen) failures.Add("Clicking a floating autocomplete closed the filter menu");

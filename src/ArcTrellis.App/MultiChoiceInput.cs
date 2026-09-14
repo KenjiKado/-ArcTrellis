@@ -16,6 +16,7 @@ internal sealed class MultiChoiceInput : UserControl
     private readonly List<(Guid Id, string Title)> _options;
     private readonly Dictionary<Guid, CheckBox> _checks = [];
     private readonly Dictionary<Guid, Border> _chips = [];
+    private bool _removingChip, _fieldWasOpenOnPress, _closedOnFieldPress;
     private readonly WrapPanel _row = new();
     private readonly Border _dropdown = new() { BorderThickness = new Thickness(1), Padding = new Thickness(4), CornerRadius = new CornerRadius(4) };
     // Nested popups take capture from the context menu and restore it on close.
@@ -81,15 +82,26 @@ internal sealed class MultiChoiceInput : UserControl
             FilterChoices();
             // A popup opened during mouse-down sees that same click's release
             // outside its HWND and closes immediately. Mouse clicks open on up.
-            if (Mouse.LeftButton != MouseButtonState.Pressed) _popup.IsOpen = true;
+            if (!_removingChip && Mouse.LeftButton != MouseButtonState.Pressed) _popup.IsOpen = true;
         };
+        bool FieldHit(DependencyObject? source) => ReferenceEquals(frame, source) || DropdownChrome.Contains(Input, source);
+        frame.AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            if (e.ChangedButton == MouseButton.Left && FieldHit(e.OriginalSource as DependencyObject))
+                _fieldWasOpenOnPress = IsOpen;
+        }), true);
         frame.AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler((_, e) =>
         {
-            if (e.ChangedButton != MouseButton.Left || DropdownChrome.Contains(arrow, e.OriginalSource as DependencyObject)) return;
-            if (!DropdownChrome.Contains(Input, e.OriginalSource as DependencyObject) && !ReferenceEquals(frame, e.OriginalSource)) return;
+            if (e.ChangedButton != MouseButton.Left || !FieldHit(e.OriginalSource as DependencyObject)) return;
+            // StaysOpen=false can dismiss the popup before mouse-up reaches this
+            // frame. Remember the state from press/Closed instead of reopening it.
+            bool close = IsOpen || _fieldWasOpenOnPress || _closedOnFieldPress;
+            _fieldWasOpenOnPress = _closedOnFieldPress = false;
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (Input.IsKeyboardFocusWithin) { FilterChoices(); _popup.IsOpen = true; }
+                if (!Input.IsKeyboardFocusWithin) return;
+                if (close) CloseDropdown();
+                else { FilterChoices(); _popup.IsOpen = true; }
             }), DispatcherPriority.Background);
         }), true);
         Input.PreviewKeyDown += (_, e) =>
@@ -106,14 +118,17 @@ internal sealed class MultiChoiceInput : UserControl
         };
         frame.MouseDown += (_, e) =>
         {
-            if (e.ChangedButton != MouseButton.Left || DropdownChrome.Contains(arrow, e.OriginalSource as DependencyObject)) return;
+            if (e.ChangedButton != MouseButton.Left || DropdownChrome.Contains(arrow, e.OriginalSource as DependencyObject)
+                || _chips.Values.Any(chip => DropdownChrome.Contains(chip, e.OriginalSource as DependencyObject))) return;
             Input.Focus(); Input.CaretIndex = Input.Text.Length; e.Handled = true;
         };
         bool arrowWasOpenOnPress = false, closedOnArrowPress = false;
         arrow.PreviewMouseLeftButtonDown += (_, _) => arrowWasOpenOnPress = IsOpen;
         _popup.Closed += (_, _) =>
         {
-            if (Mouse.LeftButton == MouseButtonState.Pressed && DropdownChrome.PointerWithin(arrow)) closedOnArrowPress = true;
+            if (Mouse.LeftButton != MouseButtonState.Pressed) return;
+            if (DropdownChrome.PointerWithin(arrow)) closedOnArrowPress = true;
+            else if (DropdownChrome.PointerWithin(frame) && !_chips.Values.Any(DropdownChrome.PointerWithin)) _closedOnFieldPress = true;
         };
         arrow.Click += (_, _) =>
         {
@@ -148,7 +163,14 @@ internal sealed class MultiChoiceInput : UserControl
             text.SetBinding(TextBlock.TextProperty, new Binding { Source = option.Title }); row.Children.Add(text);
             var remove = new Button { Content = "×", Width = 20, Height = 20, MinHeight = 0, Padding = new Thickness(0), Margin = new Thickness(5, 0, 0, 0), Cursor = Cursors.Hand, Tag = id };
             AutomationProperties.SetName(remove, Loc.T("Remove selection") + ": " + option.Title);
-            remove.Click += (_, _) => { _checks[id].IsChecked = false; Input.Focus(); };
+            remove.Click += (_, _) =>
+            {
+                _removingChip = true;
+                _checks[id].IsChecked = false;
+                CloseDropdown();
+                _fieldWasOpenOnPress = _closedOnFieldPress = false;
+                Dispatcher.BeginInvoke(new Action(() => _removingChip = false), DispatcherPriority.ContextIdle);
+            };
             row.Children.Add(remove);
             var chip = new Border { Child = row, Padding = new Thickness(7, 3, 4, 3), Margin = new Thickness(2), CornerRadius = new CornerRadius(12) };
             chip.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
