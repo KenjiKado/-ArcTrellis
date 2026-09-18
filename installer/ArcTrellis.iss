@@ -2,7 +2,7 @@
   #define AppPublishDir "..\artifacts\publish\win-x64"
 #endif
 #define AppName "ArcTrellis"
-#define AppVersion "1.3.15"
+#define AppVersion "1.3.16"
 #define AppPublisher "ArcTrellis"
 #define AppExeName "ArcTrellis.exe"
 
@@ -18,6 +18,7 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 UsePreviousAppDir=no
 UsePreviousTasks=no
+DirExistsWarning=no
 OutputDir=..\artifacts\installer
 OutputBaseFilename=ArcTrellis-Setup-{#AppVersion}-win-x64
 Compression=lzma2/ultra64
@@ -59,3 +60,22 @@ Root: HKA; Subkey: "Software\Classes\ArcTrellis.Project\shell\open\command"; Val
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ShortcutPath: String;
+  ExePath: String;
+begin
+  if (CurStep <> ssPostInstall) or not IsTaskSelected('desktopicon') then
+    Exit;
+
+  ShortcutPath := ExpandConstant('{autodesktop}\ArcTrellis.lnk');
+  ExePath := ExpandConstant('{app}\{#AppExeName}');
+  Log('Desktop shortcut requested at: ' + ShortcutPath);
+  { Refresh the link on reinstalls too, including ones where it was deleted. }
+  CreateShellLink(ShortcutPath, '{#AppName}', ExePath, '',
+    ExpandConstant('{app}'), ExePath, 0, SW_SHOWNORMAL);
+  if not FileExists(ShortcutPath) then
+    RaiseException('Could not create the desktop shortcut: ' + ShortcutPath);
+end;
