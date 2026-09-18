@@ -2,7 +2,7 @@
   #define AppPublishDir "..\artifacts\publish\win-x64"
 #endif
 #define AppName "ArcTrellis"
-#define AppVersion "1.3.14"
+#define AppVersion "1.3.15"
 #define AppPublisher "ArcTrellis"
 #define AppExeName "ArcTrellis.exe"
 
@@ -11,11 +11,13 @@ AppId={{D8B9500E-3A55-4A73-9B9D-81BFB641109B}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
-DefaultDirName={localappdata}\Programs\{#AppName}
+DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+UsePreviousAppDir=no
+UsePreviousTasks=no
 OutputDir=..\artifacts\installer
 OutputBaseFilename=ArcTrellis-Setup-{#AppVersion}-win-x64
 Compression=lzma2/ultra64
@@ -39,12 +41,15 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 english.LaunchApp=Launch ArcTrellis
 russian.LaunchApp=Запустить ArcTrellis
 
+[Tasks]
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"
+
 [Files]
 Source: "{#AppPublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\ArcTrellis"; Filename: "{app}\{#AppExeName}"
-Name: "{userdesktop}\ArcTrellis"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"
+Name: "{autodesktop}\ArcTrellis"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
 [Registry]
 Root: HKA; Subkey: "Software\Classes\.arctrellis"; ValueType: string; ValueName: ""; ValueData: "ArcTrellis.Project"; Flags: uninsdeletevalue
