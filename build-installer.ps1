@@ -42,7 +42,7 @@ try {
     & $iscc "/DAppPublishDir=$publish" ".\installer\ArcTrellis.iss"
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
 
-    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.3.13-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.3.14-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $setup) { throw "Installer output was not found." }
     $hash = Get-FileHash $setup.FullName -Algorithm SHA256
     Set-Content -Path ($setup.FullName + ".sha256") -Value ("{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $setup.Name)
@@ -52,11 +52,11 @@ try {
     if (Test-Path $installTest) { Remove-Item -Recurse -Force $installTest }
     $desktopShortcut = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)) "ArcTrellis.lnk"
     $desktopShortcutExistedBefore = Test-Path $desktopShortcut
-    $installResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LANG=russian", "/DIR=$installTest", "/TASKS=desktopicon" -Wait -PassThru
+    $installResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LANG=russian", "/DIR=$installTest" -Wait -PassThru
     if ($installResult.ExitCode -ne 0) { throw "Silent installer test failed with exit code $($installResult.ExitCode)." }
     $installedExe = Join-Path $installTest "ArcTrellis.exe"
     if (-not (Test-Path $installedExe)) { throw "The installer completed but ArcTrellis.exe was not installed." }
-    if (-not (Test-Path $desktopShortcut)) { throw "The desktop shortcut task was selected but ArcTrellis.lnk was not created." }
+    if (-not (Test-Path $desktopShortcut)) { throw "A normal install did not create ArcTrellis.lnk on the desktop." }
     $shortcutTarget = (New-Object -ComObject WScript.Shell).CreateShortcut($desktopShortcut).TargetPath
     if (-not (Test-Path $shortcutTarget) -or ([IO.Path]::GetFullPath($shortcutTarget) -ne [IO.Path]::GetFullPath($installedExe))) {
         throw "The desktop shortcut does not target the installed ArcTrellis executable."

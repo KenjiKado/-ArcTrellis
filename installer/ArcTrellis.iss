@@ -2,7 +2,7 @@
   #define AppPublishDir "..\artifacts\publish\win-x64"
 #endif
 #define AppName "ArcTrellis"
-#define AppVersion "1.3.13"
+#define AppVersion "1.3.14"
 #define AppPublisher "ArcTrellis"
 #define AppExeName "ArcTrellis.exe"
 
@@ -36,22 +36,15 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 
 [CustomMessages]
-english.DesktopShortcut=Create a desktop shortcut
-english.AdditionalShortcuts=Additional shortcuts:
 english.LaunchApp=Launch ArcTrellis
-russian.DesktopShortcut=Создать ярлык на рабочем столе
-russian.AdditionalShortcuts=Дополнительные ярлыки:
 russian.LaunchApp=Запустить ArcTrellis
-
-[Tasks]
-Name: "desktopicon"; Description: "{cm:DesktopShortcut}"; GroupDescription: "{cm:AdditionalShortcuts}"; Flags: unchecked
 
 [Files]
 Source: "{#AppPublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\ArcTrellis"; Filename: "{app}\{#AppExeName}"
-Name: "{userdesktop}\ArcTrellis"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{userdesktop}\ArcTrellis"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"
 
 [Registry]
 Root: HKA; Subkey: "Software\Classes\.arctrellis"; ValueType: string; ValueName: ""; ValueData: "ArcTrellis.Project"; Flags: uninsdeletevalue
