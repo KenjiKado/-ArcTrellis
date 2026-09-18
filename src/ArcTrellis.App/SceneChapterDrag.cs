@@ -119,10 +119,11 @@ public partial class MainWindow
         if (Vm.SelectedBook is not { } book || scene.BookId != book.Id ||
             !Vm.Project.Scenes.Contains(scene) || book.Chapters.All(chapter => chapter.Id != chapterId) ||
             scene.ChapterId == chapterId) return false;
+        Vm.SelectedScene = scene;
+        if (SceneList.Items.Contains(scene)) SceneList.SelectedItem = scene;
         Vm.MoveScene(scene, chapterId, scene.PlotlineId);
         RefreshSceneList();
         BuildTimeline();
-        if (SceneList.Items.Contains(scene)) SceneList.SelectedItem = scene;
         return true;
     }
 
