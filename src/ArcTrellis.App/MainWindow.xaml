@@ -210,8 +210,9 @@
                           <Setter Property="Template">
                             <Setter.Value>
                               <ControlTemplate TargetType="GroupItem">
+                                <Border x:Name="SceneChapterDropArea" Tag="{Binding Name}" Background="Transparent" AllowDrop="True" PreviewDragOver="SceneChapterTarget_DragOver" PreviewDrop="SceneChapterTarget_Drop">
                                 <StackPanel>
-                                  <ToggleButton x:Name="SceneChapterToggle" Tag="{Binding Name}" AllowDrop="True" FocusVisualStyle="{x:Null}" Checked="SceneChapterToggle_Checked" Unchecked="SceneChapterToggle_Unchecked" PreviewDragOver="SceneChapterTarget_DragOver" PreviewDrop="SceneChapterTarget_Drop">
+                                  <ToggleButton x:Name="SceneChapterToggle" Tag="{Binding Name}" FocusVisualStyle="{x:Null}" Checked="SceneChapterToggle_Checked" Unchecked="SceneChapterToggle_Unchecked">
                                     <ToggleButton.IsChecked>
                                       <MultiBinding Converter="{StaticResource SceneChapterExpandedConverter}" Mode="OneWay" FallbackValue="True">
                                         <Binding Path="Name"/>
@@ -222,9 +223,9 @@
                                       <ControlTemplate TargetType="ToggleButton">
                                         <Border x:Name="ChapterHeader" Background="Transparent" Padding="2,10,2,4">
                                           <StackPanel>
-                                            <DockPanel>
-                                              <Path x:Name="ChapterArrow" Width="9" Height="9" Margin="3,0,8,0" VerticalAlignment="Center" Fill="{DynamicResource MutedBrush}" Data="M 1 2 L 4.5 6 L 8 2 Z"/>
-                                              <TextBlock FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap">
+                                            <Grid>
+                                              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                              <TextBlock x:Name="ChapterTitle" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap">
                                                 <TextBlock.Text>
                                                   <MultiBinding Converter="{StaticResource SceneChapterTitleConverter}">
                                                     <Binding Path="Name"/>
@@ -232,7 +233,8 @@
                                                   </MultiBinding>
                                                 </TextBlock.Text>
                                               </TextBlock>
-                                            </DockPanel>
+                                              <Path x:Name="ChapterArrow" Grid.Column="1" Width="9" Height="9" Margin="8,0,3,0" VerticalAlignment="Center" Fill="{DynamicResource MutedBrush}" Data="M 1 2 L 4.5 6 L 8 2 Z"/>
+                                            </Grid>
                                             <Border Height="1" Margin="0,4,0,0" Background="{DynamicResource BorderBrush}"/>
                                           </StackPanel>
                                         </Border>
@@ -245,6 +247,7 @@
                                   </ToggleButton>
                                   <ItemsPresenter x:Name="ChapterScenes"/>
                                 </StackPanel>
+                                </Border>
                                 <ControlTemplate.Triggers>
                                   <Trigger SourceName="SceneChapterToggle" Property="IsChecked" Value="False">
                                     <Setter TargetName="ChapterScenes" Property="Visibility" Value="Collapsed"/>
