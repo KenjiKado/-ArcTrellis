@@ -103,7 +103,7 @@ public partial class MainWindow
     {
         scene = null;
         chapterId = default;
-        if (Vm.SelectedBook is not { } book || sender is not ToggleButton { Tag: Guid target } ||
+        if (Vm.SelectedBook is not { } book || sender is not Border { Tag: Guid target } ||
             !e.Data.GetDataPresent(SceneChapterDragFormat) ||
             !Guid.TryParse(e.Data.GetData(SceneChapterDragFormat)?.ToString(), out var id) ||
             _draggedSceneId != id ||
@@ -160,10 +160,26 @@ public partial class MainWindow
                 targets.Any(target => Equals(target.Tag, chapter.Id))))
             failures.Add("Scene accordion does not show every chapter, including empty chapters");
 
+        var dropAreas = FindVisualChildren<Border>(SceneList)
+            .Where(border => border.Tag is Guid && border.AllowDrop).ToList();
+        if (!book.Chapters.All(chapter => dropAreas.Any(area => Equals(area.Tag, chapter.Id))))
+            failures.Add("Scene chapter drop areas do not include every chapter");
+        var originalArea = dropAreas.FirstOrDefault(area => Equals(area.Tag, originalChapter));
+        var firstCard = FindVisualChildren<ListBoxItem>(SceneList)
+            .FirstOrDefault(item => ReferenceEquals(item.DataContext, first));
+        if (originalArea is null || firstCard is null || !IsDescendantOf(firstCard, originalArea))
+            failures.Add("Scene chapter drop area does not cover its scene cards");
+
         var originalToggle = targets.FirstOrDefault(target => Equals(target.Tag, originalChapter));
         if (originalToggle is null) failures.Add("Scene accordion is missing the original chapter heading");
         else
         {
+            var title = originalToggle.Template.FindName("ChapterTitle", originalToggle) as TextBlock;
+            var arrow = originalToggle.Template.FindName("ChapterArrow", originalToggle) as System.Windows.Shapes.Path;
+            if (title is null || arrow is null ||
+                title.TranslatePoint(new Point(title.ActualWidth, 0), originalToggle).X >=
+                arrow.TranslatePoint(new Point(0, 0), originalToggle).X)
+                failures.Add("Scene chapter arrow is not after the title");
             originalToggle.IsChecked = false;
             UpdateLayout();
             var originalGroup = FindVisualChildren<GroupItem>(SceneList)
@@ -187,10 +203,25 @@ public partial class MainWindow
 
         SceneList.Tag = "Dragging";
         UpdateLayout();
+        originalArea = FindVisualChildren<Border>(SceneList)
+            .FirstOrDefault(border => border.AllowDrop && Equals(border.Tag, originalChapter));
+        firstCard = FindVisualChildren<ListBoxItem>(SceneList)
+            .FirstOrDefault(item => ReferenceEquals(item.DataContext, first));
         if (SceneList.Items.Count != originalOrder.Count ||
             FindVisualChildren<ListBoxItem>(SceneList).All(item => item.Opacity >= 1) ||
             !book.Chapters.All(chapter => ChapterToggles().Any(toggle => Equals(toggle.Tag, chapter.Id))))
             failures.Add("Scene drag hid the cards or did not dim them while keeping chapter headings available");
+        if (originalArea is null || firstCard is null)
+            failures.Add("Scene chapter drop area or its card disappeared during dragging");
+        else
+        {
+            var cardCenter = firstCard.TranslatePoint(new Point(firstCard.ActualWidth / 2, firstCard.ActualHeight / 2), originalArea);
+            if (firstCard.IsHitTestVisible ||
+                cardCenter.X < 0 || cardCenter.X >= originalArea.ActualWidth ||
+                cardCenter.Y < 0 || cardCenter.Y >= originalArea.ActualHeight ||
+                originalArea.InputHitTest(cardCenter) is not DependencyObject hit || !IsDescendantOf(hit, originalArea))
+                failures.Add("Dropping on a dimmed scene card does not reach its chapter drop area");
+        }
         SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scene-chapter-drop-targets.png"));
         SceneList.Tag = null;
         UpdateLayout();
@@ -214,6 +245,13 @@ public partial class MainWindow
         Vm.Redo(); RefreshAll();
         if (Vm.Project.Scenes.Single(scene => scene.Id == first.Id).ChapterId != empty.Id)
             failures.Add("Redo did not restore the dragged scene's destination");
+    }
+
+    private static bool IsDescendantOf(DependencyObject child, DependencyObject ancestor)
+    {
+        for (DependencyObject? current = child; current is not null; current = VisualTreeHelper.GetParent(current))
+            if (ReferenceEquals(current, ancestor)) return true;
+        return false;
     }
 }
 
