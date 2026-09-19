@@ -1,4 +1,5 @@
 using System.IO;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -19,24 +20,17 @@ public partial class MainWindow
     private ListBoxItem? _pressedListItem;
     private Point _listPressPosition, _listGrabOffset;
     private readonly HashSet<Guid> _collapsedSceneChapters = [];
-    private bool _restoringSceneChapterToggle;
 
-    private void SceneChapterToggle_Loaded(object sender, RoutedEventArgs e)
-    {
-        if (sender is not ToggleButton { Tag: Guid id } toggle) return;
-        _restoringSceneChapterToggle = true;
-        try { toggle.IsChecked = !_collapsedSceneChapters.Contains(id); }
-        finally { _restoringSceneChapterToggle = false; }
-    }
+    internal bool IsSceneChapterExpanded(Guid chapterId) => !_collapsedSceneChapters.Contains(chapterId);
 
     private void SceneChapterToggle_Checked(object sender, RoutedEventArgs e)
     {
-        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Remove(id);
+        if (sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Remove(id);
     }
 
     private void SceneChapterToggle_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id }) _collapsedSceneChapters.Add(id);
+        if (sender is ToggleButton { Tag: Guid id }) _collapsedSceneChapters.Add(id);
     }
 
     private ListBoxItem? SceneCardContainer(DependencyObject? source)
@@ -181,7 +175,7 @@ public partial class MainWindow
             if (ChapterToggles().All(toggle => !Equals(toggle.Tag, originalChapter) || toggle.Visibility != Visibility.Visible))
                 failures.Add("Collapsing a scene chapter hid its header");
             if (!_collapsedSceneChapters.Contains(originalChapter))
-                failures.Add($"Collapsing a scene chapter lost its state (loaded={originalToggle.IsLoaded}, tag={originalToggle.Tag}, checked={originalToggle.IsChecked}, restoring={_restoringSceneChapterToggle})");
+                failures.Add($"Collapsing a scene chapter lost its state (loaded={originalToggle.IsLoaded}, tag={originalToggle.Tag}, checked={originalToggle.IsChecked})");
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scene-chapter-collapsed.png"));
             ((CollectionViewSource)Resources["SceneListView"]).View?.Refresh();
             UpdateLayout();
@@ -221,4 +215,14 @@ public partial class MainWindow
         if (Vm.Project.Scenes.Single(scene => scene.Id == first.Id).ChapterId != empty.Id)
             failures.Add("Redo did not restore the dragged scene's destination");
     }
+}
+
+public sealed class SceneChapterExpandedConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture) =>
+        values.Length >= 2 && values[0] is Guid id && values[1] is MainWindow window
+            ? window.IsSceneChapterExpanded(id) : true;
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        [Binding.DoNothing, Binding.DoNothing];
 }
