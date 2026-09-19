@@ -31,12 +31,12 @@ public partial class MainWindow
 
     private void SceneChapterToggle_Checked(object sender, RoutedEventArgs e)
     {
-        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Remove(id);
+        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id }) _collapsedSceneChapters.Remove(id);
     }
 
     private void SceneChapterToggle_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Add(id);
+        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id }) _collapsedSceneChapters.Add(id);
     }
 
     private ListBoxItem? SceneCardContainer(DependencyObject? source)
