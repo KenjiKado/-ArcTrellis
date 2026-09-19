@@ -176,7 +176,9 @@ public partial class MainWindow
                 .FirstOrDefault(group => group.DataContext is CollectionViewGroup { Name: Guid id } && id == originalChapter);
             if (originalGroup is null || FindVisualChildren<ItemsPresenter>(originalGroup).FirstOrDefault()?.Visibility != Visibility.Collapsed)
                 failures.Add("Collapsing a scene chapter did not hide its cards");
-            if (!originalToggle.IsVisible || !_collapsedSceneChapters.Contains(originalChapter))
+            if (originalGroup?.Visibility != Visibility.Visible ||
+                ChapterToggles().All(toggle => !Equals(toggle.Tag, originalChapter) || toggle.Visibility != Visibility.Visible) ||
+                !_collapsedSceneChapters.Contains(originalChapter))
                 failures.Add("Collapsing a scene chapter hid its header or lost its state");
             ((CollectionViewSource)Resources["SceneListView"]).View?.Refresh();
             UpdateLayout();
