@@ -31,7 +31,7 @@ public partial class MainWindow
 
     private void SceneChapterToggle_Checked(object sender, RoutedEventArgs e)
     {
-        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id }) _collapsedSceneChapters.Remove(id);
+        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Remove(id);
     }
 
     private void SceneChapterToggle_Unchecked(object sender, RoutedEventArgs e)
@@ -188,6 +188,7 @@ public partial class MainWindow
             originalToggle = ChapterToggles().FirstOrDefault(target => Equals(target.Tag, originalChapter));
             if (originalToggle?.IsChecked != false) failures.Add("Scene accordion lost its collapsed state after a refresh");
             if (originalToggle is not null) originalToggle.IsChecked = true;
+            _collapsedSceneChapters.Remove(originalChapter);
         }
 
         SceneList.Tag = "Dragging";

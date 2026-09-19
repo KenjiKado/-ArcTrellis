@@ -210,7 +210,7 @@
                             <Setter.Value>
                               <ControlTemplate TargetType="GroupItem">
                                 <StackPanel>
-                                  <ToggleButton x:Name="SceneChapterToggle" Tag="{Binding Name}" AllowDrop="True" FocusVisualStyle="{x:Null}" Loaded="SceneChapterToggle_Loaded" Checked="SceneChapterToggle_Checked" Unchecked="SceneChapterToggle_Unchecked" PreviewDragOver="SceneChapterTarget_DragOver" PreviewDrop="SceneChapterTarget_Drop">
+                                  <ToggleButton x:Name="SceneChapterToggle" Tag="{Binding Name}" IsChecked="True" AllowDrop="True" FocusVisualStyle="{x:Null}" Loaded="SceneChapterToggle_Loaded" Checked="SceneChapterToggle_Checked" Unchecked="SceneChapterToggle_Unchecked" PreviewDragOver="SceneChapterTarget_DragOver" PreviewDrop="SceneChapterTarget_Drop">
                                     <ToggleButton.Template>
                                       <ControlTemplate TargetType="ToggleButton">
                                         <Border x:Name="ChapterHeader" Background="Transparent" Padding="2,10,2,4">
@@ -321,5 +321,4 @@
   </DockPanel>
 
 </Window>
-
 
