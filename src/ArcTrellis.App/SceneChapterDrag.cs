@@ -1,6 +1,9 @@
 using System.IO;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -16,6 +19,19 @@ public partial class MainWindow
     private Scene? _pressedListScene;
     private ListBoxItem? _pressedListItem;
     private Point _listPressPosition, _listGrabOffset;
+    private readonly HashSet<Guid> _collapsedSceneChapters = [];
+
+    internal bool IsSceneChapterExpanded(Guid chapterId) => !_collapsedSceneChapters.Contains(chapterId);
+
+    private void SceneChapterToggle_Checked(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Remove(id);
+    }
+
+    private void SceneChapterToggle_Unchecked(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleButton { Tag: Guid id }) _collapsedSceneChapters.Add(id);
+    }
 
     private ListBoxItem? SceneCardContainer(DependencyObject? source)
     {
@@ -54,9 +70,6 @@ public partial class MainWindow
         _pressedListScene = null;
         _pressedListItem = null;
 
-        SceneChapterDropTargets.ItemsSource = Vm.SelectedBook!.Chapters.OrderBy(chapter => chapter.Order).ToList();
-        SceneChapterDropOverlay.Visibility = Visibility.Visible;
-        SceneChapterDropOverlay.UpdateLayout();
         var surface = (UIElement)Content;
         var layer = AdornerLayer.GetAdornerLayer(surface);
         var card = FindVisualChildren<Border>(item).FirstOrDefault(border => ReferenceEquals(border.Tag, scene) && border.BorderBrush is SolidColorBrush);
@@ -64,6 +77,7 @@ public partial class MainWindow
         timer.Tick += (_, _) => _sceneDragAdorner?.FollowCursor();
         try
         {
+            SceneList.Tag = "Dragging";
             _draggedSceneId = scene.Id;
             if (layer is not null && card is not null)
             {
@@ -72,7 +86,7 @@ public partial class MainWindow
                 _sceneDragAdorner.FollowCursor();
                 timer.Start();
             }
-            DragDrop.DoDragDrop(item, new DataObject(SceneChapterDragFormat, scene.Id.ToString()), DragDropEffects.Move);
+            DragDrop.DoDragDrop(SceneList, new DataObject(SceneChapterDragFormat, scene.Id.ToString()), DragDropEffects.Move);
         }
         finally
         {
@@ -80,8 +94,7 @@ public partial class MainWindow
             if (_sceneDragAdorner is not null) layer?.Remove(_sceneDragAdorner);
             _sceneDragAdorner = null;
             _draggedSceneId = null;
-            SceneChapterDropOverlay.Visibility = Visibility.Collapsed;
-            SceneChapterDropTargets.ItemsSource = null;
+            SceneList.Tag = null;
         }
         e.Handled = true;
     }
@@ -90,7 +103,7 @@ public partial class MainWindow
     {
         scene = null;
         chapterId = default;
-        if (Vm.SelectedBook is not { } book || sender is not Border { Tag: Guid target } ||
+        if (Vm.SelectedBook is not { } book || sender is not ToggleButton { Tag: Guid target } ||
             !e.Data.GetDataPresent(SceneChapterDragFormat) ||
             !Guid.TryParse(e.Data.GetData(SceneChapterDragFormat)?.ToString(), out var id) ||
             _draggedSceneId != id ||
@@ -122,7 +135,10 @@ public partial class MainWindow
         Vm.SelectedScene = scene;
         if (SceneList.Items.Contains(scene)) SceneList.SelectedItem = scene;
         Vm.MoveScene(scene, chapterId, scene.PlotlineId);
+        _collapsedSceneChapters.Remove(chapterId);
         RefreshSceneList();
+        var destination = FindVisualChildren<ToggleButton>(SceneList).FirstOrDefault(toggle => Equals(toggle.Tag, chapterId));
+        if (destination is not null) destination.IsChecked = true;
         BuildTimeline();
         return true;
     }
@@ -135,15 +151,49 @@ public partial class MainWindow
         var originalOrder = Vm.BookScenes.Select(scene => scene.Id).ToList();
         Vm.AddChapter();
         var empty = Vm.SelectedChapter!;
-        SceneChapterDropTargets.ItemsSource = book.Chapters.OrderBy(chapter => chapter.Order).ToList();
-        SceneChapterDropOverlay.Visibility = Visibility.Visible;
+        RefreshSceneList();
         UpdateLayout();
-        var targets = FindVisualChildren<Border>(SceneChapterDropTargets).Where(border => border.Tag is Guid).ToList();
-        if (!book.Chapters.All(chapter => targets.Any(target => Equals(target.Tag, chapter.Id))))
-            failures.Add("Scene drag targets do not include empty chapters");
+        List<ToggleButton> ChapterToggles() => FindVisualChildren<ToggleButton>(SceneList).Where(toggle => toggle.Tag is Guid).ToList();
+        var targets = ChapterToggles();
+        var groups = ((CollectionViewSource)Resources["SceneListView"]).View?.Groups?.Cast<CollectionViewGroup>().ToList();
+        if (groups is null || !book.Chapters.All(chapter => groups.Any(group => Equals(group.Name, chapter.Id)) &&
+                targets.Any(target => Equals(target.Tag, chapter.Id))))
+            failures.Add("Scene accordion does not show every chapter, including empty chapters");
+
+        var originalToggle = targets.FirstOrDefault(target => Equals(target.Tag, originalChapter));
+        if (originalToggle is null) failures.Add("Scene accordion is missing the original chapter heading");
+        else
+        {
+            originalToggle.IsChecked = false;
+            UpdateLayout();
+            var originalGroup = FindVisualChildren<GroupItem>(SceneList)
+                .FirstOrDefault(group => group.DataContext is CollectionViewGroup { Name: Guid id } && id == originalChapter);
+            if (originalGroup is null || FindVisualChildren<ItemsPresenter>(originalGroup).FirstOrDefault()?.Visibility != Visibility.Collapsed)
+                failures.Add("Collapsing a scene chapter did not hide its cards");
+            if (originalGroup?.Visibility != Visibility.Visible)
+                failures.Add("Collapsing a scene chapter hid its group");
+            if (ChapterToggles().All(toggle => !Equals(toggle.Tag, originalChapter) || toggle.Visibility != Visibility.Visible))
+                failures.Add("Collapsing a scene chapter hid its header");
+            if (!_collapsedSceneChapters.Contains(originalChapter))
+                failures.Add($"Collapsing a scene chapter lost its state (loaded={originalToggle.IsLoaded}, tag={originalToggle.Tag}, checked={originalToggle.IsChecked})");
+            SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scene-chapter-collapsed.png"));
+            ((CollectionViewSource)Resources["SceneListView"]).View?.Refresh();
+            UpdateLayout();
+            originalToggle = ChapterToggles().FirstOrDefault(target => Equals(target.Tag, originalChapter));
+            if (originalToggle?.IsChecked != false) failures.Add("Scene accordion lost its collapsed state after a refresh");
+            if (originalToggle is not null) originalToggle.IsChecked = true;
+            _collapsedSceneChapters.Remove(originalChapter);
+        }
+
+        SceneList.Tag = "Dragging";
+        UpdateLayout();
+        if (SceneList.Items.Count != originalOrder.Count ||
+            FindVisualChildren<ListBoxItem>(SceneList).All(item => item.Opacity >= 1) ||
+            !book.Chapters.All(chapter => ChapterToggles().Any(toggle => Equals(toggle.Tag, chapter.Id))))
+            failures.Add("Scene drag hid the cards or did not dim them while keeping chapter headings available");
         SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-scene-chapter-drop-targets.png"));
-        SceneChapterDropOverlay.Visibility = Visibility.Collapsed;
-        SceneChapterDropTargets.ItemsSource = null;
+        SceneList.Tag = null;
+        UpdateLayout();
 
         if (MoveSceneFromList(first, originalChapter) || !Vm.BookScenes.Select(scene => scene.Id).SequenceEqual(originalOrder))
             failures.Add("Dropping a scene on its own chapter changed its order");
@@ -165,4 +215,14 @@ public partial class MainWindow
         if (Vm.Project.Scenes.Single(scene => scene.Id == first.Id).ChapterId != empty.Id)
             failures.Add("Redo did not restore the dragged scene's destination");
     }
+}
+
+public sealed class SceneChapterExpandedConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture) =>
+        values.Length >= 2 && values[0] is Guid id && values[1] is MainWindow window
+            ? window.IsSceneChapterExpanded(id) : true;
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        [Binding.DoNothing, Binding.DoNothing];
 }

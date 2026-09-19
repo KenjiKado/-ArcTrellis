@@ -17,6 +17,7 @@
     <local:NonNegativeIntegerConverter x:Key="NonNegativeIntegerConverter"/>
     <local:ScenePlotlineColorConverter x:Key="ScenePlotlineColorConverter"/>
     <local:SceneChapterTitleConverter x:Key="SceneChapterTitleConverter"/>
+    <local:SceneChapterExpandedConverter x:Key="SceneChapterExpandedConverter"/>
     <local:NullToBooleanConverter x:Key="NullToBooleanConverter"/>
     <DataTemplate x:Key="EntityEditorTemplate">
       <Border Style="{StaticResource Card}"><ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel><TextBlock Text="Story bible entry" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="Name" Margin="0,10,0,0"/><TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontSize="18"/><TextBlock Text="Category"/><TextBox Text="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Tags"/><local:TagInput Tags="{Binding Tags}" Project="{Binding DataContext.Project, RelativeSource={RelativeSource AncestorType=Window}}"/><TextBlock Text="One-line summary"/><TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Details"/><TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" Height="220" VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="True"/><TextBlock Text="Image file path (optional)"/><TextBox Text="{Binding ImagePath, UpdateSourceTrigger=PropertyChanged}"/><TextBlock Text="Custom sheet fields" FontWeight="SemiBold" Margin="0,10,0,0"/><DataGrid ItemsSource="{Binding Fields}" AutoGenerateColumns="False" CanUserAddRows="True" MinHeight="160"><DataGrid.Columns><DataGridTextColumn Header="Field" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="*"/><DataGridTextColumn Header="Value" Binding="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Width="2*"/></DataGrid.Columns></DataGrid></StackPanel></ScrollViewer></Border>
@@ -191,25 +192,69 @@
                   <ComboBox ItemsSource="{Binding Project.Books}" SelectedValuePath="Id" SelectedValue="{Binding SelectedBookId}" DisplayMemberPath="Title"/>
                   <Grid Margin="-3,3,-3,7"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Content="＋ Scene" Click="AddScene_Click"/><Button Grid.Column="1" Content="Delete" Click="DeleteScene_Click"/><Button x:Name="SceneFilterButton" Grid.Column="2" ToolTip="Filter scenes" AutomationProperties.Name="Filter scenes" Click="SceneFilter_Click" Width="34" Padding="7,5"><Path Data="M 1,1 L 15,1 L 9.5,7 L 9.5,13 L 6.5,15 L 6.5,7 Z" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.5" Fill="Transparent" Width="16" Height="16" Stretch="Uniform"/></Button></Grid>
                 </StackPanel>
-                <Grid>
                 <ListBox x:Name="SceneList" ItemsSource="{Binding Source={StaticResource SceneListView}}" IsSynchronizedWithCurrentItem="False" SelectedValuePath="Id" SelectedValue="{Binding SelectedSceneId}" BorderThickness="0" Background="Transparent" PreviewMouseLeftButtonDown="SceneList_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="SceneList_PreviewMouseLeftButtonUp" PreviewMouseMove="SceneList_PreviewMouseMove">
+                  <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding Tag, ElementName=SceneList}" Value="Dragging">
+                          <Setter Property="Opacity" Value="0.48"/>
+                          <Setter Property="IsHitTestVisible" Value="False"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </ListBox.ItemContainerStyle>
                   <ListBox.GroupStyle>
                     <GroupStyle>
-                      <GroupStyle.HeaderTemplate>
-                        <DataTemplate>
-                          <StackPanel Margin="2,10,2,4">
-                            <TextBlock FontSize="15" FontWeight="SemiBold">
-                              <TextBlock.Text>
-                                <MultiBinding Converter="{StaticResource SceneChapterTitleConverter}">
-                                  <Binding Path="Name"/>
-                                  <Binding Path="DataContext.SelectedBook.Chapters" RelativeSource="{RelativeSource AncestorType=Window}"/>
-                                </MultiBinding>
-                              </TextBlock.Text>
-                            </TextBlock>
-                            <Border Height="1" Margin="0,4,0,0" Background="{DynamicResource BorderBrush}"/>
-                          </StackPanel>
-                        </DataTemplate>
-                      </GroupStyle.HeaderTemplate>
+                      <GroupStyle.ContainerStyle>
+                        <Style TargetType="GroupItem">
+                          <Setter Property="Template">
+                            <Setter.Value>
+                              <ControlTemplate TargetType="GroupItem">
+                                <StackPanel>
+                                  <ToggleButton x:Name="SceneChapterToggle" Tag="{Binding Name}" AllowDrop="True" FocusVisualStyle="{x:Null}" Checked="SceneChapterToggle_Checked" Unchecked="SceneChapterToggle_Unchecked" PreviewDragOver="SceneChapterTarget_DragOver" PreviewDrop="SceneChapterTarget_Drop">
+                                    <ToggleButton.IsChecked>
+                                      <MultiBinding Converter="{StaticResource SceneChapterExpandedConverter}" Mode="OneWay" FallbackValue="True">
+                                        <Binding Path="Name"/>
+                                        <Binding RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                      </MultiBinding>
+                                    </ToggleButton.IsChecked>
+                                    <ToggleButton.Template>
+                                      <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="ChapterHeader" Background="Transparent" Padding="2,10,2,4">
+                                          <StackPanel>
+                                            <DockPanel>
+                                              <Path x:Name="ChapterArrow" Width="9" Height="9" Margin="3,0,8,0" VerticalAlignment="Center" Fill="{DynamicResource MutedBrush}" Data="M 1 2 L 4.5 6 L 8 2 Z"/>
+                                              <TextBlock FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap">
+                                                <TextBlock.Text>
+                                                  <MultiBinding Converter="{StaticResource SceneChapterTitleConverter}">
+                                                    <Binding Path="Name"/>
+                                                    <Binding Path="DataContext.SelectedBook.Chapters" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                  </MultiBinding>
+                                                </TextBlock.Text>
+                                              </TextBlock>
+                                            </DockPanel>
+                                            <Border Height="1" Margin="0,4,0,0" Background="{DynamicResource BorderBrush}"/>
+                                          </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                          <Trigger Property="IsChecked" Value="False"><Setter TargetName="ChapterArrow" Property="Data" Value="M 2 1 L 6 4.5 L 2 8 Z"/></Trigger>
+                                          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ChapterHeader" Property="Background" Value="{DynamicResource HoverBrush}"/></Trigger>
+                                        </ControlTemplate.Triggers>
+                                      </ControlTemplate>
+                                    </ToggleButton.Template>
+                                  </ToggleButton>
+                                  <ItemsPresenter x:Name="ChapterScenes"/>
+                                </StackPanel>
+                                <ControlTemplate.Triggers>
+                                  <Trigger SourceName="SceneChapterToggle" Property="IsChecked" Value="False">
+                                    <Setter TargetName="ChapterScenes" Property="Visibility" Value="Collapsed"/>
+                                  </Trigger>
+                                </ControlTemplate.Triggers>
+                              </ControlTemplate>
+                            </Setter.Value>
+                          </Setter>
+                        </Style>
+                      </GroupStyle.ContainerStyle>
                     </GroupStyle>
                   </ListBox.GroupStyle>
                   <ListBox.ItemTemplate>
@@ -229,24 +274,6 @@
                     </DataTemplate>
                   </ListBox.ItemTemplate>
                 </ListBox>
-                <Border x:Name="SceneChapterDropOverlay" Visibility="Collapsed" Panel.ZIndex="1" Background="{DynamicResource PanelBrush}" Padding="8">
-                  <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Chapters" FontSize="15" FontWeight="SemiBold" Margin="2,0,0,8"/>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                      <ItemsControl x:Name="SceneChapterDropTargets">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate>
-                            <Border Tag="{Binding Id}" AllowDrop="True" PreviewDragOver="SceneChapterTarget_DragOver" PreviewDrop="SceneChapterTarget_Drop" Padding="9" Margin="0,2" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" CornerRadius="4">
-                              <Border.Style><Style TargetType="Border"><Setter Property="Background" Value="{DynamicResource ElevatedBrush}"/><Style.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter Property="Background" Value="{DynamicResource SelectedBrush}"/></Trigger></Style.Triggers></Style></Border.Style>
-                              <TextBlock Text="{Binding Title}" TextWrapping="Wrap" FontWeight="SemiBold"/>
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                    </ScrollViewer>
-                  </DockPanel>
-                </Border>
-                </Grid>
               </DockPanel>
             </Border>
             <Border x:Name="SceneEditor" Grid.Column="2" Style="{StaticResource Card}" Margin="0" IsEnabled="{Binding SelectedScene, Converter={StaticResource NullToBooleanConverter}}">
@@ -301,7 +328,3 @@
   </DockPanel>
 
 </Window>
-
-
-
-

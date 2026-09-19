@@ -242,9 +242,18 @@ public partial class MainWindow : Window
     private void RefreshSceneList()
     {
         if (!ViewChanged(ref _sceneListState, SceneListState())) return;
+        // Named groups keep empty chapters visible as accordion and drop targets.
+        var view = (CollectionViewSource)Resources["SceneListView"];
+        var names = ((PropertyGroupDescription)view.GroupDescriptions[0]).GroupNames;
+        var chapters = Vm.SelectedBook?.Chapters.OrderBy(chapter => chapter.Order).Select(chapter => (object)chapter.Id).ToList() ?? [];
+        if (!names.SequenceEqual(chapters))
+        {
+            names.Clear();
+            foreach (var chapterId in chapters) names.Add(chapterId);
+        }
         // Refresh the filtered source view; ItemCollection.Refresh can only
         // reset the displayed items when the source view is not marked dirty.
-        ((CollectionViewSource)Resources["SceneListView"]).View?.Refresh();
+        view.View?.Refresh();
         if (Vm.SelectedScene is null || !Vm.BookScenes.Contains(Vm.SelectedScene) || !Vm.MatchesSceneFilter(Vm.SelectedScene))
             Vm.SelectedScene = Vm.BookScenes.FirstOrDefault(Vm.MatchesSceneFilter);
     }
