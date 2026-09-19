@@ -19,21 +19,24 @@ public partial class MainWindow
     private ListBoxItem? _pressedListItem;
     private Point _listPressPosition, _listGrabOffset;
     private readonly HashSet<Guid> _collapsedSceneChapters = [];
+    private bool _restoringSceneChapterToggle;
 
     private void SceneChapterToggle_Loaded(object sender, RoutedEventArgs e)
     {
-        if (sender is ToggleButton { Tag: Guid id } toggle)
-            toggle.IsChecked = !_collapsedSceneChapters.Contains(id);
+        if (sender is not ToggleButton { Tag: Guid id } toggle) return;
+        _restoringSceneChapterToggle = true;
+        try { toggle.IsChecked = !_collapsedSceneChapters.Contains(id); }
+        finally { _restoringSceneChapterToggle = false; }
     }
 
     private void SceneChapterToggle_Checked(object sender, RoutedEventArgs e)
     {
-        if (sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Remove(id);
+        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Remove(id);
     }
 
     private void SceneChapterToggle_Unchecked(object sender, RoutedEventArgs e)
     {
-        if (sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Add(id);
+        if (!_restoringSceneChapterToggle && sender is ToggleButton { Tag: Guid id, IsLoaded: true }) _collapsedSceneChapters.Add(id);
     }
 
     private ListBoxItem? SceneCardContainer(DependencyObject? source)
@@ -171,9 +174,10 @@ public partial class MainWindow
             UpdateLayout();
             var originalGroup = FindVisualChildren<GroupItem>(SceneList)
                 .FirstOrDefault(group => group.DataContext is CollectionViewGroup { Name: Guid id } && id == originalChapter);
-            if (originalGroup is null || FindVisualChildren<ItemsPresenter>(originalGroup).FirstOrDefault()?.Visibility != Visibility.Collapsed ||
-                !originalToggle.IsVisible || !_collapsedSceneChapters.Contains(originalChapter))
-                failures.Add("Collapsing a scene chapter did not hide only its cards");
+            if (originalGroup is null || FindVisualChildren<ItemsPresenter>(originalGroup).FirstOrDefault()?.Visibility != Visibility.Collapsed)
+                failures.Add("Collapsing a scene chapter did not hide its cards");
+            if (!originalToggle.IsVisible || !_collapsedSceneChapters.Contains(originalChapter))
+                failures.Add("Collapsing a scene chapter hid its header or lost its state");
             ((CollectionViewSource)Resources["SceneListView"]).View?.Refresh();
             UpdateLayout();
             originalToggle = ChapterToggles().FirstOrDefault(target => Equals(target.Tag, originalChapter));
