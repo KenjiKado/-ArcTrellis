@@ -253,9 +253,15 @@ public partial class MainWindow : Window
         }
         // Refresh the filtered source view; ItemCollection.Refresh can only
         // reset the displayed items when the source view is not marked dirty.
+        var selectedScene = Vm.SelectedScene;
         view.View?.Refresh();
-        if (Vm.SelectedScene is null || !Vm.BookScenes.Contains(Vm.SelectedScene) || !Vm.MatchesSceneFilter(Vm.SelectedScene))
-            Vm.SelectedScene = Vm.BookScenes.FirstOrDefault(Vm.MatchesSceneFilter);
+        if (selectedScene is null || !Vm.BookScenes.Contains(selectedScene) || !Vm.MatchesSceneFilter(selectedScene))
+            selectedScene = Vm.BookScenes.FirstOrDefault(Vm.MatchesSceneFilter);
+        Vm.SelectedScene = selectedScene;
+        // A grouped CollectionView refresh can clear the ListBox's row selection
+        // without changing the selected scene in the view model.
+        if (!ReferenceEquals(SceneList.SelectedItem, selectedScene))
+            SceneList.SelectedItem = selectedScene;
     }
 
     private void RefreshAll()
@@ -833,8 +839,21 @@ public partial class MainWindow : Window
     {
         Guid? chapterId = Vm.SelectedScene is { } scene && Vm.BookScenes.Contains(scene) ? scene.ChapterId : null;
         WorkspaceTabs.SelectedIndex = 3;
+        int sceneCount = Vm.Project.Scenes.Count;
         Vm.AddScene(chapterId);
+        Scene? addedScene = Vm.Project.Scenes.Count > sceneCount ? Vm.Project.Scenes[^1] : null;
+        if (addedScene is not null) _collapsedSceneChapters.Remove(addedScene.ChapterId);
         RefreshAll();
+        if (addedScene is not null && SceneList.Items.Contains(addedScene))
+        {
+            SceneList.UpdateLayout();
+            var chapterToggle = FindVisualChildren<ToggleButton>(SceneList)
+                .FirstOrDefault(toggle => Equals(toggle.Tag, addedScene.ChapterId));
+            if (chapterToggle is not null) chapterToggle.IsChecked = true;
+            Vm.SelectedScene = addedScene;
+            SceneList.SelectedItem = addedScene;
+            SceneList.ScrollIntoView(addedScene);
+        }
     }
     private void DeleteScene_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("scene")) { Vm.DeleteScene(); RefreshAll(); } }
     private void AddCharacter_Click(object sender, RoutedEventArgs e) { Vm.SelectedCharacter = Vm.AddEntity(Vm.Project.Characters, "Character"); RefreshAll(); }
@@ -1179,6 +1198,31 @@ public partial class MainWindow : Window
             if (WorkspaceTabs.SelectedIndex != 2) failures.Add("Add Chapter menu action did not open Chapters");
             AddScene_Click(new MenuItem(), new RoutedEventArgs());
             if (WorkspaceTabs.SelectedIndex != 3) failures.Add("Add Scene menu action did not open Scenes");
+            SceneList.UpdateLayout();
+            var addedSceneCard = FindVisualChildren<ListBoxItem>(SceneList)
+                .FirstOrDefault(item => ReferenceEquals(item.DataContext, Vm.SelectedScene));
+            if (!ReferenceEquals(SceneList.SelectedItem, Vm.SelectedScene) ||
+                addedSceneCard is not { IsSelected: true, IsVisible: true })
+                failures.Add("New scene is not visibly selected in the Scenes list");
+
+            var previousScene = Vm.SelectedScene!;
+            var chapterToggle = FindVisualChildren<ToggleButton>(SceneList)
+                .FirstOrDefault(toggle => Equals(toggle.Tag, previousScene.ChapterId));
+            if (chapterToggle is not null)
+            {
+                chapterToggle.IsChecked = false;
+                AddScene_Click(new Button(), new RoutedEventArgs());
+                SceneList.UpdateLayout();
+                var nextScene = Vm.Project.Scenes.Last();
+                var nextCard = FindVisualChildren<ListBoxItem>(SceneList)
+                    .FirstOrDefault(item => ReferenceEquals(item.DataContext, nextScene));
+                if (nextScene.ChapterId != previousScene.ChapterId ||
+                    !ReferenceEquals(Vm.SelectedScene, nextScene) ||
+                    !ReferenceEquals(SceneList.SelectedItem, nextScene) ||
+                    nextCard is not { IsSelected: true, IsVisible: true } ||
+                    !FindVisualChildren<ToggleButton>(SceneList).Any(toggle => Equals(toggle.Tag, nextScene.ChapterId) && toggle.IsChecked == true))
+                    failures.Add("Adding a scene from Scenes did not expand its chapter and select its card");
+            }
 
             Book firstBook = Vm.SelectedBook!;
             Scene firstScene = Vm.SelectedScene!;
