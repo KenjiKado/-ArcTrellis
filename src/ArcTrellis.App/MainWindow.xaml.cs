@@ -829,7 +829,13 @@ public partial class MainWindow : Window
     private void ChapterDown_Click(object sender, RoutedEventArgs e) { Vm.MoveChapter(1); ChapterList.Items.Refresh(); RefreshAll(); }
     private void AddPlotline_Click(object sender, RoutedEventArgs e) { if (sender is MenuItem) WorkspaceTabs.SelectedIndex = 1; Vm.AddPlotline(); RefreshAll(); }
     private void DeletePlotline_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("plotline (its scenes will move to another plotline)")) { Vm.DeletePlotline(); RefreshAll(); } }
-    private void AddScene_Click(object sender, RoutedEventArgs e) { WorkspaceTabs.SelectedIndex = 3; Vm.AddScene(); RefreshAll(); }
+    private void AddScene_Click(object sender, RoutedEventArgs e)
+    {
+        Guid? chapterId = Vm.SelectedScene is { } scene && Vm.BookScenes.Contains(scene) ? scene.ChapterId : null;
+        WorkspaceTabs.SelectedIndex = 3;
+        Vm.AddScene(chapterId);
+        RefreshAll();
+    }
     private void DeleteScene_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("scene")) { Vm.DeleteScene(); RefreshAll(); } }
     private void AddCharacter_Click(object sender, RoutedEventArgs e) { Vm.SelectedCharacter = Vm.AddEntity(Vm.Project.Characters, "Character"); RefreshAll(); }
     private void DeleteCharacter_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("character")) { Vm.DeleteEntity(Vm.Project.Characters, Vm.SelectedCharacter); Vm.SelectedCharacter = Vm.Project.Characters.FirstOrDefault(); RefreshAll(); } }

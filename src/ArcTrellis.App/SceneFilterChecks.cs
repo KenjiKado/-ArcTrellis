@@ -149,5 +149,13 @@ public partial class MainWindow
         Vm.SelectedBook = book; Drain();
         if (SceneList.Items.Count != 4) failures.Add("Returning to a book restored stale scene filters");
         CheckSceneChapterDragging(failures, reportPath);
+        Vm.SelectedChapter = north;
+        Vm.SelectedScene = c;
+        SceneList.SelectedItem = c;
+        int scenesBeforeAdd = Vm.Project.Scenes.Count;
+        AddScene_Click(SceneList, new RoutedEventArgs());
+        if (Vm.Project.Scenes.Count != scenesBeforeAdd + 1 || Vm.SelectedScene is not { } added ||
+            added.ChapterId != south.Id || !SceneList.Items.Contains(added))
+            failures.Add("+ Scene did not add beside the selected scene in its chapter");
     }
 }
