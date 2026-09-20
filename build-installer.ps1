@@ -83,7 +83,7 @@ try {
     # Windows Explorer or another process can keep a shortcut memory mapped.
     # Reinstalling must not overwrite a shortcut that already targets the app.
     $shortcutMapping = [System.IO.MemoryMappedFiles.MemoryMappedFile]::CreateFromFile(
-        $desktopShortcut, [System.IO.FileMode]::Open, $null, 0, [System.IO.MemoryMappedFiles.MemoryMappedFileAccess]::Read)
+        $desktopShortcut, [System.IO.FileMode]::Open, "ArcTrellis-Shortcut-Upgrade-Smoke", 0, [System.IO.MemoryMappedFiles.MemoryMappedFileAccess]::Read)
     try {
         $mappedReinstall = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installTest" -Wait -PassThru
         if ($mappedReinstall.ExitCode -ne 0) { throw "Reinstalling while the desktop shortcut is memory mapped failed (code $($mappedReinstall.ExitCode))." }
