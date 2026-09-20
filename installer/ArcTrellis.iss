@@ -2,7 +2,7 @@
   #define AppPublishDir "..\artifacts\publish\win-x64"
 #endif
 #define AppName "ArcTrellis"
-#define AppVersion "1.3.19"
+#define AppVersion "1.3.20"
 #define AppPublisher "ArcTrellis"
 #define AppExeName "ArcTrellis.exe"
 
@@ -50,7 +50,7 @@ Source: "{#AppPublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubd
 
 [Icons]
 Name: "{group}\ArcTrellis"; Filename: "{app}\{#AppExeName}"
-Name: "{autodesktop}\ArcTrellis"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\ArcTrellis"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExeName}"; Tasks: desktopicon; Check: not FileExists(ExpandConstant('{autodesktop}\ArcTrellis.lnk'))
 
 [Registry]
 Root: HKA; Subkey: "Software\Classes\.arctrellis"; ValueType: string; ValueName: ""; ValueData: "ArcTrellis.Project"; Flags: uninsdeletevalue
@@ -60,22 +60,3 @@ Root: HKA; Subkey: "Software\Classes\ArcTrellis.Project\shell\open\command"; Val
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
-
-[Code]
-procedure CurStepChanged(CurStep: TSetupStep);
-var
-  ShortcutPath: String;
-  ExePath: String;
-begin
-  if (CurStep <> ssPostInstall) or not IsTaskSelected('desktopicon') then
-    Exit;
-
-  ShortcutPath := ExpandConstant('{autodesktop}\ArcTrellis.lnk');
-  ExePath := ExpandConstant('{app}\{#AppExeName}');
-  Log('Desktop shortcut requested at: ' + ShortcutPath);
-  { Refresh the link on reinstalls too, including ones where it was deleted. }
-  CreateShellLink(ShortcutPath, '{#AppName}', ExePath, '',
-    ExpandConstant('{app}'), ExePath, 0, SW_SHOWNORMAL);
-  if not FileExists(ShortcutPath) then
-    RaiseException('Could not create the desktop shortcut: ' + ShortcutPath);
-end;
