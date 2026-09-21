@@ -17,6 +17,7 @@ public partial class MainWindow
     private void RefreshCharacterOverview()
     {
         if (CharacterEditor is null) return;
+        Vm.RefreshCharacterCategories();
         var character = Vm.SelectedCharacter is { } selected && Vm.Project.Characters.Contains(selected) ? selected : null;
         var scenes = character is null ? new List<Scene>() : Vm.Project.Scenes.Where(scene => scene.CharacterIds.Contains(character.Id)).ToList();
         CharacterSceneCount.Text = Loc.F("In Scenes ({0})", scenes.Count);
@@ -99,7 +100,7 @@ public partial class MainWindow
         RefreshAll();
         UpdateLayout();
         if (!CharacterEditor.IsEnabled || !Equals(CharacterCategorySelector.SelectedValue, existing.Category))
-            failures.Add("Character editor or category selection did not follow the selected character");
+            failures.Add($"Character editor or category selection did not follow the selected character (enabled={CharacterEditor.IsEnabled}, model={existing.Category}, selected={CharacterCategorySelector.SelectedValue}, options={string.Join(",", Vm.CharacterCategories.Select(option => option.Code))})");
 
         var expectedScenes = Vm.Project.Scenes.Where(scene => scene.CharacterIds.Contains(existing.Id)).ToList();
         if (CharacterSceneCount.Text != Loc.F("In Scenes ({0})", expectedScenes.Count) ||

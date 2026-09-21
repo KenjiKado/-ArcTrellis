@@ -93,7 +93,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
     public Plotline? SelectedPlotline { get => _selectedPlotline; set { if (!_restoringHistory) Set(ref _selectedPlotline, value); } }
     public Scene? SelectedScene { get => _selectedScene; set { if (!_restoringHistory && Set(ref _selectedScene, value)) Raise(nameof(SelectedSceneId)); } }
-    public StoryEntity? SelectedCharacter { get => _selectedCharacter; set { if (!_restoringHistory && Set(ref _selectedCharacter, value)) Raise(nameof(SelectedCharacterId)); } }
+    public StoryEntity? SelectedCharacter { get => _selectedCharacter; set { if (!_restoringHistory && Set(ref _selectedCharacter, value)) { RefreshCharacterCategories(); Raise(nameof(SelectedCharacterId)); } } }
     public StoryEntity? SelectedPlace { get => _selectedPlace; set { if (!_restoringHistory && Set(ref _selectedPlace, value)) Raise(nameof(SelectedPlaceId)); } }
     public StoryEntity? SelectedNote { get => _selectedNote; set { if (!_restoringHistory && Set(ref _selectedNote, value)) Raise(nameof(SelectedNoteId)); } }
     public Relationship? SelectedRelationship { get => _selectedRelationship; set { if (!_restoringHistory && Set(ref _selectedRelationship, value)) Raise(nameof(SelectedRelationshipId)); } }
@@ -184,7 +184,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     ];
     private readonly List<SceneStatusOption> _characterCategories = [];
     public IReadOnlyList<SceneStatusOption> CharacterCategories => _characterCategories;
-    private void RefreshCharacterCategories()
+    public void RefreshCharacterCategories()
     {
         // Keep categories in older projects available without changing their saved values.
         var codes = CharacterCategoryCodes.Concat(Project.Characters.Select(character => character.Category))
