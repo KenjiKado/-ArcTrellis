@@ -19,15 +19,18 @@ Push-Location $projectRoot
 try {
     dotnet restore .\ArcTrellis.sln
     if ($LASTEXITCODE -ne 0) { throw "Restore failed." }
+    Write-Host "Checkpoint: Restore completed"
 
     if (-not $SkipTests) {
         dotnet run --project .\tests\ArcTrellis.SmokeTests\ArcTrellis.SmokeTests.csproj -c Release
         if ($LASTEXITCODE -ne 0) { throw "Smoke tests failed." }
+    Write-Host "Checkpoint: Smoke tests completed"
     }
 
     dotnet publish .\src\ArcTrellis.App\ArcTrellis.App.csproj -c Release -r $Runtime --self-contained true `
         -p:PublishSingleFile=true -p:PublishReadyToRun=true -o $publish
     if ($LASTEXITCODE -ne 0) { throw "Windows publish failed." }
+    Write-Host "Checkpoint: Publish completed"
 
     $isccCandidates = @(
         "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
@@ -41,6 +44,7 @@ try {
     New-Item -ItemType Directory -Force -Path $installerOutput | Out-Null
     & $iscc "/DAppPublishDir=$publish" ".\installer\ArcTrellis.iss"
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
+    Write-Host "Checkpoint: Installer compilation completed"
 
     $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.3.22-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $setup) { throw "Installer output was not found." }
@@ -54,6 +58,7 @@ try {
     $desktopShortcutExistedBefore = Test-Path $desktopShortcut
     $installResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LANG=russian", "/DIR=$installTest" -Wait -PassThru
     if ($installResult.ExitCode -ne 0) { throw "Silent installer test failed with exit code $($installResult.ExitCode)." }
+    Write-Host "Checkpoint: Initial installation completed"
     $installedExe = Join-Path $installTest "ArcTrellis.exe"
     if (-not (Test-Path $installedExe)) { throw "The installer completed but ArcTrellis.exe was not installed." }
     if (-not (Test-Path $desktopShortcut)) { throw "A normal install did not create ArcTrellis.lnk on the desktop." }
@@ -69,6 +74,7 @@ try {
     if (-not (Test-Path $uiSmokeReport)) { throw "The installed application did not complete its UI smoke test." }
     $uiSmokeResult = Get-Content $uiSmokeReport -Raw
     if (-not $uiSmokeResult.StartsWith("PASS")) { throw "Installed UI smoke test failed: $uiSmokeResult" }
+    Write-Host "Checkpoint: Installed UI smoke completed"
     Stop-Process -Id $appProcess.Id -Force
     $reopenSmokeReport = Join-Path $installerOutput "ArcTrellis-Reopen-UI-Smoke.txt"
     if (Test-Path $reopenSmokeReport) { Remove-Item -Force $reopenSmokeReport }
@@ -78,6 +84,7 @@ try {
     if (-not (Test-Path $reopenSmokeReport)) { throw "The installed application did not complete its persisted-language reopen test." }
     $reopenSmokeResult = Get-Content $reopenSmokeReport -Raw
     if (-not $reopenSmokeResult.StartsWith("PASS")) { throw "Installed reopen UI smoke test failed: $reopenSmokeResult" }
+    Write-Host "Checkpoint: Reopen UI smoke completed"
     Stop-Process -Id $reopenProcess.Id -Force
 
     # Windows Explorer or another process can keep a shortcut memory mapped.
@@ -89,6 +96,7 @@ try {
         if ($mappedReinstall.ExitCode -ne 0) { throw "Reinstalling while the desktop shortcut is memory mapped failed (code $($mappedReinstall.ExitCode))." }
     }
     finally { $shortcutMapping.Dispose() }
+    Write-Host "Checkpoint: Mapped shortcut reinstall completed"
     $mappedTarget = (New-Object -ComObject WScript.Shell).CreateShortcut($desktopShortcut).TargetPath
     if ([IO.Path]::GetFullPath($mappedTarget) -ne [IO.Path]::GetFullPath($installedExe)) { throw "The mapped desktop shortcut changed its target during reinstall." }
 
@@ -96,6 +104,7 @@ try {
     Remove-Item $desktopShortcut -Force
     $repairResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installTest" -Wait -PassThru
     if ($repairResult.ExitCode -ne 0 -or -not (Test-Path $desktopShortcut)) { throw "Reinstalling in the same directory did not repair the desktop shortcut." }
+    Write-Host "Checkpoint: Shortcut repair completed"
     $repairedTarget = (New-Object -ComObject WScript.Shell).CreateShortcut($desktopShortcut).TargetPath
     if ([IO.Path]::GetFullPath($repairedTarget) -ne [IO.Path]::GetFullPath($installedExe)) { throw "The repaired desktop shortcut targets the wrong executable." }
     $uninstaller = Join-Path $installTest "unins000.exe"
@@ -110,11 +119,13 @@ try {
     if (Test-Path $optOutDir) { Remove-Item -Recurse -Force $optOutDir }
     $optOutResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/TASKS=!desktopicon", "/DIR=$optOutDir" -Wait -PassThru
     if ($optOutResult.ExitCode -ne 0 -or -not (Test-Path (Join-Path $optOutDir "ArcTrellis.exe"))) { throw "Desktop-shortcut opt-out installation failed." }
+    Write-Host "Checkpoint: Opt-out installation completed"
     if (-not $desktopShortcutExistedBefore -and (Test-Path $desktopShortcut)) { throw "Unchecking the desktop shortcut task still created a shortcut." }
 
     # An upgrade must be able to create a shortcut even if the previous install skipped it.
     $upgradeResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$optOutDir" -Wait -PassThru
     if ($upgradeResult.ExitCode -ne 0 -or -not (Test-Path $desktopShortcut)) { throw "Reinstalling over a shortcut-free installation did not create the selected shortcut." }
+    Write-Host "Checkpoint: Upgrade installation completed"
     $upgradeTarget = (New-Object -ComObject WScript.Shell).CreateShortcut($desktopShortcut).TargetPath
     if ([IO.Path]::GetFullPath($upgradeTarget) -ne [IO.Path]::GetFullPath((Join-Path $optOutDir "ArcTrellis.exe"))) { throw "The upgrade shortcut targets the wrong executable." }
     $optOutUninstall = Start-Process (Join-Path $optOutDir "unins000.exe") -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait -PassThru
@@ -128,6 +139,7 @@ try {
     if (Test-Path $allUsersDir) { Remove-Item -Recurse -Force $allUsersDir }
     $allUsersResult = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/ALLUSERS", "/DIR=$allUsersDir" -Wait -PassThru
     if ($allUsersResult.ExitCode -ne 0) { throw "All-users installation failed with exit code $($allUsersResult.ExitCode)." }
+    Write-Host "Checkpoint: All-users installation completed"
     $allUsersExe = Join-Path $allUsersDir "ArcTrellis.exe"
     if (-not (Test-Path $allUsersExe) -or -not (Test-Path $sharedDesktopShortcut)) { throw "All-users installation did not create the shared desktop shortcut." }
     $sharedShortcutTarget = (New-Object -ComObject WScript.Shell).CreateShortcut($sharedDesktopShortcut).TargetPath
