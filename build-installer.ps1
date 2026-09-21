@@ -42,7 +42,7 @@ try {
     & $iscc "/DAppPublishDir=$publish" ".\installer\ArcTrellis.iss"
     if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed." }
 
-    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.3.18-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem $installerOutput -Filter "ArcTrellis-Setup-1.3.21-win-x64.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $setup) { throw "Installer output was not found." }
     $hash = Get-FileHash $setup.FullName -Algorithm SHA256
     Set-Content -Path ($setup.FullName + ".sha256") -Value ("{0}  {1}" -f $hash.Hash.ToLowerInvariant(), $setup.Name)
@@ -79,6 +79,18 @@ try {
     $reopenSmokeResult = Get-Content $reopenSmokeReport -Raw
     if (-not $reopenSmokeResult.StartsWith("PASS")) { throw "Installed reopen UI smoke test failed: $reopenSmokeResult" }
     Stop-Process -Id $reopenProcess.Id -Force
+
+    # Windows Explorer or another process can keep a shortcut memory mapped.
+    # Reinstalling must not overwrite a shortcut that already targets the app.
+    $shortcutMapping = [System.IO.MemoryMappedFiles.MemoryMappedFile]::CreateFromFile(
+        $desktopShortcut, [System.IO.FileMode]::Open, "ArcTrellis-Shortcut-Upgrade-Smoke", 0, [System.IO.MemoryMappedFiles.MemoryMappedFileAccess]::Read)
+    try {
+        $mappedReinstall = Start-Process $setup.FullName -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$installTest" -Wait -PassThru
+        if ($mappedReinstall.ExitCode -ne 0) { throw "Reinstalling while the desktop shortcut is memory mapped failed (code $($mappedReinstall.ExitCode))." }
+    }
+    finally { $shortcutMapping.Dispose() }
+    $mappedTarget = (New-Object -ComObject WScript.Shell).CreateShortcut($desktopShortcut).TargetPath
+    if ([IO.Path]::GetFullPath($mappedTarget) -ne [IO.Path]::GetFullPath($installedExe)) { throw "The mapped desktop shortcut changed its target during reinstall." }
 
     # Reinstalling over an existing directory must repair a deleted shortcut.
     Remove-Item $desktopShortcut -Force
