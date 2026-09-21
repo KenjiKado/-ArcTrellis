@@ -307,7 +307,62 @@
           </Grid>
         </TabItem>
 
-        <TabItem Header="Characters"><Grid x:Name="CharactersHost" Margin="8"><Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Style="{StaticResource Card}"><DockPanel><StackPanel DockPanel.Dock="Top" Orientation="Horizontal"><Button Content="＋ Character" Click="AddCharacter_Click"/><Button Content="Delete" Click="DeleteCharacter_Click"/></StackPanel><ListBox ItemsSource="{Binding Project.Characters}" IsSynchronizedWithCurrentItem="False" SelectedValuePath="Id" SelectedValue="{Binding SelectedCharacterId}" DisplayMemberPath="Name"/></DockPanel></Border><ContentControl Grid.Column="1" Content="{Binding SelectedCharacter}" ContentTemplate="{StaticResource EntityEditorTemplate}"/></Grid></TabItem>
+        <TabItem Header="Characters">
+          <Grid x:Name="CharactersHost" Margin="8">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Border Style="{StaticResource Card}" Margin="0,0,12,0">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+                  <Button Content="＋ Character" Click="AddCharacter_Click"/>
+                  <Button Content="Delete" Click="DeleteCharacter_Click"/>
+                </StackPanel>
+                <ListBox x:Name="CharacterList" ItemsSource="{Binding Project.Characters}" IsSynchronizedWithCurrentItem="False"
+                         SelectedValuePath="Id" SelectedValue="{Binding SelectedCharacterId}" DisplayMemberPath="Name"/>
+              </DockPanel>
+            </Border>
+            <Border x:Name="CharacterEditor" Grid.Column="1" Style="{StaticResource Card}"
+                    IsEnabled="{Binding SelectedCharacter, Converter={StaticResource NullToBooleanConverter}}">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel DataContext="{Binding SelectedCharacter}" Margin="2">
+                  <TextBlock Text="Character" FontSize="22" FontWeight="SemiBold"/>
+                  <TextBlock Text="Name" Foreground="{DynamicResource MutedBrush}" Margin="0,12,0,3"/>
+                  <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontSize="18"/>
+                  <TextBlock Text="Category" Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,3"/>
+                  <ComboBox x:Name="CharacterCategorySelector"
+                            ItemsSource="{Binding DataContext.CharacterCategories, RelativeSource={RelativeSource AncestorType=Window}}"
+                            SelectedValuePath="Code" DisplayMemberPath="Label"
+                            SelectedValue="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/>
+                  <TextBlock Text="Books" Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,3"/>
+                  <ContentControl x:Name="CharacterBooksHost"/>
+                  <TextBlock Text="Tags" Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,3"/>
+                  <local:TagInput Tags="{Binding Tags}" Project="{Binding DataContext.Project, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                  <TextBlock Text="One-line summary" Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,3"/>
+                  <TextBox Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}"/>
+                  <TextBlock Text="Details" FontWeight="SemiBold" Margin="0,14,0,3"/>
+                  <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
+                           AcceptsReturn="True" TextWrapping="Wrap" Height="220"
+                           VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="True" VerticalContentAlignment="Top"/>
+                  <Button Content="Gallery" ToolTip="Coming soon" IsEnabled="False"
+                          HorizontalAlignment="Left" Margin="0,14,0,0"/>
+                  <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                    <TextBlock x:Name="CharacterChapterCount" Text="In Chapters (0)" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="CharacterSceneCount" Text="In Scenes (0)" FontWeight="SemiBold" Margin="20,0,0,0"/>
+                  </StackPanel>
+                  <TextBlock Text="Relations" FontWeight="SemiBold" Margin="0,16,0,6"/>
+                  <DataGrid x:Name="CharacterRelationsTable" AutoGenerateColumns="False" IsReadOnly="True"
+                            CanUserAddRows="False" MinHeight="160" MinColumnWidth="100"
+                            VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <DataGrid.Columns>
+                      <DataGridTextColumn Header="Name" Binding="{Binding Other.Name}" Width="2*"/>
+                      <DataGridTextColumn Header="Relation type" Binding="{Binding Relation.Type}" Width="*"/>
+                      <DataGridTextColumn Header="Description" Binding="{Binding Relation.Description}" Width="2*"/>
+                    </DataGrid.Columns>
+                  </DataGrid>
+                </StackPanel>
+              </ScrollViewer>
+            </Border>
+          </Grid>
+        </TabItem>
         <TabItem Header="Places"><Grid Margin="8"><Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Style="{StaticResource Card}"><DockPanel><StackPanel DockPanel.Dock="Top" Orientation="Horizontal"><Button Content="＋ Place" Click="AddPlace_Click"/><Button Content="Delete" Click="DeletePlace_Click"/></StackPanel><ListBox ItemsSource="{Binding Project.Places}" IsSynchronizedWithCurrentItem="False" SelectedValuePath="Id" SelectedValue="{Binding SelectedPlaceId}" DisplayMemberPath="Name"/></DockPanel></Border><ContentControl Grid.Column="1" Content="{Binding SelectedPlace}" ContentTemplate="{StaticResource EntityEditorTemplate}"/></Grid></TabItem>
         <TabItem Header="Notes"><Grid Margin="8"><Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Style="{StaticResource Card}"><DockPanel><StackPanel DockPanel.Dock="Top" Orientation="Horizontal"><Button Content="＋ Note" Click="AddNote_Click"/><Button Content="Delete" Click="DeleteNote_Click"/></StackPanel><ListBox ItemsSource="{Binding Project.Notes}" IsSynchronizedWithCurrentItem="False" SelectedValuePath="Id" SelectedValue="{Binding SelectedNoteId}"><ListBox.ItemTemplate><DataTemplate><StackPanel Margin="2"><TextBlock Text="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Category}" Foreground="{DynamicResource MutedBrush}"/></StackPanel></DataTemplate></ListBox.ItemTemplate></ListBox></DockPanel></Border><ContentControl Grid.Column="1" Content="{Binding SelectedNote}" ContentTemplate="{StaticResource EntityEditorTemplate}"/></Grid></TabItem>
 
