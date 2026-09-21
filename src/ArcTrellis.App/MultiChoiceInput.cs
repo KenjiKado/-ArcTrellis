@@ -24,6 +24,7 @@ internal sealed class MultiChoiceInput : UserControl
     private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Bottom, Focusable = false };
     private readonly TextBlock _empty = new() { Text = Loc.T("No matches"), Margin = new Thickness(6), Visibility = Visibility.Collapsed };
     internal TextBox Input { get; } = new() { Tag = "FilterDraft", Width = 145, MinHeight = 28, BorderThickness = new Thickness(0), Background = Brushes.Transparent, Margin = new Thickness(2) };
+    internal event EventHandler? SelectionChanged;
     internal IReadOnlyCollection<Guid> SelectedIds => _selected;
     internal IReadOnlyDictionary<Guid, CheckBox> Choices => _checks;
     internal bool IsOpen => _popup.IsOpen;
@@ -67,8 +68,8 @@ internal sealed class MultiChoiceInput : UserControl
             var text = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = 320 };
             text.SetBinding(TextBlock.TextProperty, new Binding { Source = option.Title });
             var check = new CheckBox { Tag = id, IsChecked = _selected.Contains(id), Margin = new Thickness(3), Cursor = Cursors.Hand, Content = text };
-            check.Checked += (_, _) => { _selected.Add(id); RenderChips(); Input.Clear(); };
-            check.Unchecked += (_, _) => { _selected.Remove(id); RenderChips(); };
+            check.Checked += (_, _) => { _selected.Add(id); RenderChips(); Input.Clear(); SelectionChanged?.Invoke(this, EventArgs.Empty); };
+            check.Unchecked += (_, _) => { _selected.Remove(id); RenderChips(); SelectionChanged?.Invoke(this, EventArgs.Empty); };
             _checks.Add(id, check); rows.Children.Add(check);
         }
         rows.Children.Add(_empty);
