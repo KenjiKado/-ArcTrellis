@@ -1,11 +1,8 @@
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -132,13 +129,8 @@ internal sealed class CharacterGalleryPreview : UserControl
 public sealed class CharacterGalleryWindow : Window
 {
     private readonly List<string> _paths;
-    private readonly ListBox _images = new()
-    {
-        SelectionMode = SelectionMode.Extended,
-        BorderThickness = new Thickness(0),
-        Background = Brushes.Transparent,
-        HorizontalContentAlignment = HorizontalAlignment.Left
-    };
+    private readonly WrapPanel _images = new() { Orientation = Orientation.Horizontal };
+    private readonly HashSet<string> _selectedPaths = new(StringComparer.OrdinalIgnoreCase);
     private readonly TextBlock _empty = new()
     {
         FontSize = 18,
@@ -150,7 +142,9 @@ public sealed class CharacterGalleryWindow : Window
     internal Button AddImageButton { get; }
     internal Button DeleteImageButton { get; }
     internal IReadOnlyList<string> ImagePaths => _paths;
-    internal int GridItemCount => _images.Items.Count;
+    internal int GridItemCount => _images.Children.Count;
+    internal int RenderedGridItemCount => _images.Children.Cast<FrameworkElement>()
+        .Count(item => item.IsVisible && item.ActualWidth > 0 && item.ActualHeight > 0);
 
     public CharacterGalleryWindow(string characterName, IEnumerable<string> imagePaths)
     {
@@ -176,12 +170,7 @@ public sealed class CharacterGalleryWindow : Window
         toolbar.Children.Add(AddImageButton);
         toolbar.Children.Add(DeleteImageButton);
 
-        var itemPanel = new FrameworkElementFactory(typeof(WrapPanel));
-        itemPanel.SetValue(WrapPanel.OrientationProperty, Orientation.Horizontal);
-        _images.ItemsPanel = new ItemsPanelTemplate(itemPanel);
-        _images.SelectionChanged += (_, _) => DeleteImageButton.IsEnabled = _images.SelectedItems.Count > 0;
-        _images.PreviewMouseDoubleClick += Images_MouseDoubleClick;
-        _images.PreviewKeyDown += (_, e) =>
+        PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.Delete) { DeleteSelected(); e.Handled = true; }
             else if (e.Key == Key.Enter) { OpenSelected(); e.Handled = true; }
@@ -214,10 +203,9 @@ public sealed class CharacterGalleryWindow : Window
 
     internal void SelectForTest(string path)
     {
-        _images.SelectedItems.Clear();
-        if (_images.Items.Cast<ListBoxItem>().FirstOrDefault(item =>
-                string.Equals(item.Tag as string, path, StringComparison.OrdinalIgnoreCase)) is { } match)
-            match.IsSelected = true;
+        _selectedPaths.Clear();
+        if (_paths.Contains(path, StringComparer.OrdinalIgnoreCase)) _selectedPaths.Add(path);
+        RefreshSelectionVisuals();
     }
 
     internal void DeleteSelectedForTest() => DeleteSelected();
@@ -255,39 +243,47 @@ public sealed class CharacterGalleryWindow : Window
 
     private void DeleteSelected()
     {
-        var selected = _images.SelectedItems.Cast<ListBoxItem>()
-            .Select(item => item.Tag as string)
-            .Where(path => path is not null)
-            .Cast<string>()
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (selected.Count == 0) return;
-        _paths.RemoveAll(path => selected.Contains(path));
+        if (_selectedPaths.Count == 0) return;
+        _paths.RemoveAll(path => _selectedPaths.Contains(path));
+        _selectedPaths.Clear();
         RefreshGrid();
     }
 
     private void RefreshGrid(string? selectedPath = null)
     {
-        _images.Items.Clear();
+        _images.Children.Clear();
+        _selectedPaths.RemoveWhere(path => !_paths.Contains(path, StringComparer.OrdinalIgnoreCase));
+        if (selectedPath is not null)
+        {
+            _selectedPaths.Clear();
+            _selectedPaths.Add(selectedPath);
+        }
         foreach (string path in _paths)
         {
-            var item = new ListBoxItem
+            var item = CreateImageTile(path);
+            item.Tag = path;
+            item.Margin = new Thickness(5);
+            item.ToolTip = path;
+            item.Cursor = Cursors.Hand;
+            item.Focusable = true;
+            AutomationProperties.SetName(item, Path.GetFileName(path));
+            item.PreviewMouseLeftButtonDown += (_, e) =>
             {
-                Tag = path,
-                Content = CreateImageTile(path),
-                Padding = new Thickness(0),
-                Margin = new Thickness(5),
-                HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                ToolTip = path
+                if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) _selectedPaths.Clear();
+                if (!_selectedPaths.Add(path) && (Keyboard.Modifiers & ModifierKeys.Control) != 0)
+                    _selectedPaths.Remove(path);
+                item.Focus();
+                RefreshSelectionVisuals();
+                if (e.ClickCount == 2) OpenImage(path);
+                e.Handled = true;
             };
-            _images.Items.Add(item);
-            if (string.Equals(path, selectedPath, StringComparison.OrdinalIgnoreCase)) item.IsSelected = true;
+            _images.Children.Add(item);
         }
         _empty.Visibility = _paths.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        DeleteImageButton.IsEnabled = _images.SelectedItems.Count > 0;
-        if (_images.SelectedItem is not null) _images.ScrollIntoView(_images.SelectedItem);
+        RefreshSelectionVisuals();
     }
 
-    private static FrameworkElement CreateImageTile(string path)
+    private static Border CreateImageTile(string path)
     {
         var border = new Border
         {
@@ -328,18 +324,25 @@ public sealed class CharacterGalleryWindow : Window
         return border;
     }
 
-    private void Images_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    private void RefreshSelectionVisuals()
     {
-        if (e.ChangedButton != MouseButton.Left || e.OriginalSource is not DependencyObject source ||
-            ItemsControl.ContainerFromElement(_images, source) is not ListBoxItem item) return;
-        item.IsSelected = true;
-        OpenSelected();
-        e.Handled = true;
+        foreach (Border item in _images.Children)
+        {
+            bool selected = item.Tag is string path && _selectedPaths.Contains(path);
+            item.BorderThickness = new Thickness(selected ? 3 : 1);
+            item.SetResourceReference(Border.BorderBrushProperty, selected ? "AccentBrush" : "BorderBrush");
+        }
+        DeleteImageButton.IsEnabled = _selectedPaths.Count > 0;
     }
 
     private void OpenSelected()
     {
-        if (_images.SelectedItem is not ListBoxItem { Tag: string path }) return;
+        if (_selectedPaths.FirstOrDefault() is not { } path) return;
+        OpenImage(path);
+    }
+
+    private void OpenImage(string path)
+    {
         try
         {
             if (!File.Exists(path)) throw new FileNotFoundException();

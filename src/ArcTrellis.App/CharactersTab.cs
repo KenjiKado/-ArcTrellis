@@ -278,8 +278,10 @@ public partial class MainWindow
             failures.Add("Gallery did not add a dropped Windows image to its grid");
         galleryDialog.SelectForTest(droppedImage);
         galleryDialog.DeleteSelectedForTest();
+        galleryDialog.UpdateLayout();
         if (galleryDialog.ImagePaths.Contains(droppedImage, StringComparer.OrdinalIgnoreCase) ||
-            !File.Exists(droppedImage))
+            !File.Exists(droppedImage) || galleryDialog.GridItemCount != 6 ||
+            galleryDialog.RenderedGridItemCount != 6)
             failures.Add("Gallery Delete removed the source file or retained its gallery reference");
         SaveVisualPng(galleryDialog,
             Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-character-gallery.png"));
