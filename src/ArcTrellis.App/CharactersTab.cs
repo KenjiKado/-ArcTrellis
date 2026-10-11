@@ -286,8 +286,25 @@ public partial class MainWindow
         galleryDialog.UpdateLayout();
         if (!galleryDialog.DisplayedGridPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse()))
             failures.Add("Gallery grid does not show the newest image first");
-        if (galleryDialog.GalleryRightGap > 6)
+        if (galleryDialog.GalleryRightGap > 1)
             failures.Add($"Gallery grid leaves {galleryDialog.GalleryRightGap:0.##} pixels unused on the right");
+        galleryDialog.Width = 760;
+        galleryDialog.Height = galleryDialog.MinHeight;
+        galleryDialog.UpdateLayout();
+        int repeatedColumns = galleryDialog.GalleryColumnCount;
+        double repeatedTileWidth = galleryDialog.GalleryTileWidth;
+        galleryDialog.Width = 900;
+        galleryDialog.Height = 600;
+        galleryDialog.UpdateLayout();
+        galleryDialog.Width = 760;
+        galleryDialog.Height = galleryDialog.MinHeight;
+        galleryDialog.UpdateLayout();
+        if (galleryDialog.GalleryColumnCount != repeatedColumns ||
+            Math.Abs(galleryDialog.GalleryTileWidth - repeatedTileWidth) > 0.5)
+            failures.Add("Gallery resize did not return to the same column count and image width");
+        galleryDialog.Width = 940;
+        galleryDialog.Height = 680;
+        galleryDialog.UpdateLayout();
         string droppedImage = Path.Combine(galleryDirectory, "dropped.png");
         File.Copy(galleryPaths[0], droppedImage, true);
         if (galleryDialog.AddFilesForTest([droppedImage]) != 1 || galleryDialog.GridItemCount != 7 ||

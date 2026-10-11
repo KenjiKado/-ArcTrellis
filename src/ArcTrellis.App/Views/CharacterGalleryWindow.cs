@@ -4,6 +4,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -187,13 +188,12 @@ internal sealed class CharacterGalleryPreview : UserControl
 public sealed class CharacterGalleryWindow : Window
 {
     private const double TileTargetSlotWidth = 210;
-    private const double TileHorizontalMargin = 10;
     private readonly List<string> _paths;
-    private readonly WrapPanel _images = new() { Orientation = Orientation.Horizontal };
+    private readonly UniformGrid _images = new() { Columns = 1 };
+    private readonly Grid _gallerySurface = new();
     private readonly ScrollViewer _galleryScroller;
     private readonly HashSet<string> _selectedPaths = new(StringComparer.OrdinalIgnoreCase);
     private int _galleryColumnCount = 1;
-    private double _galleryTileWidth = 190;
     private readonly TextBlock _empty = new()
     {
         FontSize = 18,
@@ -210,8 +210,10 @@ public sealed class CharacterGalleryWindow : Window
         .Select(item => item.Tag).OfType<string>().ToList();
     internal int RenderedGridItemCount => _images.Children.Cast<FrameworkElement>()
         .Count(item => item.IsVisible && item.ActualWidth > 0 && item.ActualHeight > 0);
-    internal double GalleryRightGap => Math.Max(0,
-        _galleryScroller.ViewportWidth - _galleryColumnCount * (_galleryTileWidth + TileHorizontalMargin));
+    internal int GalleryColumnCount => _galleryColumnCount;
+    internal double GalleryTileWidth => _images.Children.OfType<FrameworkElement>()
+        .FirstOrDefault()?.ActualWidth ?? 0;
+    internal double GalleryRightGap => Math.Max(0, _galleryScroller.ViewportWidth - _images.ActualWidth);
 
     public CharacterGalleryWindow(string characterName, IEnumerable<string> imagePaths)
     {
@@ -244,21 +246,21 @@ public sealed class CharacterGalleryWindow : Window
         };
 
         _empty.Text = Loc.T("Drop images here");
-        var gallerySurface = new Grid();
         _galleryScroller = new ScrollViewer
         {
             Content = _images,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
-        _galleryScroller.SizeChanged += (_, _) => FitGalleryTiles();
-        gallerySurface.Children.Add(_galleryScroller);
-        gallerySurface.Children.Add(_empty);
+        _gallerySurface.SizeChanged += (_, _) => SetGalleryColumns();
+        _gallerySurface.Children.Add(_galleryScroller);
+        _gallerySurface.Children.Add(_empty);
 
         var layout = new DockPanel { Margin = new Thickness(14) };
         DockPanel.SetDock(toolbar, Dock.Top);
         layout.Children.Add(toolbar);
-        layout.Children.Add(gallerySurface);
+        layout.Children.Add(_gallerySurface);
         Content = layout;
 
         DragEnter += Gallery_DragOver;
@@ -268,7 +270,7 @@ public sealed class CharacterGalleryWindow : Window
         Loaded += (_, _) =>
         {
             Loc.Apply(this);
-            FitGalleryTiles();
+            SetGalleryColumns();
         };
     }
 
@@ -353,29 +355,25 @@ public sealed class CharacterGalleryWindow : Window
             _images.Children.Add(item);
         }
         _empty.Visibility = _paths.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        FitGalleryTiles();
+        SetGalleryColumns();
         RefreshSelectionVisuals();
     }
 
-    private void FitGalleryTiles()
+    private void SetGalleryColumns()
     {
-        double viewportWidth = _galleryScroller.ViewportWidth;
-        if (!double.IsFinite(viewportWidth) || viewportWidth <= 0)
-            viewportWidth = _galleryScroller.ActualWidth;
-        if (!double.IsFinite(viewportWidth) || viewportWidth <= 0) return;
-
-        _galleryColumnCount = Math.Max(1, (int)Math.Round(
-            viewportWidth / TileTargetSlotWidth, MidpointRounding.AwayFromZero));
-        _galleryTileWidth = Math.Max(150,
-            Math.Floor(viewportWidth / _galleryColumnCount - TileHorizontalMargin));
-        foreach (Border item in _images.Children) item.Width = _galleryTileWidth;
+        double layoutWidth = _gallerySurface.ActualWidth;
+        if (!double.IsFinite(layoutWidth) || layoutWidth <= 0) return;
+        int columns = Math.Max(1, (int)Math.Round(
+            layoutWidth / TileTargetSlotWidth, MidpointRounding.AwayFromZero));
+        if (columns == _galleryColumnCount) return;
+        _galleryColumnCount = columns;
+        _images.Columns = columns;
     }
 
     private static Border CreateImageTile(string path)
     {
         var border = new Border
         {
-            Width = 190,
             Height = 170,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(7),
