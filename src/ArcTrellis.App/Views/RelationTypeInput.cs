@@ -81,16 +81,16 @@ internal sealed class RelationTypeInput : UserControl
         content.Children.Add(Input);
         frame.Child = content;
 
+        _customChoice.Click += (_, _) => SelectCustom();
+        _choiceRows.Children.Add(_customChoice);
+        _empty.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+        _choiceRows.Children.Add(_empty);
+
         foreach (var option in options
             .Where(option => !string.IsNullOrWhiteSpace(option.Value))
             .Select(option => new RelationTypeChoice(option.Group, option.Value.Trim()))
             .DistinctBy(option => option.Value, StringComparer.CurrentCultureIgnoreCase))
             AddChoice(option);
-
-        _customChoice.Click += (_, _) => SelectCustom();
-        _choiceRows.Children.Add(_customChoice);
-        _empty.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
-        _choiceRows.Children.Add(_empty);
 
         _popup.PlacementTarget = frame;
         _popup.Child = _dropdown;
