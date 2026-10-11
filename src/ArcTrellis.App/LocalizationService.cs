@@ -47,6 +47,7 @@ public static class Loc
         ["Gallery"] = "Галерея", ["Add image"] = "Добавить изображение",
         ["{0} more images"] = "Ещё изображений: {0}",
         ["Drop images here"] = "Перетащите изображения сюда",
+        ["Loading images..."] = "Загрузка изображений...",
         ["No images yet"] = "Изображений пока нет",
         ["Image files"] = "Файлы изображений",
         ["Character gallery updated"] = "Галерея персонажа обновлена",

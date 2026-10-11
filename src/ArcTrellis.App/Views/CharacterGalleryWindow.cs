@@ -1,12 +1,17 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Ellipse = System.Windows.Shapes.Ellipse;
 using Shape = System.Windows.Shapes.Shape;
@@ -15,6 +20,13 @@ namespace ArcTrellis.App.Views;
 
 internal static class GalleryImageSupport
 {
+    private readonly record struct PreviewCacheKey(
+        string Path, int DecodeWidth, long Length, long LastWriteTicks);
+
+    private const int MaxCachedPreviews = 128;
+    private static readonly SemaphoreSlim DecodeSlots = new(3, 3);
+    private static readonly ConcurrentDictionary<PreviewCacheKey, ImageSource> PreviewCache = new();
+    private static readonly ConcurrentQueue<PreviewCacheKey> CacheOrder = new();
     private static readonly HashSet<string> Extensions =
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -41,6 +53,53 @@ internal static class GalleryImageSupport
             return bitmap;
         }
         catch { return null; }
+    }
+
+    internal static async Task<ImageSource?> LoadPreviewAsync(
+        string path, int decodeWidth, CancellationToken cancellationToken)
+    {
+        PreviewCacheKey? key = CreateCacheKey(path, decodeWidth);
+        if (key is null) return null;
+        if (PreviewCache.TryGetValue(key.Value, out ImageSource? cached)) return cached;
+
+        await DecodeSlots.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (PreviewCache.TryGetValue(key.Value, out cached)) return cached;
+            ImageSource? preview = await Task.Run(
+                () => LoadPreview(key.Value.Path, key.Value.DecodeWidth), cancellationToken)
+                .ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (preview is null) return null;
+            if (PreviewCache.TryAdd(key.Value, preview))
+            {
+                CacheOrder.Enqueue(key.Value);
+                TrimCache();
+            }
+            return preview;
+        }
+        finally
+        {
+            DecodeSlots.Release();
+        }
+    }
+
+    private static PreviewCacheKey? CreateCacheKey(string path, int decodeWidth)
+    {
+        try
+        {
+            var file = new FileInfo(path);
+            if (!file.Exists) return null;
+            return new PreviewCacheKey(file.FullName, decodeWidth, file.Length,
+                file.LastWriteTimeUtc.Ticks);
+        }
+        catch { return null; }
+    }
+
+    private static void TrimCache()
+    {
+        while (PreviewCache.Count > MaxCachedPreviews && CacheOrder.TryDequeue(out var oldest))
+            PreviewCache.TryRemove(oldest, out _);
     }
 }
 
@@ -192,7 +251,14 @@ public sealed class CharacterGalleryWindow : Window
     private readonly WrapPanel _images = new() { Orientation = Orientation.Horizontal };
     private readonly Grid _gallerySurface = new();
     private readonly ScrollViewer _galleryScroller;
+    private readonly DockPanel _layout;
+    private readonly Border _busyOverlay;
     private readonly HashSet<string> _selectedPaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Task> _thumbnailLoadTasks =
+        new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource _thumbnailLoadCancellation = new();
+    private bool _gridInitialized;
+    private bool _isBusy;
     private int _galleryColumnCount = 1;
     private double _galleryTileWidth = 190;
     private readonly TextBlock _empty = new()
@@ -215,6 +281,7 @@ public sealed class CharacterGalleryWindow : Window
     internal double GalleryTileWidth => _galleryTileWidth;
     internal double GalleryRightGap => Math.Max(0,
         _galleryScroller.ViewportWidth - _galleryColumnCount * (_galleryTileWidth + TileHorizontalMargin));
+    internal bool IsBusy => _isBusy;
 
     public CharacterGalleryWindow(string characterName, IEnumerable<string> imagePaths)
     {
@@ -233,7 +300,7 @@ public sealed class CharacterGalleryWindow : Window
         DeleteImageButton = new Button { Content = Loc.T("Delete"), IsEnabled = false };
         AutomationProperties.SetName(AddImageButton, Loc.T("Add image"));
         AutomationProperties.SetName(DeleteImageButton, Loc.T("Delete"));
-        AddImageButton.Click += (_, _) => ChooseImages();
+        AddImageButton.Click += async (_, _) => await ChooseImagesAsync();
         DeleteImageButton.Click += (_, _) => DeleteSelected();
 
         var toolbar = new StackPanel { Orientation = Orientation.Horizontal };
@@ -242,11 +309,12 @@ public sealed class CharacterGalleryWindow : Window
 
         PreviewKeyDown += (_, e) =>
         {
+            if (_isBusy) { e.Handled = true; return; }
             if (e.Key == Key.Delete) { DeleteSelected(); e.Handled = true; }
             else if (e.Key == Key.Enter) { OpenSelected(); e.Handled = true; }
         };
 
-        _empty.Text = Loc.T("Drop images here");
+        _empty.Text = _paths.Count == 0 ? Loc.T("Drop images here") : Loc.T("Loading images...");
         _galleryScroller = new ScrollViewer
         {
             Content = _images,
@@ -259,24 +327,48 @@ public sealed class CharacterGalleryWindow : Window
         _gallerySurface.Children.Add(_galleryScroller);
         _gallerySurface.Children.Add(_empty);
 
-        var layout = new DockPanel { Margin = new Thickness(14) };
+        _layout = new DockPanel { Margin = new Thickness(14) };
         DockPanel.SetDock(toolbar, Dock.Top);
-        layout.Children.Add(toolbar);
-        layout.Children.Add(_gallerySurface);
-        Content = layout;
+        _layout.Children.Add(toolbar);
+        _layout.Children.Add(_gallerySurface);
+
+        _busyOverlay = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(170, 12, 18, 29)),
+            Child = CreateBusyIndicator(),
+            Visibility = Visibility.Collapsed
+        };
+        var root = new Grid();
+        root.Children.Add(_layout);
+        root.Children.Add(_busyOverlay);
+        Content = root;
 
         DragEnter += Gallery_DragOver;
         DragOver += Gallery_DragOver;
         Drop += Gallery_Drop;
-        RefreshGrid();
         Loaded += (_, _) =>
         {
             Loc.Apply(this);
             FitGalleryTiles();
+            Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle,
+                new Action(EnsureGridInitialized));
+        };
+        Closed += (_, _) =>
+        {
+            _thumbnailLoadCancellation.Cancel();
+            _thumbnailLoadCancellation.Dispose();
         };
     }
 
-    internal int AddFilesForTest(IEnumerable<string> paths) => AddImages(paths);
+    internal int AddFilesForTest(IEnumerable<string> paths)
+    {
+        EnsureGridInitialized();
+        List<string> addedPaths = AppendImages(paths);
+        if (addedPaths.Count > 0) RefreshGrid(addedPaths[^1]);
+        return addedPaths.Count;
+    }
+
+    internal void InitializeGridForTest() => EnsureGridInitialized();
 
     internal void SelectForTest(string path)
     {
@@ -287,7 +379,7 @@ public sealed class CharacterGalleryWindow : Window
 
     internal void DeleteSelectedForTest() => DeleteSelected();
 
-    private void ChooseImages()
+    private async Task ChooseImagesAsync()
     {
         var dialog = new OpenFileDialog
         {
@@ -296,13 +388,12 @@ public sealed class CharacterGalleryWindow : Window
             CheckFileExists = true,
             Filter = $"{Loc.T("Image files")} (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff;*.webp;*.avif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.tif;*.tiff;*.webp;*.avif|All files (*.*)|*.*"
         };
-        if (dialog.ShowDialog(this) == true) AddImages(dialog.FileNames);
+        if (dialog.ShowDialog(this) == true) await AddImagesWithFeedbackAsync(dialog.FileNames);
     }
 
-    private int AddImages(IEnumerable<string> paths)
+    private List<string> AppendImages(IEnumerable<string> paths)
     {
-        string? lastAdded = null;
-        int count = 0;
+        var addedPaths = new List<string>();
         foreach (string rawPath in paths)
         {
             if (!GalleryImageSupport.IsSupported(rawPath) || !File.Exists(rawPath)) continue;
@@ -311,16 +402,41 @@ public sealed class CharacterGalleryWindow : Window
             catch { continue; }
             if (_paths.Contains(path, StringComparer.OrdinalIgnoreCase)) continue;
             _paths.Add(path);
-            lastAdded = path;
-            count++;
+            addedPaths.Add(path);
         }
-        if (count > 0) RefreshGrid(lastAdded);
-        return count;
+        return addedPaths;
+    }
+
+    private async Task<int> AddImagesWithFeedbackAsync(IEnumerable<string> paths)
+    {
+        EnsureGridInitialized();
+        List<string> addedPaths = AppendImages(paths);
+        if (addedPaths.Count == 0) return 0;
+
+        SetBusy(true);
+        try
+        {
+            await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
+            RefreshGrid(addedPaths[^1]);
+            await Dispatcher.InvokeAsync(static () => { }, DispatcherPriority.Render);
+            Task[] addedLoads = addedPaths
+                .Select(path => _thumbnailLoadTasks.GetValueOrDefault(path))
+                .Where(task => task is not null)
+                .Cast<Task>()
+                .ToArray();
+            if (addedLoads.Length > 0) await Task.WhenAll(addedLoads);
+        }
+        catch (OperationCanceledException) when (!IsLoaded) { }
+        finally
+        {
+            SetBusy(false);
+        }
+        return addedPaths.Count;
     }
 
     private void DeleteSelected()
     {
-        if (_selectedPaths.Count == 0) return;
+        if (_isBusy || _selectedPaths.Count == 0) return;
         _paths.RemoveAll(path => _selectedPaths.Contains(path));
         _selectedPaths.Clear();
         RefreshGrid();
@@ -328,6 +444,11 @@ public sealed class CharacterGalleryWindow : Window
 
     private void RefreshGrid(string? selectedPath = null)
     {
+        _thumbnailLoadCancellation.Cancel();
+        _thumbnailLoadCancellation.Dispose();
+        _thumbnailLoadCancellation = new CancellationTokenSource();
+        CancellationToken cancellationToken = _thumbnailLoadCancellation.Token;
+        _thumbnailLoadTasks.Clear();
         _images.Children.Clear();
         _selectedPaths.RemoveWhere(path => !_paths.Contains(path, StringComparer.OrdinalIgnoreCase));
         if (selectedPath is not null)
@@ -337,7 +458,8 @@ public sealed class CharacterGalleryWindow : Window
         }
         foreach (string path in _paths.AsEnumerable().Reverse())
         {
-            var item = CreateImageTile(path);
+            GalleryTileVisual tile = CreateImageTile(path);
+            Border item = tile.Container;
             item.Tag = path;
             item.Margin = new Thickness(5);
             item.ToolTip = path;
@@ -355,6 +477,7 @@ public sealed class CharacterGalleryWindow : Window
                 e.Handled = true;
             };
             _images.Children.Add(item);
+            _thumbnailLoadTasks[path] = LoadTilePreviewAsync(tile, path, cancellationToken);
         }
         _empty.Visibility = _paths.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         FitGalleryTiles();
@@ -378,7 +501,7 @@ public sealed class CharacterGalleryWindow : Window
         foreach (Border item in _images.Children) item.Width = tileWidth;
     }
 
-    private static Border CreateImageTile(string path)
+    private static GalleryTileVisual CreateImageTile(string path)
     {
         var border = new Border
         {
@@ -391,20 +514,21 @@ public sealed class CharacterGalleryWindow : Window
         border.SetResourceReference(Border.BackgroundProperty, "InputBrush");
         border.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         var grid = new Grid();
-        ImageSource? source = GalleryImageSupport.LoadPreview(path, 480);
-        if (source is not null) grid.Children.Add(new Image { Source = source, Stretch = Stretch.UniformToFill });
-        else
+        var image = new Image
         {
-            var unavailable = new TextBlock
-            {
-                Text = "▧",
-                FontSize = 38,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            unavailable.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
-            grid.Children.Add(unavailable);
-        }
+            Stretch = Stretch.UniformToFill,
+            Visibility = Visibility.Collapsed
+        };
+        var placeholder = new TextBlock
+        {
+            Text = Loc.T("Loading images..."),
+            FontSize = 13,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        placeholder.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+        grid.Children.Add(image);
+        grid.Children.Add(placeholder);
         var name = new TextBlock
         {
             Text = Path.GetFileName(path),
@@ -416,7 +540,96 @@ public sealed class CharacterGalleryWindow : Window
         };
         grid.Children.Add(name);
         border.Child = grid;
-        return border;
+        return new GalleryTileVisual(border, image, placeholder);
+    }
+
+    private static async Task LoadTilePreviewAsync(
+        GalleryTileVisual tile, string path, CancellationToken cancellationToken)
+    {
+        try
+        {
+            ImageSource? source = await GalleryImageSupport.LoadPreviewAsync(path, 384,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (source is not null)
+            {
+                tile.Image.Source = source;
+                tile.Image.Visibility = Visibility.Visible;
+                tile.Placeholder.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                tile.Placeholder.Text = "▧";
+                tile.Placeholder.FontSize = 38;
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private void EnsureGridInitialized()
+    {
+        if (_gridInitialized) return;
+        _gridInitialized = true;
+        RefreshGrid();
+    }
+
+    private void SetBusy(bool busy)
+    {
+        _isBusy = busy;
+        _layout.IsHitTestVisible = !busy;
+        _layout.Opacity = busy ? 0.48 : 1;
+        _busyOverlay.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+        AllowDrop = !busy;
+        Cursor = busy ? Cursors.Wait : Cursors.Arrow;
+    }
+
+    private static FrameworkElement CreateBusyIndicator()
+    {
+        const double canvasSize = 48;
+        const double dotSize = 7;
+        const int dotCount = 10;
+        var spinner = new Canvas
+        {
+            Width = canvasSize,
+            Height = canvasSize,
+            RenderTransformOrigin = new Point(0.5, 0.5)
+        };
+        for (int index = 0; index < dotCount; index++)
+        {
+            double angle = index * Math.PI * 2 / dotCount;
+            var dot = new Ellipse
+            {
+                Width = dotSize,
+                Height = dotSize,
+                Opacity = 0.2 + 0.8 * (index + 1) / dotCount
+            };
+            dot.SetResourceReference(Shape.FillProperty, "AccentBrush");
+            Canvas.SetLeft(dot, canvasSize / 2 + Math.Cos(angle) * 18 - dotSize / 2);
+            Canvas.SetTop(dot, canvasSize / 2 + Math.Sin(angle) * 18 - dotSize / 2);
+            spinner.Children.Add(dot);
+        }
+        var rotation = new RotateTransform();
+        spinner.RenderTransform = rotation;
+        rotation.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360,
+            TimeSpan.FromMilliseconds(850)) { RepeatBehavior = RepeatBehavior.Forever });
+
+        var label = new TextBlock
+        {
+            Text = Loc.T("Loading images..."),
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Brushes.White,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 10, 0, 0)
+        };
+        var panel = new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        panel.Children.Add(spinner);
+        panel.Children.Add(label);
+        return panel;
     }
 
     private void RefreshSelectionVisuals()
@@ -432,7 +645,7 @@ public sealed class CharacterGalleryWindow : Window
 
     private void OpenSelected()
     {
-        if (_selectedPaths.FirstOrDefault() is not { } path) return;
+        if (_isBusy || _selectedPaths.FirstOrDefault() is not { } path) return;
         OpenImage(path);
     }
 
@@ -456,10 +669,10 @@ public sealed class CharacterGalleryWindow : Window
         e.Handled = true;
     }
 
-    private void Gallery_Drop(object sender, DragEventArgs e)
+    private async void Gallery_Drop(object sender, DragEventArgs e)
     {
-        AddImages(DraggedImagePaths(e.Data));
         e.Handled = true;
+        await AddImagesWithFeedbackAsync(DraggedImagePaths(e.Data));
     }
 
     private static IEnumerable<string> DraggedImagePaths(IDataObject data)
@@ -468,4 +681,6 @@ public sealed class CharacterGalleryWindow : Window
             data.GetData(DataFormats.FileDrop, true) is not string[] files) return [];
         return files.Where(path => GalleryImageSupport.IsSupported(path) && File.Exists(path));
     }
+
+    private sealed record GalleryTileVisual(Border Container, Image Image, TextBlock Placeholder);
 }
