@@ -486,18 +486,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (cleanType.Length == 0 || source.Id == target.Id ||
             !Project.Relationships.Contains(relation) ||
             !Project.Characters.Contains(source) || !Project.Characters.Contains(target) ||
-            (relation.FromEntityId != source.Id && relation.ToEntityId != source.Id)) return false;
+            relation.FromEntityId != source.Id) return false;
 
         string cleanDescription = description.Trim();
-        Guid currentTargetId = relation.FromEntityId == source.Id ? relation.ToEntityId : relation.FromEntityId;
+        Guid currentTargetId = relation.ToEntityId;
         if (currentTargetId == target.Id &&
             string.Equals(relation.Type, cleanType, StringComparison.CurrentCulture) &&
             string.Equals(relation.Description, cleanDescription, StringComparison.CurrentCulture))
             return true;
 
         Snapshot();
-        if (relation.FromEntityId == source.Id) relation.ToEntityId = target.Id;
-        else relation.FromEntityId = target.Id;
+        relation.ToEntityId = target.Id;
         relation.Type = cleanType;
         relation.Description = cleanDescription;
         SelectedRelationship = relation;

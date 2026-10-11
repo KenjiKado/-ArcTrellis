@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using ArcTrellis.App.Views;
 using ArcTrellis.Core.Models;
@@ -27,8 +28,8 @@ public partial class MainWindow
         {
             foreach (var relation in Vm.Project.Relationships)
             {
-                if (relation.FromEntityId != character.Id && relation.ToEntityId != character.Id) continue;
-                Guid otherId = relation.FromEntityId == character.Id ? relation.ToEntityId : relation.FromEntityId;
+                if (relation.FromEntityId != character.Id) continue;
+                Guid otherId = relation.ToEntityId;
                 var other = Vm.Project.Characters.Concat(Vm.Project.Places).FirstOrDefault(entity => entity.Id == otherId);
                 if (other is not null) relations.Add(new CharacterRelationRow(other, relation));
             }
@@ -103,6 +104,15 @@ public partial class MainWindow
             !ConfirmDelete("relation")) return;
         Vm.DeleteRelationship(row.Relation);
         RefreshCharacterOverview();
+    }
+
+    private void CharacterRelationDescriptionHeader_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not DataGridColumnHeader header) return;
+        header.ApplyTemplate();
+        if (header.Template.FindName("PART_RightHeaderGripper", header) is not Thumb outerGrip) return;
+        outerGrip.Visibility = Visibility.Collapsed;
+        outerGrip.IsHitTestVisible = false;
     }
 
     private void CharacterRelationsTable_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
@@ -202,6 +212,10 @@ public partial class MainWindow
                      "Rival", "Now competing") ||
                  createdRelation.Type != "Rival" || createdRelation.Description != "Now competing")
             failures.Add("Character relationship editing did not update the selected relation");
+        if (createdRelation is not null &&
+            checkVm.UpdateCharacterRelationship(createdRelation, relationTarget, person,
+                "Reverse relation", "Should not be accepted"))
+            failures.Add("A target character was allowed to edit a source-only relation");
         checkVm.DeleteRelationship(createdRelation);
         if (createdRelation is not null && checkVm.Project.Relationships.Contains(createdRelation))
             failures.Add("Character relationship deletion did not remove the selected relation");
@@ -286,14 +300,18 @@ public partial class MainWindow
         if (CharacterRelationsTable.RowHeight != 44 ||
             CharacterRelationsTable.RowStyle is null || CharacterRelationsTable.CellStyle is null)
             failures.Add("Character relations table does not match the Chapters scene table style");
+        var descriptionHeader = FindVisualChildren<DataGridColumnHeader>(CharacterRelationsTable)
+            .FirstOrDefault(header => ReferenceEquals(header.Column, CharacterRelationsTable.Columns[2]));
+        var outerDescriptionGrip = descriptionHeader?.Template
+            .FindName("PART_RightHeaderGripper", descriptionHeader) as Thumb;
         if (!CharacterRelationsTable.CanUserResizeColumns || CharacterRelationsTable.CanUserResizeRows ||
             CharacterRelationsTable.CanUserReorderColumns ||
             CharacterRelationsTable.Columns.Count != 3 ||
-            !CharacterRelationsTable.Columns[0].CanUserResize ||
-            !CharacterRelationsTable.Columns[1].CanUserResize ||
-            CharacterRelationsTable.Columns[2].CanUserResize ||
+            CharacterRelationsTable.Columns.Any(column => !column.CanUserResize) ||
+            outerDescriptionGrip is null || outerDescriptionGrip.IsHitTestVisible ||
+            outerDescriptionGrip.Visibility != Visibility.Collapsed ||
             CharacterRelationsTable.HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled)
-            failures.Add("Character relations table does not resize only at its inner column dividers");
+            failures.Add("The Description column is not resizable or the table outline still has an active resize grip");
 
         var other = Vm.Project.Characters.FirstOrDefault(entity => entity.Id != existing.Id);
         if (other is not null)
@@ -313,7 +331,20 @@ public partial class MainWindow
             }
             if (!AddCharacterRelationButton.IsEnabled)
                 failures.Add("Character relation Add button is inactive for a selected character");
+
+            Vm.SelectedCharacter = other;
+            RefreshCharacterOverview();
             UpdateLayout();
+            if (CharacterRelationsTable.ItemsSource is IEnumerable<CharacterRelationRow> targetRows &&
+                targetRows.Any(row => ReferenceEquals(row.Relation, relation)))
+                failures.Add("A source character relation was also displayed for its target character");
+            Vm.SelectedCharacter = existing;
+            RefreshCharacterOverview();
+            UpdateLayout();
+            if (CharacterRelationsTable.ItemsSource is IEnumerable<CharacterRelationRow> sourceRows &&
+                sourceRows.FirstOrDefault(row => ReferenceEquals(row.Relation, relation)) is { } sourceRow)
+                CharacterRelationsTable.SelectedItem = sourceRow;
+
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-characters-tab.png"));
             CharacterRelationsTable.BringIntoView();
             UpdateLayout();

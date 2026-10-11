@@ -378,7 +378,12 @@
                     <DataGrid.Columns>
                       <DataGridTextColumn Header="Name" Binding="{Binding Other.Name}" Width="2*" CanUserResize="True"/>
                       <DataGridTextColumn Header="Relation type" Binding="{Binding Relation.Type}" Width="*" CanUserResize="True"/>
-                      <DataGridTemplateColumn Header="Description" Width="2*" CanUserResize="False">
+                      <DataGridTemplateColumn Header="Description" Width="2*" CanUserResize="True">
+                        <DataGridTemplateColumn.HeaderStyle>
+                          <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                            <EventSetter Event="Loaded" Handler="CharacterRelationDescriptionHeader_Loaded"/>
+                          </Style>
+                        </DataGridTemplateColumn.HeaderStyle>
                         <DataGridTemplateColumn.CellTemplate>
                           <DataTemplate>
                             <TextBlock Text="{Binding Relation.Description}" TextWrapping="NoWrap"

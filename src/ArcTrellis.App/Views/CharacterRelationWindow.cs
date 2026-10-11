@@ -351,7 +351,7 @@ public sealed class CharacterRelationWindow : Window
 
         if (relation is not null)
         {
-            Guid targetId = relation.FromEntityId == source.Id ? relation.ToEntityId : relation.FromEntityId;
+            Guid targetId = relation.ToEntityId;
             if (targetOptions.FirstOrDefault(character => character.Id == targetId) is { } target)
                 TargetInput.Select(target);
             RelationTypesInput.Select(relation.Type);
