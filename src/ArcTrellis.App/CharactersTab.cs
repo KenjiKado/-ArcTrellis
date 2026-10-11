@@ -108,9 +108,18 @@ public partial class MainWindow
 
     private void CharacterRelationDescriptionHeader_Loaded(object sender, RoutedEventArgs e)
     {
-        if (sender is not DataGridColumnHeader header) return;
+        if (sender is DataGridColumnHeader header) HideOuterRelationHeaderGrip(header);
+    }
+
+    private void HideOuterRelationHeaderGrip(DataGridColumnHeader header)
+    {
         header.ApplyTemplate();
-        if (header.Template.FindName("PART_RightHeaderGripper", header) is not Thumb outerGrip) return;
+        header.UpdateLayout();
+        var outerGrip = FindVisualChildren<Thumb>(header)
+            .OrderByDescending(grip => grip.TranslatePoint(new Point(), header).X)
+            .FirstOrDefault();
+        if (outerGrip is null) return;
+        header.Tag = outerGrip;
         outerGrip.Visibility = Visibility.Collapsed;
         outerGrip.IsHitTestVisible = false;
     }
@@ -302,16 +311,21 @@ public partial class MainWindow
             failures.Add("Character relations table does not match the Chapters scene table style");
         var descriptionHeader = FindVisualChildren<DataGridColumnHeader>(CharacterRelationsTable)
             .FirstOrDefault(header => ReferenceEquals(header.Column, CharacterRelationsTable.Columns[2]));
-        var outerDescriptionGrip = descriptionHeader?.Template
-            .FindName("PART_RightHeaderGripper", descriptionHeader) as Thumb;
+        if (descriptionHeader is not null) HideOuterRelationHeaderGrip(descriptionHeader);
+        var outerDescriptionGrip = descriptionHeader?.Tag as Thumb;
+        var innerDescriptionGrip = descriptionHeader is null ? null :
+            FindVisualChildren<Thumb>(descriptionHeader).FirstOrDefault(grip =>
+                !ReferenceEquals(grip, outerDescriptionGrip) &&
+                grip.IsHitTestVisible && grip.Visibility == Visibility.Visible);
         if (!CharacterRelationsTable.CanUserResizeColumns || CharacterRelationsTable.CanUserResizeRows ||
             CharacterRelationsTable.CanUserReorderColumns ||
             CharacterRelationsTable.Columns.Count != 3 ||
             CharacterRelationsTable.Columns.Any(column => !column.CanUserResize) ||
+            innerDescriptionGrip is null ||
             outerDescriptionGrip is null || outerDescriptionGrip.IsHitTestVisible ||
             outerDescriptionGrip.Visibility != Visibility.Collapsed ||
             CharacterRelationsTable.HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled)
-            failures.Add("The Description column is not resizable or the table outline still has an active resize grip");
+            failures.Add("The Description divider is not resizable or the table outline still has an active resize grip");
 
         var other = Vm.Project.Characters.FirstOrDefault(entity => entity.Id != existing.Id);
         if (other is not null)
