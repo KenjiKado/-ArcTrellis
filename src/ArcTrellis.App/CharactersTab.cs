@@ -266,9 +266,9 @@ public partial class MainWindow
         if (!person.GalleryImages.SequenceEqual(galleryPaths)) failures.Add("Redo did not restore character gallery images");
         var compactGallery = new CharacterGalleryPreview(person.GalleryImages);
         if (compactGallery.PreviewCount != 6 || compactGallery.HiddenImageCount != 1 ||
-            compactGallery.BadgeText != "+1" ||
+            compactGallery.BadgeText != "+1" || compactGallery.ImagePreviewToolTipCount != 0 ||
             !compactGallery.DisplayedPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse().Take(5)))
-            failures.Add("Character gallery preview does not show the five newest images first and the hidden count");
+            failures.Add("Character gallery preview order, hidden count, or tooltip behavior is incorrect");
         var shortGallery = new CharacterGalleryPreview(galleryPaths.Take(3));
         if (shortGallery.PreviewCount != 4 || shortGallery.BadgeText != "+" ||
             !shortGallery.DisplayedPaths.SequenceEqual(galleryPaths.Take(3).Reverse()))
@@ -286,6 +286,8 @@ public partial class MainWindow
         galleryDialog.UpdateLayout();
         if (!galleryDialog.DisplayedGridPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse()))
             failures.Add("Gallery grid does not show the newest image first");
+        if (galleryDialog.GalleryRightGap > 6)
+            failures.Add($"Gallery grid leaves {galleryDialog.GalleryRightGap:0.##} pixels unused on the right");
         string droppedImage = Path.Combine(galleryDirectory, "dropped.png");
         File.Copy(galleryPaths[0], droppedImage, true);
         if (galleryDialog.AddFilesForTest([droppedImage]) != 1 || galleryDialog.GridItemCount != 7 ||

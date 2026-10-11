@@ -52,6 +52,10 @@ internal sealed class CharacterGalleryPreview : UserControl
     internal int HiddenImageCount { get; }
     internal string BadgeText { get; }
     internal int PreviewCount => _previews.Children.Count;
+    internal int ImagePreviewToolTipCount => _previews.Children.OfType<Grid>()
+        .Take(DisplayedPaths.Count)
+        .Count(surface => surface.ToolTip is not null ||
+            surface.Children.OfType<FrameworkElement>().Any(child => child.ToolTip is not null));
     internal event EventHandler? OpenRequested;
 
     internal CharacterGalleryPreview(IEnumerable<string> imagePaths)
@@ -62,14 +66,13 @@ internal sealed class CharacterGalleryPreview : UserControl
         BadgeText = HiddenImageCount == 0 ? "+" : FormatHiddenCount(HiddenImageCount);
         Cursor = Cursors.Hand;
         Focusable = true;
-        ToolTip = Loc.T("Gallery");
         AutomationProperties.SetName(this, Loc.T("Gallery"));
         Content = _previews;
 
         for (int index = 0; index < DisplayedPaths.Count; index++)
         {
             string path = DisplayedPaths[index];
-            _previews.Children.Add(CreateCircle(path, "▧", Path.GetFileName(path), index > 0));
+            _previews.Children.Add(CreateCircle(path, "▧", index > 0));
         }
         string badgeToolTip = HiddenImageCount == 0
             ? Loc.T("Add image")
@@ -104,18 +107,17 @@ internal sealed class CharacterGalleryPreview : UserControl
         return scaled.ToString(scaled % 1 == 0 ? "0" : "0.#", CultureInfo.InvariantCulture);
     }
 
-    private static Grid CreateCircle(string? path, string fallback, string toolTip, bool overlap)
+    private static Grid CreateCircle(string path, string fallback, bool overlap)
     {
         const double size = 56;
         var circle = new Ellipse
         {
             Width = size,
             Height = size,
-            StrokeThickness = 2,
-            ToolTip = toolTip
+            StrokeThickness = 2
         };
         circle.SetResourceReference(Shape.StrokeProperty, "PanelBrush");
-        ImageSource? preview = path is null ? null : GalleryImageSupport.LoadPreview(path, 160);
+        ImageSource? preview = GalleryImageSupport.LoadPreview(path, 160);
         if (preview is null) circle.SetResourceReference(Shape.FillProperty, "ElevatedBrush");
         else circle.Fill = new ImageBrush(preview) { Stretch = Stretch.UniformToFill };
 
@@ -123,8 +125,7 @@ internal sealed class CharacterGalleryPreview : UserControl
         {
             Width = size,
             Height = size,
-            Margin = overlap ? new Thickness(-10, 0, 0, 0) : new Thickness(0),
-            ToolTip = toolTip
+            Margin = overlap ? new Thickness(-10, 0, 0, 0) : new Thickness(0)
         };
         surface.Children.Add(circle);
         if (preview is null)
@@ -132,14 +133,13 @@ internal sealed class CharacterGalleryPreview : UserControl
             var label = new TextBlock
             {
                 Text = fallback,
-                FontSize = path is null ? 28 : 20,
+                FontSize = 20,
                 FontWeight = FontWeights.SemiBold,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 IsHitTestVisible = false
             };
-            label.SetResourceReference(TextBlock.ForegroundProperty,
-                path is null ? "AccentBrush" : "MutedBrush");
+            label.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
             surface.Children.Add(label);
         }
         Panel.SetZIndex(surface, overlap ? 1 : 0);
@@ -186,9 +186,14 @@ internal sealed class CharacterGalleryPreview : UserControl
 
 public sealed class CharacterGalleryWindow : Window
 {
+    private const double TileTargetSlotWidth = 210;
+    private const double TileHorizontalMargin = 10;
     private readonly List<string> _paths;
     private readonly WrapPanel _images = new() { Orientation = Orientation.Horizontal };
+    private readonly ScrollViewer _galleryScroller;
     private readonly HashSet<string> _selectedPaths = new(StringComparer.OrdinalIgnoreCase);
+    private int _galleryColumnCount = 1;
+    private double _galleryTileWidth = 190;
     private readonly TextBlock _empty = new()
     {
         FontSize = 18,
@@ -205,6 +210,8 @@ public sealed class CharacterGalleryWindow : Window
         .Select(item => item.Tag).OfType<string>().ToList();
     internal int RenderedGridItemCount => _images.Children.Cast<FrameworkElement>()
         .Count(item => item.IsVisible && item.ActualWidth > 0 && item.ActualHeight > 0);
+    internal double GalleryRightGap => Math.Max(0,
+        _galleryScroller.ViewportWidth - _galleryColumnCount * (_galleryTileWidth + TileHorizontalMargin));
 
     public CharacterGalleryWindow(string characterName, IEnumerable<string> imagePaths)
     {
@@ -238,12 +245,14 @@ public sealed class CharacterGalleryWindow : Window
 
         _empty.Text = Loc.T("Drop images here");
         var gallerySurface = new Grid();
-        gallerySurface.Children.Add(new ScrollViewer
+        _galleryScroller = new ScrollViewer
         {
             Content = _images,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-        });
+        };
+        _galleryScroller.SizeChanged += (_, _) => FitGalleryTiles();
+        gallerySurface.Children.Add(_galleryScroller);
         gallerySurface.Children.Add(_empty);
 
         var layout = new DockPanel { Margin = new Thickness(14) };
@@ -256,7 +265,11 @@ public sealed class CharacterGalleryWindow : Window
         DragOver += Gallery_DragOver;
         Drop += Gallery_Drop;
         RefreshGrid();
-        Loaded += (_, _) => Loc.Apply(this);
+        Loaded += (_, _) =>
+        {
+            Loc.Apply(this);
+            FitGalleryTiles();
+        };
     }
 
     internal int AddFilesForTest(IEnumerable<string> paths) => AddImages(paths);
@@ -340,7 +353,22 @@ public sealed class CharacterGalleryWindow : Window
             _images.Children.Add(item);
         }
         _empty.Visibility = _paths.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        FitGalleryTiles();
         RefreshSelectionVisuals();
+    }
+
+    private void FitGalleryTiles()
+    {
+        double viewportWidth = _galleryScroller.ViewportWidth;
+        if (!double.IsFinite(viewportWidth) || viewportWidth <= 0)
+            viewportWidth = _galleryScroller.ActualWidth;
+        if (!double.IsFinite(viewportWidth) || viewportWidth <= 0) return;
+
+        _galleryColumnCount = Math.Max(1, (int)Math.Round(
+            viewportWidth / TileTargetSlotWidth, MidpointRounding.AwayFromZero));
+        _galleryTileWidth = Math.Max(150,
+            Math.Floor(viewportWidth / _galleryColumnCount - TileHorizontalMargin));
+        foreach (Border item in _images.Children) item.Width = _galleryTileWidth;
     }
 
     private static Border CreateImageTile(string path)
