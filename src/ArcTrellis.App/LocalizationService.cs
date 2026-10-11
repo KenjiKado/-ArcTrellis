@@ -43,7 +43,8 @@ public static class Loc
         ["Tags (comma separated)"] = "Теги (через запятую)", ["Summary"] = "Краткое описание", ["Scene notes / draft"] = "Заметки / черновик сцены", ["Editing notes"] = "Редакторские заметки",
         ["Custom fields"] = "Дополнительные поля", ["Field"] = "Поле", ["Value"] = "Значение", ["＋ Character"] = "＋ Персонаж", ["＋ Place"] = "＋ Место", ["＋ Note"] = "＋ Заметка",
         ["Story bible entry"] = "Запись энциклопедии", ["Name"] = "Имя", ["Category"] = "Категория", ["One-line summary"] = "Краткое резюме", ["Details"] = "Подробности",
-        ["Books"] = "Книги", ["Gallery"] = "Галерея", ["Coming soon"] = "Скоро появится",
+        ["Books"] = "Книги", ["In Books"] = "В книгах", ["All"] = "Все",
+        ["Gallery"] = "Галерея", ["Coming soon"] = "Скоро появится",
         ["In Chapters ({0})"] = "В главах ({0})", ["In Scenes ({0})"] = "В сценах ({0})",
         ["Relations"] = "Связи", ["Relation type"] = "Тип связи", ["Character books updated"] = "Книги персонажа обновлены",
         ["Main character"] = "Главный персонаж", ["Deuteragonist"] = "Второй главный персонаж",
@@ -52,6 +53,9 @@ public static class Loc
         ["Recurring"] = "Постоянный персонаж", ["Guest/episodic"] = "Эпизодический персонаж",
         ["Minor"] = "Малозначимый персонаж", ["Cameo character"] = "Камео",
         ["Background character"] = "Фоновый персонаж", ["Off-scene character"] = "Закадровый персонаж",
+        ["Main"] = "Главный", ["Supporting"] = "Второго плана", ["Secondary"] = "Второстепенный",
+        ["Guest / episodic"] = "Гостевой / эпизодический", ["Cameo"] = "Камео",
+        ["Background"] = "Фоновый", ["Off-scene"] = "Закадровый",
         ["Image file path (optional)"] = "Путь к изображению (необязательно)", ["Custom sheet fields"] = "Дополнительные поля анкеты", ["＋ Relationship"] = "＋ Связь",
         ["Character & world connections"] = "Связи персонажей и мира", ["From"] = "От", ["Relationship"] = "Тип связи", ["To"] = "К", ["Description"] = "Описание",
         ["Search the entire series bible"] = "Поиск по всей энциклопедии серии", ["Type"] = "Тип", ["Context"] = "Контекст", ["Story spine"] = "Основа сюжета",
@@ -192,11 +196,17 @@ public static class Loc
 
 public sealed class SceneStatusOption : ArcTrellis.Core.Models.ObservableObject
 {
+    private readonly string _labelKey;
     private string _label;
-    public SceneStatusOption(string code, string label) { Code = code; _label = label; }
+    public SceneStatusOption(string code, string label, string? labelKey = null)
+    {
+        Code = code;
+        _labelKey = labelKey ?? code;
+        _label = label;
+    }
     public string Code { get; }
     public string Label { get => _label; private set => Set(ref _label, value); }
-    public void RefreshLocalization() => Label = Loc.T(Code);
+    public void RefreshLocalization() => Label = Loc.T(_labelKey);
 }
 
 public sealed class StatusTextConverter : IValueConverter

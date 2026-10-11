@@ -19,10 +19,6 @@ public partial class MainWindow
         if (CharacterEditor is null) return;
         Vm.RefreshCharacterCategories();
         var character = Vm.SelectedCharacter is { } selected && Vm.Project.Characters.Contains(selected) ? selected : null;
-        var scenes = character is null ? new List<Scene>() : Vm.Project.Scenes.Where(scene => scene.CharacterIds.Contains(character.Id)).ToList();
-        CharacterSceneCount.Text = Loc.F("In Scenes ({0})", scenes.Count);
-        CharacterChapterCount.Text = Loc.F("In Chapters ({0})", scenes.Select(scene => scene.ChapterId).Distinct().Count());
-
         var relations = new List<CharacterRelationRow>();
         if (character is not null)
         {
@@ -60,7 +56,7 @@ public partial class MainWindow
             current.SelectedIds.ToHashSet().SetEquals(character.BookIds)) return;
 
         _characterBooksInput?.CloseDropdown();
-        var input = new MultiChoiceInput("Books", books, character.BookIds);
+        var input = new MultiChoiceInput("In Books", books, character.BookIds, includeAll: true);
         input.SelectionChanged += (_, _) =>
         {
             if (ReferenceEquals(Vm.SelectedCharacter, character))
@@ -80,6 +76,15 @@ public partial class MainWindow
         var secondBook = checkVm.SelectedBook!;
         var person = checkVm.AddEntity(checkVm.Project.Characters, "Character");
         if (person.Category != "Main character") failures.Add("New character has no selectable category");
+        string[] categoryLabelKeys =
+        [
+            "Main", "Deuteragonist", "Tritagonist", "Antagonist",
+            "Supporting", "Secondary", "Recurring", "Guest / episodic",
+            "Minor", "Cameo", "Background", "Off-scene"
+        ];
+        if (!checkVm.CharacterCategories.Take(categoryLabelKeys.Length).Select(option => option.Label)
+            .SequenceEqual(categoryLabelKeys.Select(Loc.T)))
+            failures.Add("Character category labels do not use the consistent role style");
         checkVm.SetCharacterBooks(person, [firstBook.Id, secondBook.Id]);
         if (!person.BookIds.ToHashSet().SetEquals([firstBook.Id, secondBook.Id]))
             failures.Add("Character books did not retain multiple selections");
@@ -88,6 +93,25 @@ public partial class MainWindow
         checkVm.Redo();
         if (!person.BookIds.ToHashSet().SetEquals([firstBook.Id, secondBook.Id]))
             failures.Add("Redo did not restore selected character books");
+
+        var allBooksInput = new MultiChoiceInput("In Books",
+            checkVm.Project.Books.Select(book => (book.Id, book.Title)), [], includeAll: true);
+        int allSelectionEvents = 0;
+        allBooksInput.SelectionChanged += (_, _) => allSelectionEvents++;
+        if (!allBooksInput.Choices.TryGetValue(Guid.Empty, out var allBooksChoice))
+            failures.Add("Character books multiselect does not offer All");
+        else
+        {
+            if (allBooksInput.Choices.Keys.FirstOrDefault() != Guid.Empty)
+                failures.Add("Character books multiselect does not place All at the top");
+            allBooksChoice.IsChecked = true;
+            var allBookIds = checkVm.Project.Books.Select(book => book.Id).ToHashSet();
+            if (!allBooksInput.SelectedIds.ToHashSet().SetEquals(allBookIds) ||
+                !allBookIds.All(id => allBooksInput.Choices[id].IsChecked == true))
+                failures.Add("All did not check every existing character book");
+            if (allSelectionEvents != 1)
+                failures.Add("Selecting All raised more than one character books change");
+        }
 
         WorkspaceTabs.SelectedIndex = 4;
         var existing = Vm.Project.Characters.FirstOrDefault();
@@ -102,10 +126,6 @@ public partial class MainWindow
         if (!CharacterEditor.IsEnabled || !Equals(CharacterCategorySelector.SelectedValue, existing.Category))
             failures.Add($"Character editor or category selection did not follow the selected character (enabled={CharacterEditor.IsEnabled}, model={existing.Category}, selected={CharacterCategorySelector.SelectedValue}, options={string.Join(",", Vm.CharacterCategories.Select(option => option.Code))})");
 
-        var expectedScenes = Vm.Project.Scenes.Where(scene => scene.CharacterIds.Contains(existing.Id)).ToList();
-        if (CharacterSceneCount.Text != Loc.F("In Scenes ({0})", expectedScenes.Count) ||
-            CharacterChapterCount.Text != Loc.F("In Chapters ({0})", expectedScenes.Select(scene => scene.ChapterId).Distinct().Count()))
-            failures.Add("Character scene and chapter counts are incorrect");
         if (_characterBooksInput is null || !Vm.Project.Books.All(book => _characterBooksInput.Choices.ContainsKey(book.Id)))
             failures.Add("Character books multiselect does not offer every project book");
 

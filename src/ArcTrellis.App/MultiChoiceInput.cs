@@ -16,7 +16,8 @@ internal sealed class MultiChoiceInput : UserControl
     private readonly List<(Guid Id, string Title)> _options;
     private readonly Dictionary<Guid, CheckBox> _checks = [];
     private readonly Dictionary<Guid, Border> _chips = [];
-    private bool _removingChip, _fieldWasOpenOnPress, _closedOnFieldPress;
+    private CheckBox? _selectAll;
+    private bool _removingChip, _fieldWasOpenOnPress, _closedOnFieldPress, _synchronizingChecks;
     private readonly WrapPanel _row = new();
     private readonly Border _dropdown = new() { BorderThickness = new Thickness(1), Padding = new Thickness(4), CornerRadius = new CornerRadius(4) };
     // Nested popups take capture from the context menu and restore it on close.
@@ -32,9 +33,9 @@ internal sealed class MultiChoiceInput : UserControl
     internal Border DropdownSurface => _dropdown;
     internal void CloseDropdown() => _popup.IsOpen = false;
 
-    internal MultiChoiceInput(string label, IEnumerable<(Guid Id, string Title)> options, IEnumerable<Guid> selected)
+    internal MultiChoiceInput(string label, IEnumerable<(Guid Id, string Title)> options, IEnumerable<Guid> selected, bool includeAll = false)
     {
-        _options = options.ToList();
+        _options = options.Where(option => option.Id != Guid.Empty).ToList();
         _selected = selected.Where(id => _options.Any(option => option.Id == id)).ToHashSet();
         AutomationProperties.SetName(Input, Loc.T(label));
         var layout = new StackPanel();
@@ -62,14 +63,45 @@ internal sealed class MultiChoiceInput : UserControl
         DropdownChrome.SetCompact(_dropdown, true);
         layout.Children.Add(frame); layout.Children.Add(_popup); Content = layout;
         var rows = new StackPanel();
+        if (includeAll)
+        {
+            var allText = new TextBlock { Text = Loc.T("All"), TextWrapping = TextWrapping.Wrap, MaxWidth = 320, FontWeight = FontWeights.SemiBold };
+            _selectAll = new CheckBox
+            {
+                Tag = Guid.Empty,
+                IsChecked = _options.Count > 0 && _options.All(option => _selected.Contains(option.Id)),
+                Margin = new Thickness(3),
+                Cursor = Cursors.Hand,
+                Content = allText
+            };
+            _selectAll.Checked += (_, _) => SetAll(true);
+            _selectAll.Unchecked += (_, _) => SetAll(false);
+            _checks.Add(Guid.Empty, _selectAll);
+            rows.Children.Add(_selectAll);
+        }
         foreach (var option in _options)
         {
             Guid id = option.Id;
             var text = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = 320 };
             text.SetBinding(TextBlock.TextProperty, new Binding { Source = option.Title });
             var check = new CheckBox { Tag = id, IsChecked = _selected.Contains(id), Margin = new Thickness(3), Cursor = Cursors.Hand, Content = text };
-            check.Checked += (_, _) => { _selected.Add(id); RenderChips(); Input.Clear(); SelectionChanged?.Invoke(this, EventArgs.Empty); };
-            check.Unchecked += (_, _) => { _selected.Remove(id); RenderChips(); SelectionChanged?.Invoke(this, EventArgs.Empty); };
+            check.Checked += (_, _) =>
+            {
+                if (_synchronizingChecks) return;
+                _selected.Add(id);
+                SyncSelectAll();
+                RenderChips();
+                Input.Clear();
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
+            };
+            check.Unchecked += (_, _) =>
+            {
+                if (_synchronizingChecks) return;
+                _selected.Remove(id);
+                SyncSelectAll();
+                RenderChips();
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
+            };
             _checks.Add(id, check); rows.Children.Add(check);
         }
         rows.Children.Add(_empty);
@@ -147,9 +179,38 @@ internal sealed class MultiChoiceInput : UserControl
     private void FilterChoices()
     {
         string query = Input.Text.Trim();
+        if (_selectAll is not null)
+            _selectAll.Visibility = string.IsNullOrWhiteSpace(query) ||
+                Loc.T("All").Contains(query, StringComparison.CurrentCultureIgnoreCase)
+                ? Visibility.Visible : Visibility.Collapsed;
         foreach (var option in _options)
             _checks[option.Id].Visibility = option.Title.Contains(query, StringComparison.CurrentCultureIgnoreCase) ? Visibility.Visible : Visibility.Collapsed;
         _empty.Visibility = _checks.Values.Any(check => check.Visibility == Visibility.Visible) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void SetAll(bool selected)
+    {
+        if (_synchronizingChecks) return;
+        _synchronizingChecks = true;
+        try
+        {
+            _selected.Clear();
+            if (selected)
+                foreach (var option in _options) _selected.Add(option.Id);
+            foreach (var option in _options) _checks[option.Id].IsChecked = selected;
+        }
+        finally { _synchronizingChecks = false; }
+        RenderChips();
+        Input.Clear();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SyncSelectAll()
+    {
+        if (_selectAll is null) return;
+        _synchronizingChecks = true;
+        try { _selectAll.IsChecked = _options.Count > 0 && _options.All(option => _selected.Contains(option.Id)); }
+        finally { _synchronizingChecks = false; }
     }
 
     private void RenderChips()

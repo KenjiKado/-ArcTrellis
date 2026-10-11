@@ -182,6 +182,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
         "Guest/episodic", "Minor", "Cameo character", "Background character",
         "Off-scene character"
     ];
+    private static readonly IReadOnlyDictionary<string, string> CharacterCategoryLabelKeys =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Main character"] = "Main",
+            ["Deuteragonist"] = "Deuteragonist",
+            ["Tritagonist"] = "Tritagonist",
+            ["Antagonist"] = "Antagonist",
+            ["Supporting character"] = "Supporting",
+            ["Secondary character"] = "Secondary",
+            ["Recurring"] = "Recurring",
+            ["Guest/episodic"] = "Guest / episodic",
+            ["Minor"] = "Minor",
+            ["Cameo character"] = "Cameo",
+            ["Background character"] = "Background",
+            ["Off-scene character"] = "Off-scene"
+        };
+    private static string CharacterCategoryLabelKey(string code) =>
+        CharacterCategoryLabelKeys.TryGetValue(code, out string? labelKey) ? labelKey : code;
     private readonly List<SceneStatusOption> _characterCategories = [];
     public IReadOnlyList<SceneStatusOption> CharacterCategories => _characterCategories;
     public void RefreshCharacterCategories()
@@ -191,7 +209,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
             .Where(code => !string.IsNullOrWhiteSpace(code)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (_characterCategories.Select(option => option.Code).SequenceEqual(codes)) return;
         _characterCategories.Clear();
-        _characterCategories.AddRange(codes.Select(code => new SceneStatusOption(code, Loc.T(code))));
+        _characterCategories.AddRange(codes.Select(code =>
+        {
+            string labelKey = CharacterCategoryLabelKey(code);
+            return new SceneStatusOption(code, Loc.T(labelKey), labelKey);
+        }));
         Raise(nameof(CharacterCategories));
     }
     public void RefreshLocalization()

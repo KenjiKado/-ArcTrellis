@@ -331,8 +331,9 @@
                   <ComboBox x:Name="CharacterCategorySelector"
                             ItemsSource="{Binding DataContext.CharacterCategories, RelativeSource={RelativeSource AncestorType=Window}}"
                             SelectedValuePath="Code" DisplayMemberPath="Label"
-                            SelectedValue="{Binding Category, UpdateSourceTrigger=PropertyChanged}"/>
-                  <TextBlock Text="Books" Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,3"/>
+                            SelectedValue="{Binding Category, UpdateSourceTrigger=PropertyChanged}"
+                            AutomationProperties.Name="Category"/>
+                  <TextBlock Text="In Books" Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,3"/>
                   <ContentControl x:Name="CharacterBooksHost"/>
                   <TextBlock Text="Tags" Foreground="{DynamicResource MutedBrush}" Margin="0,10,0,3"/>
                   <local:TagInput Tags="{Binding Tags}" Project="{Binding DataContext.Project, RelativeSource={RelativeSource AncestorType=Window}}"/>
@@ -344,10 +345,6 @@
                            VerticalScrollBarVisibility="Auto" SpellCheck.IsEnabled="True" VerticalContentAlignment="Top"/>
                   <Button Content="Gallery" ToolTip="Coming soon" IsEnabled="False"
                           HorizontalAlignment="Left" Margin="0,14,0,0"/>
-                  <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                    <TextBlock x:Name="CharacterChapterCount" Text="In Chapters (0)" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="CharacterSceneCount" Text="In Scenes (0)" FontWeight="SemiBold" Margin="20,0,0,0"/>
-                  </StackPanel>
                   <TextBlock Text="Relations" FontWeight="SemiBold" Margin="0,16,0,6"/>
                   <DataGrid x:Name="CharacterRelationsTable" AutoGenerateColumns="False" IsReadOnly="True"
                             CanUserAddRows="False" MinHeight="160" MinColumnWidth="100"
