@@ -21,6 +21,7 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
       - name: Build, test, and package
+        timeout-minutes: 12
         shell: pwsh
         run: .\build-installer.ps1
       - uses: actions/upload-artifact@v4

@@ -30,7 +30,6 @@ public partial class MainWindow
         plotline.SelectionChanged += selection;
         if (card is not null) card.Unloaded += unloaded;
         var timelineHeader = TimelineGrid.Children[0];
-        var relationSource = RelationFrom.ItemsSource;
         try
         {
             Vm.EditTag(tags, "FlickerProbe", false);
@@ -49,8 +48,8 @@ public partial class MainWindow
                 failures.Add($"Tag history flickered: plotline changes={selectionChanges}, card unloads={unloads}");
             if (!ReferenceEquals(source, plotline.ItemsSource) || !Equals(selectedPlotline, plotline.SelectedValue))
                 failures.Add("Tag history reset the plotline dropdown");
-            if (!ReferenceEquals(timelineHeader, TimelineGrid.Children[0]) || !ReferenceEquals(relationSource, RelationFrom.ItemsSource))
-                failures.Add("Tag history rebuilt unrelated timeline or relationship controls");
+            if (!ReferenceEquals(timelineHeader, TimelineGrid.Children[0]))
+                failures.Add("Tag history rebuilt unrelated timeline controls");
             if (!FindVisualChildren<Border>(input).Contains(retainedChip)) failures.Add("Tag history recreated an unchanged chip");
 
             SceneList.Focus();

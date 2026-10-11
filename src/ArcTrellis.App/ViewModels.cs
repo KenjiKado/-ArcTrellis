@@ -17,7 +17,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         2 => SelectedChapter?.Id.ToString(), 3 => SelectedScene?.Id.ToString(),
         4 => SelectedCharacter?.Id.ToString(), 5 => SelectedPlace?.Id.ToString(),
-        6 => SelectedNote?.Id.ToString(), 7 => SelectedRelationship?.Id.ToString(), _ => "tab"
+        6 => SelectedNote?.Id.ToString(), _ => "tab"
     });
     private string HistoryScope
     {
@@ -48,6 +48,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public MainViewModel(StoryProject project)
     {
         _project = project;
+        NormalizeCharacterCategories();
         SelectDefaults();
     }
 
@@ -93,7 +94,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
     public Plotline? SelectedPlotline { get => _selectedPlotline; set { if (!_restoringHistory) Set(ref _selectedPlotline, value); } }
     public Scene? SelectedScene { get => _selectedScene; set { if (!_restoringHistory && Set(ref _selectedScene, value)) Raise(nameof(SelectedSceneId)); } }
-    public StoryEntity? SelectedCharacter { get => _selectedCharacter; set { if (!_restoringHistory && Set(ref _selectedCharacter, value)) Raise(nameof(SelectedCharacterId)); } }
+    public StoryEntity? SelectedCharacter { get => _selectedCharacter; set { if (!_restoringHistory && Set(ref _selectedCharacter, value)) { RefreshCharacterCategories(); Raise(nameof(SelectedCharacterId)); } } }
     public StoryEntity? SelectedPlace { get => _selectedPlace; set { if (!_restoringHistory && Set(ref _selectedPlace, value)) Raise(nameof(SelectedPlaceId)); } }
     public StoryEntity? SelectedNote { get => _selectedNote; set { if (!_restoringHistory && Set(ref _selectedNote, value)) Raise(nameof(SelectedNoteId)); } }
     public Relationship? SelectedRelationship { get => _selectedRelationship; set { if (!_restoringHistory && Set(ref _selectedRelationship, value)) Raise(nameof(SelectedRelationshipId)); } }
@@ -175,12 +176,62 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public IEnumerable<Scene> ChapterScenes => StableItems(ref _chapterScenes, SelectedChapter is null ? [] : Project.Scenes.Where(s => s.ChapterId == SelectedChapter.Id).OrderBy(s => Project.Plotlines.FirstOrDefault(p => p.Id == s.PlotlineId)?.Order ?? int.MaxValue).ThenBy(s => s.Order));
     public ObservableCollection<SearchResult> SearchResults { get; } = [];
     public IReadOnlyList<SceneStatusOption> SceneStatuses { get; } = [new("Planned", Loc.T("Planned")), new("Drafted", Loc.T("Drafted")), new("Revised", Loc.T("Revised")), new("Final", Loc.T("Final")), new("Cut", Loc.T("Cut"))];
-    public void RefreshLocalization() { foreach (var option in SceneStatuses) option.RefreshLocalization(); Raise(nameof(BookPlotlines)); Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Status = Loc.T("Ready"); }
+    private static readonly string[] CharacterCategoryCodes =
+    [
+        "Main character", "Deuteragonist", "Tritagonist", "Antagonist",
+        "Supporting character", "Secondary character", "Recurring",
+        "Guest/episodic", "Minor", "Cameo character", "Background character",
+        "Off-scene character"
+    ];
+    private static readonly IReadOnlyDictionary<string, string> CharacterCategoryLabelKeys =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Main character"] = "Main",
+            ["Deuteragonist"] = "Deuteragonist",
+            ["Tritagonist"] = "Tritagonist",
+            ["Antagonist"] = "Antagonist",
+            ["Supporting character"] = "Supporting",
+            ["Secondary character"] = "Secondary",
+            ["Recurring"] = "Recurring",
+            ["Guest/episodic"] = "Guest / episodic",
+            ["Minor"] = "Minor",
+            ["Cameo character"] = "Cameo",
+            ["Background character"] = "Background",
+            ["Off-scene character"] = "Off-scene"
+        };
+    private static string CharacterCategoryLabelKey(string code) =>
+        CharacterCategoryLabelKeys.TryGetValue(code, out string? labelKey) ? labelKey : code;
+    private readonly List<SceneStatusOption> _characterCategories = [];
+    public IReadOnlyList<SceneStatusOption> CharacterCategories => _characterCategories;
+    public void RefreshCharacterCategories()
+    {
+        // Migrate legacy and blank character categories before updating the selector.
+        NormalizeCharacterCategories();
+        var codes = CharacterCategoryCodes.Concat(Project.Characters.Select(character => character.Category))
+            .Where(code => !string.IsNullOrWhiteSpace(code) &&
+                !string.Equals(code, "General", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (_characterCategories.Select(option => option.Code).SequenceEqual(codes)) return;
+        _characterCategories.Clear();
+        _characterCategories.AddRange(codes.Select(code =>
+        {
+            string labelKey = CharacterCategoryLabelKey(code);
+            return new SceneStatusOption(code, Loc.T(labelKey), labelKey);
+        }));
+        Raise(nameof(CharacterCategories));
+    }
+    public void RefreshLocalization()
+    {
+        foreach (var option in SceneStatuses) option.RefreshLocalization();
+        foreach (var option in CharacterCategories) option.RefreshLocalization();
+        Raise(nameof(BookPlotlines)); Raise(nameof(BookScenes)); Raise(nameof(ChapterScenes)); Status = Loc.T("Ready");
+    }
 
     public void ReplaceProject(StoryProject project, string? path = null)
     {
         TagService.Synchronize(project);
         Project = project;
+        NormalizeCharacterCategories();
         FilePath = path;
         _history.Clear(); _pendingSnapshot = _pendingScope = _pinnedScope = _pinnedSelection = null;
         SetChapterFilters([], []);
@@ -226,7 +277,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var ids = SelectedBook.Chapters.Select(c => c.Id).ToHashSet();
         foreach (var scene in Project.Scenes.Where(s => ids.Contains(s.ChapterId)).ToList()) Project.Scenes.Remove(scene);
         foreach (var plotline in Project.Plotlines.Where(plotline => plotline.BookId == SelectedBook.Id).ToList()) Project.Plotlines.Remove(plotline);
+        Guid deletedBookId = SelectedBook.Id;
         Project.Books.Remove(SelectedBook); Renumber(Project.Books);
+        foreach (var character in Project.Characters) character.BookIds.Remove(deletedBookId);
         SelectedBook = Project.Books.OrderBy(x => x.Order).FirstOrDefault(); Dirty("Book deleted");
     }
 
@@ -313,7 +366,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Snapshot();
         if (character is null)
         {
-            character = new StoryEntity { Name = characterName!.Trim() };
+            character = new StoryEntity { Name = characterName!.Trim(), Category = "Main character" };
             Project.Characters.Add(character);
         }
         scene.CharacterIds.Add(character.Id);
@@ -364,12 +417,24 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public StoryEntity AddEntity(ObservableCollection<StoryEntity> collection, string kind)
     {
         Snapshot();
-        var item = new StoryEntity { Name = Loc.T($"New {kind}"), Category = Loc.T(kind == "Note" ? "Research" : "General") };
+        var category = kind == "Character" ? "Main character" : Loc.T(kind == "Note" ? "Research" : "General");
+        var item = new StoryEntity { Name = Loc.T($"New {kind}"), Category = category };
         collection.Add(item);
         if (kind == "Character") SelectedCharacter = item;
         else if (kind == "Place") SelectedPlace = item;
         else if (kind == "Note") SelectedNote = item;
         Dirty(kind + " added"); return item;
+    }
+
+    public void SetCharacterBooks(StoryEntity character, IEnumerable<Guid> bookIds)
+    {
+        if (!Project.Characters.Contains(character)) return;
+        var selected = bookIds.Where(id => Project.Books.Any(book => book.Id == id)).Distinct().ToList();
+        if (character.BookIds.Count == selected.Count && selected.All(character.BookIds.Contains)) return;
+        Snapshot();
+        character.BookIds.Clear();
+        foreach (Guid id in selected) character.BookIds.Add(id);
+        Dirty("Character books updated");
     }
 
     public void DeleteEntity(ObservableCollection<StoryEntity> collection, StoryEntity? entity)
@@ -392,11 +457,38 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Project.Relationships.Add(relation); SelectedRelationship = relation; Dirty("Relationship added");
     }
 
-    public void DeleteRelationship()
+    public Relationship? AddCharacterRelationship(StoryEntity source, StoryEntity target,
+        IEnumerable<string> types, string description)
     {
-        if (SelectedRelationship is null) return;
-        Snapshot(); Project.Relationships.Remove(SelectedRelationship);
-        SelectedRelationship = Project.Relationships.FirstOrDefault(); Dirty("Item deleted");
+        if (ReferenceEquals(source, target) || !Project.Characters.Contains(source) ||
+            !Project.Characters.Contains(target)) return null;
+        var selectedTypes = types.Select(type => type.Trim()).Where(type => type.Length > 0)
+            .Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
+        if (selectedTypes.Count == 0) return null;
+        Snapshot();
+        var relation = new Relationship
+        {
+            FromEntityId = source.Id,
+            ToEntityId = target.Id,
+            Type = string.Join(", ", selectedTypes),
+            Description = description.Trim()
+        };
+        Project.Relationships.Add(relation);
+        SelectedRelationship = relation;
+        Dirty("Relationship added");
+        return relation;
+    }
+
+    public void DeleteRelationship() => DeleteRelationship(SelectedRelationship);
+
+    public void DeleteRelationship(Relationship? relation)
+    {
+        if (relation is null || !Project.Relationships.Contains(relation)) return;
+        Snapshot();
+        Project.Relationships.Remove(relation);
+        if (ReferenceEquals(SelectedRelationship, relation))
+            SelectedRelationship = Project.Relationships.FirstOrDefault();
+        Dirty("Item deleted");
     }
     public void RecordPropertyEdit(object source, string property, object? beforeValue, object? afterValue)
     {
@@ -514,12 +606,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
         IsDirty = true; Status = Loc.T(message); Project.ModifiedUtc = DateTime.UtcNow;
         ProjectReplaced?.Invoke(this, EventArgs.Empty);
     }
+    private void NormalizeCharacterCategories()
+    {
+        foreach (var character in Project.Characters.Where(character =>
+            string.IsNullOrWhiteSpace(character.Category) ||
+            string.Equals(character.Category, "General", StringComparison.OrdinalIgnoreCase)))
+            character.Category = "Main character";
+    }
+
     private void SelectDefaults()
     {
         _selectedBook = Project.Books.OrderBy(x => x.Order).FirstOrDefault();
         _selectedChapter = _selectedBook?.Chapters.OrderBy(x => x.Order).FirstOrDefault();
         _selectedPlotline = _selectedBook is null ? null : Project.Plotlines.Where(plotline => plotline.BookId == _selectedBook.Id).OrderBy(plotline => plotline.Order).FirstOrDefault();
         _selectedScene = BookScenes.FirstOrDefault();
+        RefreshCharacterCategories();
         _selectedCharacter = Project.Characters.FirstOrDefault();
         _selectedPlace = Project.Places.FirstOrDefault();
         _selectedNote = Project.Notes.FirstOrDefault();

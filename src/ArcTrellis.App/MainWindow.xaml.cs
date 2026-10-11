@@ -75,6 +75,8 @@ public partial class MainWindow : Window
             if (args.PropertyName == nameof(MainViewModel.SelectedBook)) CloseSceneFilter();
             if (args.PropertyName is nameof(MainViewModel.SelectedBook) or nameof(MainViewModel.HasSceneFilters))
                 Dispatcher.BeginInvoke(new Action(RefreshSceneList), DispatcherPriority.Loaded);
+            if (args.PropertyName == nameof(MainViewModel.SelectedCharacter))
+                Dispatcher.BeginInvoke(new Action(RefreshCharacterOverview), DispatcherPriority.Loaded);
         };
         AddHandler(TextCompositionManager.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
         AddHandler(DataObject.PastingEvent, new DataObjectPastingEventHandler(NumericTextBox_Pasting));
@@ -87,6 +89,7 @@ public partial class MainWindow : Window
             if (e.Source is CharacterInput input && input.DataContext is Scene scene)
             {
                 Vm.EditSceneCharacter(scene, e.CharacterId, e.CharacterName, e.Remove);
+                RefreshCharacterOverview();
                 e.Handled = true;
             }
         }));
@@ -162,6 +165,7 @@ public partial class MainWindow : Window
         CloseChapterFilter();
         CloseSceneFilter();
         Vm.ActiveTab = WorkspaceTabs.SelectedIndex;
+        if (WorkspaceTabs.SelectedIndex == 4) RefreshCharacterOverview();
         Dispatcher.BeginInvoke(new Action(ApplyLocalization), DispatcherPriority.Loaded);
     }
     private void AnyTextChanged(object sender, TextChangedEventArgs e)
@@ -236,6 +240,7 @@ public partial class MainWindow : Window
             Vm.RecordPropertyEdit(source, binding.ResolvedSourcePropertyName, previous, next);
             if (source is Chapter) RefreshChapterFilter();
             if (source is Scene) Dispatcher.BeginInvoke(new Action(RefreshSceneList), DispatcherPriority.Background);
+            if (source is Relationship) RefreshCharacterOverview();
         }
     }
 
@@ -268,10 +273,10 @@ public partial class MainWindow : Window
     {
         Title = Vm.WindowTitle;
         BuildTimeline();
-        RefreshRelations();
         RefreshChapterFilter();
         RefreshStats();
         RefreshSceneList();
+        RefreshCharacterOverview();
         Loc.Apply(this);
     }
 
@@ -669,13 +674,6 @@ public partial class MainWindow : Window
         Vm.SelectedPlotline = plotline;
     }
 
-    private void RefreshRelations()
-    {
-        var entities = Vm.Project.Characters.Concat(Vm.Project.Places).Concat(Vm.Project.Notes).ToList();
-        if (RelationFrom.ItemsSource is IEnumerable<StoryEntity> previous && previous.SequenceEqual(entities)) return;
-        RelationFrom.ItemsSource = entities; RelationTo.ItemsSource = entities;
-    }
-
     private async void AutosaveTimer_Tick(object? sender, EventArgs e)
     {
         if (!Vm.IsDirty) return;
@@ -862,8 +860,6 @@ public partial class MainWindow : Window
     private void DeletePlace_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("place")) { Vm.DeleteEntity(Vm.Project.Places, Vm.SelectedPlace); Vm.SelectedPlace = Vm.Project.Places.FirstOrDefault(); RefreshAll(); } }
     private void AddNote_Click(object sender, RoutedEventArgs e) { Vm.SelectedNote = Vm.AddEntity(Vm.Project.Notes, "Note"); RefreshAll(); }
     private void DeleteNote_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("note")) { Vm.DeleteEntity(Vm.Project.Notes, Vm.SelectedNote); Vm.SelectedNote = Vm.Project.Notes.FirstOrDefault(); RefreshAll(); } }
-    private void AddRelationship_Click(object sender, RoutedEventArgs e) { Vm.AddRelationship(); RefreshAll(); }
-    private void DeleteRelationship_Click(object sender, RoutedEventArgs e) { if (Vm.SelectedRelationship is { } r) { Vm.DeleteRelationship(); } }
     private void Search_Click(object sender, RoutedEventArgs e) => Vm.RunSearch();
     private TextBoxBase? FocusedTextEditor()
         => (Keyboard.FocusedElement as TextBoxBase ?? FocusManager.GetFocusedElement(this) as TextBoxBase) is { IsVisible: true } editor ? editor : null;
@@ -1167,6 +1163,7 @@ public partial class MainWindow : Window
             ApplyLocalization();
             UpdateLayout();
             if ((WorkspaceTabs.Items[0] as TabItem)?.Header?.ToString() != "Dashboard") failures.Add("English tab localization failed");
+            if (WorkspaceTabs.Items.OfType<TabItem>().Any(tab => tab.Header?.ToString() == "Relationships")) failures.Add("Standalone Relationships tab was not removed");
             if (FileMenuItem.Header?.ToString() != "File" || LightThemeItem.Header?.ToString() != "Light theme") failures.Add("English menu localization failed");
             var englishText = CollectVisibleText(this).ToList();
             if (!englishText.Contains("Scene card") || !englishText.Contains("Status")) failures.Add("English deferred content localization failed");
@@ -1589,6 +1586,7 @@ public partial class MainWindow : Window
                 failures.Add($"Plotline undo mismatch: model={Vm.SelectedScene?.PlotlineId}, selector={scenePlotlineSelector.SelectedValue}, expected={originalScenePlotline}, status={Vm.Status}, tab={Vm.ActiveTab}");
             CheckStableTagHistory(failures);
             CheckSceneFilters(failures, reportPath);
+            CheckCharactersTab(failures, reportPath);
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
             File.WriteAllText(reportPath, failures.Count == 0 ? "PASS" : "FAIL: " + string.Join("; ", failures));
         }
