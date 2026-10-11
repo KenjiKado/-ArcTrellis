@@ -19,7 +19,7 @@ internal sealed class RelationTypeInput : UserControl
         new(StringComparer.CurrentCultureIgnoreCase);
     private readonly Dictionary<string, StackPanel> _groupPanels =
         new(StringComparer.CurrentCultureIgnoreCase);
-    private readonly StackPanel _choiceRows = new();
+    private readonly StackPanel _choiceRows = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly Border _dropdown =
         new() { BorderThickness = new Thickness(1), Padding = new Thickness(4), CornerRadius = new CornerRadius(4) };
     private readonly Popup _popup =
@@ -104,7 +104,8 @@ internal sealed class RelationTypeInput : UserControl
             Content = _choiceRows,
             MaxHeight = 260,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch
         };
         layout.Children.Add(frame);
         layout.Children.Add(_popup);
@@ -285,6 +286,7 @@ internal sealed class RelationTypeInput : UserControl
             Tag = option.Value,
             Content = text,
             HorizontalContentAlignment = HorizontalAlignment.Left,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
             Background = Brushes.Transparent,
             BorderThickness = new Thickness(0),
             Padding = new Thickness(8, 5, 8, 5),
@@ -303,7 +305,7 @@ internal sealed class RelationTypeInput : UserControl
     private StackPanel EnsureGroup(string name)
     {
         if (_groupPanels.TryGetValue(name, out var existing)) return existing;
-        var panel = new StackPanel();
+        var panel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch };
         var header = new TextBlock
         {
             Text = name.ToUpperInvariant(),
