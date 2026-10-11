@@ -205,7 +205,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public IReadOnlyList<SceneStatusOption> CharacterCategories => _characterCategories;
     public void RefreshCharacterCategories()
     {
-        // Keep categories in older projects available without changing their saved values.
+        // Migrate legacy and blank character categories before updating the selector.
+        NormalizeCharacterCategories();
         var codes = CharacterCategoryCodes.Concat(Project.Characters.Select(character => character.Category))
             .Where(code => !string.IsNullOrWhiteSpace(code) &&
                 !string.Equals(code, "General", StringComparison.OrdinalIgnoreCase))
