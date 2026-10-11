@@ -351,7 +351,7 @@
                     <Button x:Name="DeleteCharacterRelationButton" Content="Delete" Click="DeleteCharacterRelation_Click" IsEnabled="False"/>
                   </StackPanel>
                   <DataGrid x:Name="CharacterRelationsTable" AutoGenerateColumns="False" IsReadOnly="True"
-                            CanUserAddRows="False" MinHeight="160"
+                            CanUserAddRows="False" MinHeight="160" MinColumnWidth="120"
                             RowHeight="44" FontSize="14" CanUserSortColumns="False"
                             CanUserResizeColumns="False" CanUserResizeRows="False" CanUserReorderColumns="False"
                             SelectionMode="Single" SelectionUnit="FullRow"
