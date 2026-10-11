@@ -479,6 +479,31 @@ public sealed class MainViewModel : INotifyPropertyChanged
         return relation;
     }
 
+    public bool UpdateCharacterRelationship(Relationship relation, StoryEntity source,
+        StoryEntity target, string type, string description)
+    {
+        string cleanType = type.Trim();
+        if (cleanType.Length == 0 || source.Id == target.Id ||
+            !Project.Relationships.Contains(relation) ||
+            !Project.Characters.Contains(source) || !Project.Characters.Contains(target) ||
+            relation.FromEntityId != source.Id) return false;
+
+        string cleanDescription = description.Trim();
+        Guid currentTargetId = relation.ToEntityId;
+        if (currentTargetId == target.Id &&
+            string.Equals(relation.Type, cleanType, StringComparison.CurrentCulture) &&
+            string.Equals(relation.Description, cleanDescription, StringComparison.CurrentCulture))
+            return true;
+
+        Snapshot();
+        relation.ToEntityId = target.Id;
+        relation.Type = cleanType;
+        relation.Description = cleanDescription;
+        SelectedRelationship = relation;
+        Dirty("Relationship updated");
+        return true;
+    }
+
     public void DeleteRelationship() => DeleteRelationship(SelectedRelationship);
 
     public void DeleteRelationship(Relationship? relation)
