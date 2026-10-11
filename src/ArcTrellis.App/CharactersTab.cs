@@ -183,10 +183,12 @@ public partial class MainWindow
         relationDialog.UpdateLayout();
         if (relationDialog.TargetInput.IsOpen)
             failures.Add("Target character autocomplete opened when the relation popup opened");
+        string[] writeoGroups =
+            ["FAMILY", "ROMANTIC", "SOCIAL", "HIERARCHY", "CONFLICT", "ALLIANCE", "SUPERNATURAL", "PROFESSIONAL"];
         if (relationDialog.RelationTypesInput.Choices.Count < CharacterRelationWindow.DefaultRelationTypes.Count ||
             !relationDialog.RelationTypesInput.Choices.Contains("Friend", StringComparer.CurrentCultureIgnoreCase) ||
-            !relationDialog.RelationTypesInput.Groups.Contains("SUPERNATURAL", StringComparer.CurrentCultureIgnoreCase))
-            failures.Add("Relation type field does not expose the Writeo-style grouped select options");
+            !relationDialog.RelationTypesInput.Groups.Take(writeoGroups.Length).SequenceEqual(writeoGroups))
+            failures.Add("Relation type field does not expose the ordered Writeo-style grouped select options");
         relationDialog.SelectTargetForTest(relationTarget);
         relationDialog.AddTypeForTest("Friend");
         relationDialog.AddTypeForTest("Custom bond");
@@ -197,11 +199,12 @@ public partial class MainWindow
             relationDialog.RelationTypesInput.SelectedValues.Count != 1 ||
             relationDialog.TargetInput.Input.SelectionLength != 0)
             failures.Add("Add relation popup did not retain exactly one relation type or its custom value");
+        SaveVisualPng(relationDialog, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-add-relation.png"));
         relationDialog.RelationTypesInput.OpenForTest();
         relationDialog.UpdateLayout();
-        SaveVisualPng(relationDialog, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-relation-types.png"));
+        SaveVisualPng(relationDialog.RelationTypesInput.DropdownSurface,
+            Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-relation-types.png"));
         relationDialog.RelationTypesInput.CloseDropdown();
-        SaveVisualPng(relationDialog, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-add-relation.png"));
         relationDialog.Close();
 
         WorkspaceTabs.SelectedIndex = 4;

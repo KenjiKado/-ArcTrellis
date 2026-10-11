@@ -54,6 +54,7 @@ internal sealed class RelationTypeInput : UserControl
         SelectedValue is null ? [] : [SelectedValue];
     internal string? SelectedValue { get; private set; }
     internal bool IsOpen => _popup.IsOpen;
+    internal Border DropdownSurface => _dropdown;
     internal event EventHandler? SelectionChanged;
 
     internal RelationTypeInput(IEnumerable<RelationTypeChoice> options)
