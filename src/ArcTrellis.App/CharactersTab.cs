@@ -256,6 +256,8 @@ public partial class MainWindow
             editDialog.RelationDescription != "Existing description" ||
             editDialog.TargetInput.IsOpen)
             failures.Add("Edit relation popup was not pre-populated or did not use Save");
+        SaveVisualPng(editDialog,
+            Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-edit-relation.png"));
         editDialog.Close();
 
         WorkspaceTabs.SelectedIndex = 4;
@@ -296,6 +298,8 @@ public partial class MainWindow
             if (!AddCharacterRelationButton.IsEnabled)
                 failures.Add("Character relation Add button is inactive for a selected character");
             UpdateLayout();
+            SaveVisualPng(CharacterRelationsTable,
+                Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-character-relations.png"));
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-characters-tab.png"));
             Vm.Project.Relationships.Remove(relation);
             RefreshCharacterOverview();
