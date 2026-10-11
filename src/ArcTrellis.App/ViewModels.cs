@@ -48,6 +48,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public MainViewModel(StoryProject project)
     {
         _project = project;
+        NormalizeCharacterCategories();
         SelectDefaults();
     }
 
@@ -206,7 +207,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         // Keep categories in older projects available without changing their saved values.
         var codes = CharacterCategoryCodes.Concat(Project.Characters.Select(character => character.Category))
-            .Where(code => !string.IsNullOrWhiteSpace(code)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            .Where(code => !string.IsNullOrWhiteSpace(code) &&
+                !string.Equals(code, "General", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (_characterCategories.Select(option => option.Code).SequenceEqual(codes)) return;
         _characterCategories.Clear();
         _characterCategories.AddRange(codes.Select(code =>
@@ -227,6 +230,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         TagService.Synchronize(project);
         Project = project;
+        NormalizeCharacterCategories();
         FilePath = path;
         _history.Clear(); _pendingSnapshot = _pendingScope = _pinnedScope = _pinnedSelection = null;
         SetChapterFilters([], []);
@@ -452,11 +456,38 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Project.Relationships.Add(relation); SelectedRelationship = relation; Dirty("Relationship added");
     }
 
-    public void DeleteRelationship()
+    public Relationship? AddCharacterRelationship(StoryEntity source, StoryEntity target,
+        IEnumerable<string> types, string description)
     {
-        if (SelectedRelationship is null) return;
-        Snapshot(); Project.Relationships.Remove(SelectedRelationship);
-        SelectedRelationship = Project.Relationships.FirstOrDefault(); Dirty("Item deleted");
+        if (ReferenceEquals(source, target) || !Project.Characters.Contains(source) ||
+            !Project.Characters.Contains(target)) return null;
+        var selectedTypes = types.Select(type => type.Trim()).Where(type => type.Length > 0)
+            .Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
+        if (selectedTypes.Count == 0) return null;
+        Snapshot();
+        var relation = new Relationship
+        {
+            FromEntityId = source.Id,
+            ToEntityId = target.Id,
+            Type = string.Join(", ", selectedTypes),
+            Description = description.Trim()
+        };
+        Project.Relationships.Add(relation);
+        SelectedRelationship = relation;
+        Dirty("Relationship added");
+        return relation;
+    }
+
+    public void DeleteRelationship() => DeleteRelationship(SelectedRelationship);
+
+    public void DeleteRelationship(Relationship? relation)
+    {
+        if (relation is null || !Project.Relationships.Contains(relation)) return;
+        Snapshot();
+        Project.Relationships.Remove(relation);
+        if (ReferenceEquals(SelectedRelationship, relation))
+            SelectedRelationship = Project.Relationships.FirstOrDefault();
+        Dirty("Item deleted");
     }
     public void RecordPropertyEdit(object source, string property, object? beforeValue, object? afterValue)
     {
@@ -574,6 +605,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         IsDirty = true; Status = Loc.T(message); Project.ModifiedUtc = DateTime.UtcNow;
         ProjectReplaced?.Invoke(this, EventArgs.Empty);
     }
+    private void NormalizeCharacterCategories()
+    {
+        foreach (var character in Project.Characters.Where(character =>
+            string.IsNullOrWhiteSpace(character.Category) ||
+            string.Equals(character.Category, "General", StringComparison.OrdinalIgnoreCase)))
+            character.Category = "Main character";
+    }
+
     private void SelectDefaults()
     {
         _selectedBook = Project.Books.OrderBy(x => x.Order).FirstOrDefault();

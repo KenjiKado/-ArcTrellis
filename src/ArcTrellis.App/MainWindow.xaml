@@ -346,8 +346,14 @@
                   <Button Content="Gallery" ToolTip="Coming soon" IsEnabled="False"
                           HorizontalAlignment="Left" Margin="0,14,0,0"/>
                   <TextBlock Text="Relations" FontWeight="SemiBold" Margin="0,16,0,6"/>
+                  <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                    <Button x:Name="AddCharacterRelationButton" Content="＋ Relation" Click="AddCharacterRelation_Click"/>
+                    <Button x:Name="DeleteCharacterRelationButton" Content="Delete" Click="DeleteCharacterRelation_Click" IsEnabled="False"/>
+                  </StackPanel>
                   <DataGrid x:Name="CharacterRelationsTable" AutoGenerateColumns="False" IsReadOnly="True"
                             CanUserAddRows="False" MinHeight="160" MinColumnWidth="100"
+                            SelectionMode="Single" SelectionUnit="FullRow"
+                            SelectionChanged="CharacterRelationsTable_SelectionChanged"
                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                     <DataGrid.Columns>
                       <DataGridTextColumn Header="Name" Binding="{Binding Other.Name}" Width="2*"/>

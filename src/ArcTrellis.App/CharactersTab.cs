@@ -1,5 +1,7 @@
 using System.IO;
+using System.Windows;
 using System.Windows.Controls;
+using ArcTrellis.App.Views;
 using ArcTrellis.Core.Models;
 using ArcTrellis.Core.Services;
 
@@ -33,10 +35,55 @@ public partial class MainWindow
         var relationState = new List<object?> { Vm.Project, character };
         relationState.AddRange(relations.Select(row => (object?)(row.Relation, row.Other, row.Relation.FromEntityId, row.Relation.ToEntityId)));
         if (ViewChanged(ref _characterRelationState, relationState))
+        {
             CharacterRelationsTable.ItemsSource = relations;
+            CharacterRelationsTable.SelectedItem = null;
+            DeleteCharacterRelationButton.IsEnabled = false;
+        }
 
         RefreshCharacterBooks(character);
     }
+
+    private static IEnumerable<string> SplitRelationTypes(string value) =>
+        value.Split([',', ';', '•', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private void AddCharacterRelation_Click(object sender, RoutedEventArgs e)
+    {
+        if (Vm.SelectedCharacter is not { } source) return;
+        var targets = Vm.Project.Characters.Where(character => character.Id != source.Id).ToList();
+        if (targets.Count == 0)
+        {
+            MessageBox.Show(Loc.T("Add another character before creating a relation."),
+                Loc.T("Add relation"), MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var existingTypes = Vm.Project.Relationships.SelectMany(relation => SplitRelationTypes(relation.Type))
+            .Distinct(StringComparer.CurrentCultureIgnoreCase);
+        var dialog = new CharacterRelationWindow(source, targets, existingTypes) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.TargetCharacter is not { } target) return;
+        var relation = Vm.AddCharacterRelationship(source, target, dialog.RelationTypes, dialog.RelationDescription);
+        if (relation is null) return;
+        RefreshCharacterOverview();
+        if (CharacterRelationsTable.ItemsSource is IEnumerable<CharacterRelationRow> rows &&
+            rows.FirstOrDefault(row => ReferenceEquals(row.Relation, relation)) is { } selected)
+        {
+            CharacterRelationsTable.SelectedItem = selected;
+            CharacterRelationsTable.ScrollIntoView(selected);
+        }
+    }
+
+    private void DeleteCharacterRelation_Click(object sender, RoutedEventArgs e)
+    {
+        if (CharacterRelationsTable.SelectedItem is not CharacterRelationRow row ||
+            !ConfirmDelete("relation")) return;
+        Vm.DeleteRelationship(row.Relation);
+        RefreshCharacterOverview();
+    }
+
+    private void CharacterRelationsTable_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        DeleteCharacterRelationButton.IsEnabled =
+            CharacterRelationsTable.SelectedItem is CharacterRelationRow;
 
     private void RefreshCharacterBooks(StoryEntity? character)
     {
@@ -70,6 +117,13 @@ public partial class MainWindow
 
     private void CheckCharactersTab(List<string> failures, string reportPath)
     {
+        var legacyProject = new TemplateService().CreateBlank();
+        legacyProject.Characters.Add(new StoryEntity { Name = "Legacy", Category = "General" });
+        var legacyVm = new MainViewModel(legacyProject);
+        if (legacyVm.Project.Characters[0].Category != "Main character" ||
+            legacyVm.CharacterCategories.Any(option => string.Equals(option.Code, "General", StringComparison.OrdinalIgnoreCase)))
+            failures.Add("Legacy General character category was not removed and migrated");
+
         var checkVm = new MainViewModel(new TemplateService().CreateBlank());
         var firstBook = checkVm.SelectedBook!;
         checkVm.AddBook();
@@ -113,6 +167,33 @@ public partial class MainWindow
                 failures.Add("Selecting All raised more than one character books change");
         }
 
+        var relationTarget = checkVm.AddEntity(checkVm.Project.Characters, "Character");
+        relationTarget.Name = "Relation target";
+        var createdRelation = checkVm.AddCharacterRelationship(person, relationTarget,
+            ["Friend", "Rival", "Friend"], "Complicated history");
+        if (createdRelation is null || createdRelation.Type != "Friend, Rival" ||
+            createdRelation.Description != "Complicated history")
+            failures.Add("Character relationship creation lost selected types or description");
+        checkVm.DeleteRelationship(createdRelation);
+        if (createdRelation is not null && checkVm.Project.Relationships.Contains(createdRelation))
+            failures.Add("Character relationship deletion did not remove the selected relation");
+
+        var relationDialog = new CharacterRelationWindow(person, [relationTarget], ["Custom bond"]) { Owner = this };
+        relationDialog.Show();
+        relationDialog.UpdateLayout();
+        relationDialog.SelectTargetForTest(relationTarget);
+        relationDialog.AddTypeForTest("Friend");
+        relationDialog.AddTypeForTest("Custom bond");
+        relationDialog.DescriptionInput.Text = "Dialog description";
+        relationDialog.UpdateLayout();
+        if (!relationDialog.SaveButton.IsEnabled ||
+            !relationDialog.RelationTypes.ToHashSet(StringComparer.CurrentCultureIgnoreCase)
+                .SetEquals(["Friend", "Custom bond"]) ||
+            relationDialog.TargetInput.Input.SelectionLength != 0)
+            failures.Add("Add relation popup did not retain its target, multiple types, or custom type");
+        SaveVisualPng(relationDialog, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-add-relation.png"));
+        relationDialog.Close();
+
         WorkspaceTabs.SelectedIndex = 4;
         var existing = Vm.Project.Characters.FirstOrDefault();
         if (existing is null) existing = Vm.AddEntity(Vm.Project.Characters, "Character");
@@ -129,7 +210,7 @@ public partial class MainWindow
         if (_characterBooksInput is null || !Vm.Project.Books.All(book => _characterBooksInput.Choices.ContainsKey(book.Id)))
             failures.Add("Character books multiselect does not offer every project book");
 
-        var other = Vm.Project.Characters.Concat(Vm.Project.Places).FirstOrDefault(entity => entity.Id != existing.Id);
+        var other = Vm.Project.Characters.FirstOrDefault(entity => entity.Id != existing.Id);
         if (other is not null)
         {
             var relation = new Relationship { FromEntityId = existing.Id, ToEntityId = other.Id, Type = "Friend", Description = "Trusted" };
@@ -138,6 +219,15 @@ public partial class MainWindow
             if (CharacterRelationsTable.ItemsSource is not IEnumerable<CharacterRelationRow> rows ||
                 !rows.Any(row => ReferenceEquals(row.Relation, relation) && row.Other.Name == other.Name))
                 failures.Add("Character relations table does not show the related name, type, and description");
+            else
+            {
+                CharacterRelationsTable.SelectedItem = rows.First(row => ReferenceEquals(row.Relation, relation));
+                UpdateLayout();
+                if (!DeleteCharacterRelationButton.IsEnabled)
+                    failures.Add("Character relation Delete button did not follow the selected row");
+            }
+            if (!AddCharacterRelationButton.IsEnabled)
+                failures.Add("Character relation Add button is inactive for a selected character");
             UpdateLayout();
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-characters-tab.png"));
             Vm.Project.Relationships.Remove(relation);
