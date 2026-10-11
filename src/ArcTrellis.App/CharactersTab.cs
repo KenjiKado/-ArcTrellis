@@ -62,7 +62,7 @@ public partial class MainWindow
             .Distinct(StringComparer.CurrentCultureIgnoreCase);
         var dialog = new CharacterRelationWindow(source, targets, existingTypes) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.TargetCharacter is not { } target) return;
-        var relation = Vm.AddCharacterRelationship(source, target, dialog.RelationTypes, dialog.RelationDescription);
+        var relation = Vm.AddCharacterRelationship(source, target, [dialog.RelationType], dialog.RelationDescription);
         if (relation is null) return;
         RefreshCharacterOverview();
         if (CharacterRelationsTable.ItemsSource is IEnumerable<CharacterRelationRow> rows &&
@@ -170,8 +170,8 @@ public partial class MainWindow
         var relationTarget = checkVm.AddEntity(checkVm.Project.Characters, "Character");
         relationTarget.Name = "Relation target";
         var createdRelation = checkVm.AddCharacterRelationship(person, relationTarget,
-            ["Friend", "Rival", "Friend"], "Complicated history");
-        if (createdRelation is null || createdRelation.Type != "Friend, Rival" ||
+            ["Friend"], "Complicated history");
+        if (createdRelation is null || createdRelation.Type != "Friend" ||
             createdRelation.Description != "Complicated history")
             failures.Add("Character relationship creation lost selected types or description");
         checkVm.DeleteRelationship(createdRelation);
@@ -184,18 +184,23 @@ public partial class MainWindow
         if (relationDialog.TargetInput.IsOpen)
             failures.Add("Target character autocomplete opened when the relation popup opened");
         if (relationDialog.RelationTypesInput.Choices.Count < CharacterRelationWindow.DefaultRelationTypes.Count ||
-            !relationDialog.RelationTypesInput.Choices.Contains(Loc.T("Friend"), StringComparer.CurrentCultureIgnoreCase))
-            failures.Add("Relation type field does not expose the preset multiselect options");
+            !relationDialog.RelationTypesInput.Choices.Contains("Friend", StringComparer.CurrentCultureIgnoreCase) ||
+            !relationDialog.RelationTypesInput.Groups.Contains("SUPERNATURAL", StringComparer.CurrentCultureIgnoreCase))
+            failures.Add("Relation type field does not expose the Writeo-style grouped select options");
         relationDialog.SelectTargetForTest(relationTarget);
         relationDialog.AddTypeForTest("Friend");
         relationDialog.AddTypeForTest("Custom bond");
         relationDialog.DescriptionInput.Text = "Dialog description";
         relationDialog.UpdateLayout();
         if (!relationDialog.SaveButton.IsEnabled ||
-            !relationDialog.RelationTypes.ToHashSet(StringComparer.CurrentCultureIgnoreCase)
-                .SetEquals(["Friend", "Custom bond"]) ||
+            relationDialog.RelationType != "Custom bond" ||
+            relationDialog.RelationTypesInput.SelectedValues.Count != 1 ||
             relationDialog.TargetInput.Input.SelectionLength != 0)
-            failures.Add("Add relation popup did not retain its target, multiple types, or custom type");
+            failures.Add("Add relation popup did not retain exactly one relation type or its custom value");
+        relationDialog.RelationTypesInput.OpenForTest();
+        relationDialog.UpdateLayout();
+        SaveVisualPng(relationDialog, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-relation-types.png"));
+        relationDialog.RelationTypesInput.CloseDropdown();
         SaveVisualPng(relationDialog, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-add-relation.png"));
         relationDialog.Close();
 

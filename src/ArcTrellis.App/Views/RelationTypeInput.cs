@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -10,16 +9,16 @@ using System.Windows.Threading;
 
 namespace ArcTrellis.App.Views;
 
-/// <summary>A searchable relation-type multiselect with preset and custom values.</summary>
+internal sealed record RelationTypeChoice(string Group, string Value);
+
+/// <summary>A searchable, grouped single-select that also accepts a custom relation type.</summary>
 internal sealed class RelationTypeInput : UserControl
 {
-    private readonly ObservableCollection<string> _selected;
-    private readonly List<string> _options = [];
-    private readonly Dictionary<string, CheckBox> _checks =
+    private readonly List<RelationTypeChoice> _options = [];
+    private readonly Dictionary<string, Button> _buttons =
         new(StringComparer.CurrentCultureIgnoreCase);
-    private readonly Dictionary<string, Border> _chips =
+    private readonly Dictionary<string, StackPanel> _groupPanels =
         new(StringComparer.CurrentCultureIgnoreCase);
-    private readonly WrapPanel _row = new();
     private readonly StackPanel _choiceRows = new();
     private readonly Border _dropdown =
         new() { BorderThickness = new Thickness(1), Padding = new Thickness(4), CornerRadius = new CornerRadius(4) };
@@ -30,33 +29,36 @@ internal sealed class RelationTypeInput : UserControl
         HorizontalContentAlignment = HorizontalAlignment.Left,
         Background = Brushes.Transparent,
         BorderThickness = new Thickness(0),
-        Padding = new Thickness(7, 5, 7, 5),
+        Padding = new Thickness(7, 6, 7, 6),
         Cursor = Cursors.Hand,
         Visibility = Visibility.Collapsed
     };
     private readonly TextBlock _empty =
         new() { Text = Loc.T("No matches"), Margin = new Thickness(7), Visibility = Visibility.Collapsed };
-    private bool _removingChip, _fieldWasOpenOnPress, _closedOnFieldPress, _synchronizing;
+    private readonly Button _clear;
+    private bool _committing, _fieldWasOpenOnPress, _closedOnFieldPress;
 
     internal TextBox Input { get; } = new()
     {
         Tag = "RelationTypeDraft",
-        Width = 145,
+        MaxLength = 15,
         MinHeight = 28,
         BorderThickness = new Thickness(0),
         Background = Brushes.Transparent,
         Margin = new Thickness(2)
     };
-    internal IReadOnlyList<string> Choices => _options;
-    internal IReadOnlyCollection<string> SelectedValues => _selected;
+    internal IReadOnlyList<string> Choices => _options.Select(option => option.Value).ToList();
+    internal IReadOnlyList<string> Groups => _options.Select(option => option.Group)
+        .Distinct(StringComparer.CurrentCultureIgnoreCase).ToList();
+    internal IReadOnlyCollection<string> SelectedValues =>
+        SelectedValue is null ? [] : [SelectedValue];
+    internal string? SelectedValue { get; private set; }
     internal bool IsOpen => _popup.IsOpen;
     internal event EventHandler? SelectionChanged;
 
-    internal RelationTypeInput(IEnumerable<string> options, ObservableCollection<string> selected)
+    internal RelationTypeInput(IEnumerable<RelationTypeChoice> options)
     {
-        _selected = selected;
         AutomationProperties.SetName(Input, Loc.T("Relation type"));
-
         var layout = new StackPanel();
         var frame = new Border
         {
@@ -73,9 +75,22 @@ internal sealed class RelationTypeInput : UserControl
         var arrow = CreateArrow(Loc.T("Relation type"));
         DockPanel.SetDock(arrow, Dock.Right);
         content.Children.Add(arrow);
-        _row.Children.Add(Input);
-        content.Children.Add(_row);
+        _clear = CreateClear();
+        DockPanel.SetDock(_clear, Dock.Right);
+        content.Children.Add(_clear);
+        content.Children.Add(Input);
         frame.Child = content;
+
+        foreach (var option in options
+            .Where(option => !string.IsNullOrWhiteSpace(option.Value))
+            .Select(option => new RelationTypeChoice(option.Group, option.Value.Trim()))
+            .DistinctBy(option => option.Value, StringComparer.CurrentCultureIgnoreCase))
+            AddChoice(option);
+
+        _customChoice.Click += (_, _) => SelectCustom();
+        _choiceRows.Children.Add(_customChoice);
+        _empty.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+        _choiceRows.Children.Add(_empty);
 
         _popup.PlacementTarget = frame;
         _popup.Child = _dropdown;
@@ -83,59 +98,52 @@ internal sealed class RelationTypeInput : UserControl
         DropdownChrome.SetCompact(_dropdown, true);
         _dropdown.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
         _dropdown.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
-
-        foreach (string option in options
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => value.Trim())
-            .Distinct(StringComparer.CurrentCultureIgnoreCase))
-            AddChoice(option);
-
-        _customChoice.Click += (_, _) => AddCustom(Input.Text);
-        _choiceRows.Children.Add(_customChoice);
-        _empty.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
-        _choiceRows.Children.Add(_empty);
         _dropdown.Child = new ScrollViewer
         {
             Content = _choiceRows,
-            MaxHeight = 210,
+            MaxHeight = 260,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
         };
-
         layout.Children.Add(frame);
         layout.Children.Add(_popup);
         Content = layout;
 
-        Input.TextChanged += (_, _) => FilterChoices();
+        Input.TextChanged += (_, _) =>
+        {
+            if (_committing) return;
+            if (SelectedValue is not null &&
+                !string.Equals(SelectedValue, Input.Text, StringComparison.CurrentCulture))
+            {
+                SelectedValue = null;
+                UpdateClear();
+                SelectionChanged?.Invoke(this, EventArgs.Empty);
+            }
+            FilterChoices(Input.Text);
+            if (IsLoaded && Input.IsKeyboardFocusWithin) _popup.IsOpen = true;
+        };
         Input.GotKeyboardFocus += (_, _) =>
         {
-            FilterChoices();
-            if (!_removingChip && Mouse.LeftButton != MouseButtonState.Pressed)
-                _popup.IsOpen = true;
+            FilterChoices(SelectedValue is null ? Input.Text : "");
+            if (Mouse.LeftButton != MouseButtonState.Pressed) _popup.IsOpen = true;
         };
         Input.PreviewKeyDown += (_, e) =>
         {
-            if (e.Key == Key.Back && Input.Text.Length == 0 &&
-                Keyboard.Modifiers == ModifierKeys.None && _selected.Count > 0)
-            {
-                Remove(_selected[^1]);
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Enter)
+            if (e.Key == Key.Enter)
             {
                 string value = Input.Text.Trim();
                 if (value.Length > 0)
                 {
-                    string? existing = _options.FirstOrDefault(option =>
+                    string? exact = _options.Select(option => option.Value).FirstOrDefault(option =>
                         string.Equals(option, value, StringComparison.CurrentCultureIgnoreCase));
-                    if (existing is null) AddCustom(value);
-                    else _checks[existing].IsChecked = true;
+                    if (exact is not null) Select(exact);
+                    else SelectCustom();
                 }
                 e.Handled = true;
             }
             else if (e.Key == Key.Down)
             {
-                var first = _checks.Values.FirstOrDefault(check => check.Visibility == Visibility.Visible);
+                var first = _buttons.Values.FirstOrDefault(button => button.Visibility == Visibility.Visible);
                 if (first is not null) first.Focus();
                 else if (_customChoice.Visibility == Visibility.Visible) _customChoice.Focus();
                 e.Handled = true;
@@ -163,18 +171,14 @@ internal sealed class RelationTypeInput : UserControl
             {
                 if (!Input.IsKeyboardFocusWithin) return;
                 if (close) CloseDropdown();
-                else
-                {
-                    FilterChoices();
-                    _popup.IsOpen = true;
-                }
+                else OpenDropdown();
             }), DispatcherPriority.Background);
         }), true);
         frame.MouseDown += (_, e) =>
         {
             if (e.ChangedButton != MouseButton.Left ||
                 DropdownChrome.Contains(arrow, e.OriginalSource as DependencyObject) ||
-                _chips.Values.Any(chip => DropdownChrome.Contains(chip, e.OriginalSource as DependencyObject))) return;
+                DropdownChrome.Contains(_clear, e.OriginalSource as DependencyObject)) return;
             Input.Focus();
             Input.CaretIndex = Input.Text.Length;
             e.Handled = true;
@@ -186,9 +190,7 @@ internal sealed class RelationTypeInput : UserControl
         {
             if (Mouse.LeftButton != MouseButtonState.Pressed) return;
             if (DropdownChrome.PointerWithin(arrow)) closedOnArrowPress = true;
-            else if (DropdownChrome.PointerWithin(frame) &&
-                     !_chips.Values.Any(DropdownChrome.PointerWithin))
-                _closedOnFieldPress = true;
+            else if (DropdownChrome.PointerWithin(frame)) _closedOnFieldPress = true;
         };
         arrow.Click += (_, _) =>
         {
@@ -198,11 +200,14 @@ internal sealed class RelationTypeInput : UserControl
             else
             {
                 Input.Focus();
-                FilterChoices();
-                _popup.IsOpen = true;
+                OpenDropdown();
             }
         };
-
+        _clear.Click += (_, _) =>
+        {
+            ClearSelection();
+            CloseDropdown();
+        };
         LostKeyboardFocus += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
         {
             if (!IsKeyboardFocusWithin && !_dropdown.IsKeyboardFocusWithin &&
@@ -210,154 +215,149 @@ internal sealed class RelationTypeInput : UserControl
         }), DispatcherPriority.Input);
         Unloaded += (_, _) => CloseDropdown();
 
-        RenderChips();
-        FilterChoices();
+        FilterChoices("");
+        UpdateClear();
     }
 
     internal void Select(string value)
     {
         string clean = value.Trim();
         if (clean.Length == 0) return;
-        string? existing = _options.FirstOrDefault(option =>
+        string? existing = _options.Select(option => option.Value).FirstOrDefault(option =>
             string.Equals(option, clean, StringComparison.CurrentCultureIgnoreCase));
         if (existing is null)
         {
-            AddChoice(clean);
+            AddChoice(new RelationTypeChoice("CUSTOM", clean));
             existing = clean;
         }
-        _checks[existing].IsChecked = true;
+        _committing = true;
+        Input.Text = existing;
+        Input.CaretIndex = Input.Text.Length;
+        Input.SelectionLength = 0;
+        _committing = false;
+        SelectedValue = existing;
+        UpdateClear();
+        CloseDropdown();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    internal void OpenForTest() => OpenDropdown();
     internal void CloseDropdown() => _popup.IsOpen = false;
 
-    private void AddChoice(string value)
+    private void OpenDropdown()
     {
-        if (_checks.ContainsKey(value)) return;
-        _options.Add(value);
-        var text = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, MaxWidth = 420 };
-        var check = new CheckBox
-        {
-            Tag = value,
-            IsChecked = _selected.Contains(value, StringComparer.CurrentCultureIgnoreCase),
-            Margin = new Thickness(3),
-            Cursor = Cursors.Hand,
-            Content = text
-        };
-        check.Checked += (_, _) =>
-        {
-            if (_synchronizing) return;
-            if (!_selected.Contains(value, StringComparer.CurrentCultureIgnoreCase))
-                _selected.Add(value);
-            RenderChips();
-            Input.Clear();
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
-        };
-        check.Unchecked += (_, _) =>
-        {
-            if (_synchronizing) return;
-            foreach (string match in _selected
-                .Where(item => string.Equals(item, value, StringComparison.CurrentCultureIgnoreCase)).ToList())
-                _selected.Remove(match);
-            RenderChips();
-            SelectionChanged?.Invoke(this, EventArgs.Empty);
-        };
-        _checks.Add(value, check);
-        _choiceRows.Children.Insert(Math.Max(0, _choiceRows.Children.Count - 2), check);
+        FilterChoices("");
+        _popup.IsOpen = IsLoaded;
     }
 
-    private void AddCustom(string value)
+    private void SelectCustom()
     {
-        string clean = value.Trim();
+        string clean = Input.Text.Trim();
         if (clean.Length == 0) return;
-        string? existing = _options.FirstOrDefault(option =>
-            string.Equals(option, clean, StringComparison.CurrentCultureIgnoreCase));
-        if (existing is null)
-        {
-            AddChoice(clean);
-            existing = clean;
-        }
-        _checks[existing].IsChecked = true;
+        Select(clean);
+    }
+
+    private void ClearSelection()
+    {
+        _committing = true;
         Input.Clear();
-        FilterChoices();
-        _popup.IsOpen = true;
+        _committing = false;
+        SelectedValue = null;
+        UpdateClear();
+        FilterChoices("");
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void Remove(string value)
+    private void AddChoice(RelationTypeChoice option)
     {
-        if (_checks.TryGetValue(value, out var check)) check.IsChecked = false;
+        if (_buttons.ContainsKey(option.Value)) return;
+        _options.Add(option);
+        var group = EnsureGroup(option.Group);
+        var text = new TextBlock
+        {
+            Text = option.Value,
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 430
+        };
+        var button = new Button
+        {
+            Tag = option.Value,
+            Content = text,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(8, 5, 8, 5),
+            Cursor = Cursors.Hand
+        };
+        button.Click += (_, _) => Select(option.Value);
+        button.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            Select(option.Value);
+            e.Handled = true;
+        };
+        _buttons.Add(option.Value, button);
+        group.Children.Add(button);
     }
 
-    private void FilterChoices()
+    private StackPanel EnsureGroup(string name)
     {
-        string query = Input.Text.Trim();
-        foreach (string option in _options)
-            _checks[option].Visibility =
-                option.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+        if (_groupPanels.TryGetValue(name, out var existing)) return existing;
+        var panel = new StackPanel();
+        var header = new TextBlock
+        {
+            Text = name.ToUpperInvariant(),
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(7, 9, 7, 3)
+        };
+        header.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+        panel.Children.Add(header);
+        _groupPanels.Add(name, panel);
+        _choiceRows.Children.Insert(Math.Max(0, _choiceRows.Children.Count - 2), panel);
+        return panel;
+    }
+
+    private void FilterChoices(string text)
+    {
+        string query = text.Trim();
+        foreach (var option in _options)
+            _buttons[option.Value].Visibility =
+                option.Value.Contains(query, StringComparison.CurrentCultureIgnoreCase)
                     ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var pair in _groupPanels)
+            pair.Value.Visibility = pair.Value.Children.OfType<Button>()
+                .Any(button => button.Visibility == Visibility.Visible)
+                ? Visibility.Visible : Visibility.Collapsed;
         bool exact = _options.Any(option =>
-            string.Equals(option, query, StringComparison.CurrentCultureIgnoreCase));
-        _customChoice.Content = "＋ " + query;
+            string.Equals(option.Value, query, StringComparison.CurrentCultureIgnoreCase));
+        _customChoice.Content = "＋ Create \"" + query + "\"";
         _customChoice.Visibility = query.Length > 0 && !exact
             ? Visibility.Visible : Visibility.Collapsed;
-        bool any = _checks.Values.Any(check => check.Visibility == Visibility.Visible) ||
+        bool any = _groupPanels.Values.Any(panel => panel.Visibility == Visibility.Visible) ||
                    _customChoice.Visibility == Visibility.Visible;
         _empty.Visibility = any ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    private void RenderChips()
+    private void UpdateClear() =>
+        _clear.Visibility = SelectedValue is null ? Visibility.Collapsed : Visibility.Visible;
+
+    private static Button CreateClear()
     {
-        foreach (var old in _chips.Where(pair =>
-            !_selected.Contains(pair.Key, StringComparer.CurrentCultureIgnoreCase)).ToList())
+        var clear = new Button
         {
-            _row.Children.Remove(old.Value);
-            _chips.Remove(old.Key);
-        }
-        foreach (string value in _selected.Where(value => !_chips.ContainsKey(value)).ToList())
-        {
-            if (!_checks.ContainsKey(value)) AddChoice(value);
-            var chipRow = new StackPanel { Orientation = Orientation.Horizontal };
-            var label = new TextBlock
-            {
-                Text = value,
-                MaxWidth = 220,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = value
-            };
-            chipRow.Children.Add(label);
-            var remove = new Button
-            {
-                Content = "×",
-                Width = 20,
-                Height = 20,
-                MinHeight = 0,
-                Padding = new Thickness(0),
-                Margin = new Thickness(5, 0, 0, 0),
-                Cursor = Cursors.Hand,
-                Tag = value
-            };
-            AutomationProperties.SetName(remove, Loc.T("Remove selection") + ": " + value);
-            remove.Click += (_, _) =>
-            {
-                _removingChip = true;
-                Remove(value);
-                CloseDropdown();
-                _fieldWasOpenOnPress = _closedOnFieldPress = false;
-                Dispatcher.BeginInvoke(new Action(() => _removingChip = false),
-                    DispatcherPriority.ContextIdle);
-            };
-            chipRow.Children.Add(remove);
-            var chip = new Border
-            {
-                Child = chipRow,
-                Padding = new Thickness(7, 3, 4, 3),
-                Margin = new Thickness(2),
-                CornerRadius = new CornerRadius(12)
-            };
-            chip.SetResourceReference(Border.BackgroundProperty, "ElevatedBrush");
-            _chips.Add(value, chip);
-            _row.Children.Insert(_row.Children.Count - 1, chip);
-        }
+            Content = "×",
+            Width = 24,
+            Height = 28,
+            MinHeight = 0,
+            Padding = new Thickness(0),
+            Margin = new Thickness(0),
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Focusable = false,
+            Cursor = Cursors.Hand,
+            Visibility = Visibility.Collapsed
+        };
+        AutomationProperties.SetName(clear, Loc.T("Clear"));
+        return clear;
     }
 
     private static Button CreateArrow(string automationName)

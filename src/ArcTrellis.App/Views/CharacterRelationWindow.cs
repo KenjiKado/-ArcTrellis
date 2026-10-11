@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -160,18 +159,85 @@ internal sealed class CharacterTargetInput : UserControl
 
 public sealed class CharacterRelationWindow : Window
 {
-    public static IReadOnlyList<string> DefaultRelationTypes { get; } =
+    public sealed record RelationTypeGroup(string Name, IReadOnlyList<string> Types);
+
+    public static IReadOnlyList<RelationTypeGroup> DefaultRelationTypeGroups { get; } =
     [
-        "Family", "Parent", "Child", "Sibling", "Spouse", "Relative",
-        "Friend", "Best friend", "Acquaintance", "Neighbor",
-        "Romantic partner", "Love interest", "Crush", "Former partner",
-        "Ally", "Mentor", "Student", "Colleague", "Employer", "Employee",
-        "Rival", "Enemy", "Nemesis", "Guardian", "Ward", "Leader", "Follower"
+        new("FAMILY",
+        [
+            "Parent", "Child", "Sibling", "Spouse", "Twin", "Grandparent", "Grandchild",
+            "Uncle", "Aunt", "Nephew", "Niece", "Cousin", "In-Law", "Step-Parent",
+            "Step-Child", "Step-Sibling", "Adopted", "Adoptive", "Foster Parent",
+            "Foster Child", "Blood Heir", "Blood Parent", "Clan Elder", "Clan Member",
+            "Ancestor", "Descendant", "Bloodline", "Dynasty", "Half-Sibling", "Bastard",
+            "Orphan Of"
+        ]),
+        new("ROMANTIC",
+        [
+            "Lover", "Love Interest", "Crush", "Admirer", "Beloved", "Soulmate",
+            "Fiancé", "Betrothed", "Consort", "Suitor", "Courting", "Ex-Lover",
+            "Ex-Partner", "Ex-Spouse", "Secret Lover", "Forbidden Love",
+            "Unrequited Love", "Arranged Match", "Paramour", "Affair", "Bonded",
+            "Fated Pair", "Mated", "Chosen One", "Destined", "Blood Bond",
+            "Pact Bound", "Flirtation", "Infatuation", "Obsession"
+        ]),
+        new("SOCIAL",
+        [
+            "Friend", "Best Friend", "Acquaintance", "Stranger", "Neighbor", "Roommate",
+            "Colleague", "Coworker", "Classmate", "Business Partner", "Client",
+            "Service Provider", "Confidant", "Companion", "Trusted Friend",
+            "Childhood Friend", "Pen Pal", "Sworn Friend", "Blood Brother", "Oath Sworn",
+            "Spirit Friend", "Familiar", "Summoner", "Summoned", "Party Member",
+            "Crew Member", "Tribe Member", "Guild Member", "Order Member", "Coven Member"
+        ]),
+        new("HIERARCHY",
+        [
+            "Mentor", "Student", "Teacher", "Pupil", "Master", "Apprentice", "Disciple",
+            "Sensei", "Employer", "Employee", "Boss", "Subordinate", "Superior",
+            "Inferior", "Leader", "Follower", "Commander", "Soldier", "Captain", "Crew",
+            "Advisor", "Advisee", "Counselor", "Counseled", "King/Queen", "Subject",
+            "Lord/Lady", "Vassal", "Servant", "Squire", "Knight", "Herald", "Liege",
+            "Priest", "Devotee", "Prophet", "Believer"
+        ]),
+        new("CONFLICT",
+        [
+            "Enemy", "Rival", "Nemesis", "Adversary", "Opponent", "Foe", "Betrayer",
+            "Betrayed", "Traitor", "Deceiver", "Deceived", "Bully", "Victim", "Oppressor",
+            "Oppressed", "Tyrant", "Rebel", "Captor", "Captive", "Competitor",
+            "Challenger", "Defender", "Usurper", "Usurped", "Avenger", "Target", "Hunter",
+            "Hunted", "Stalker", "Stalked", "Cursed By", "Cursed", "Bound Enemy",
+            "Blood Feud", "Sworn Enemy"
+        ]),
+        new("ALLIANCE",
+        [
+            "Ally", "Partner", "Teammate", "Comrade", "Supporter", "Supported", "Guardian",
+            "Ward", "Protector", "Protected", "Bodyguard", "Charge", "Champion", "Patron",
+            "Sponsor", "Sponsored", "Benefactor", "Beneficiary", "Faction Ally",
+            "Faction Leader", "Faction Member", "Oath Bound", "Sworn Ally", "Shield Mate",
+            "Battle Sworn", "Pack Member", "Pack Alpha", "Pack Beta", "Hive Mind", "Linked",
+            "Contract"
+        ]),
+        new("SUPERNATURAL",
+        [
+            "Deity", "Worshipper", "Avatar", "God", "Chosen", "Chooser", "Blessed By",
+            "Blessed", "Demon", "Host", "Possessed", "Possessor", "Corrupted", "Corruptor",
+            "Bound Spirit", "Binder", "Vessel", "Contained", "Enchanted", "Enchanter",
+            "Sire", "Progeny", "Maker", "Created", "Necromancer", "Raised", "Dragon Rider",
+            "Dragon", "Rider", "Mount", "Shapeshifter", "Doppelganger", "Original",
+            "Reincarnation", "Past Life"
+        ]),
+        new("PROFESSIONAL",
+        [
+            "Accomplice", "Informant", "Handler", "Crime Boss", "Underling", "Hitman",
+            "Fixer", "General", "Lieutenant", "Recruit", "Trainer", "War Buddy",
+            "Brothers in Arms", "Doctor", "Patient", "Healer", "Healed", "Muse", "Artist",
+            "Writer", "Biographer", "Ambassador", "Diplomat", "Spy", "Double Agent",
+            "Assassin", "Merchant", "Customer", "Debtor", "Creditor", "Smuggler", "Contact"
+        ])
     ];
 
-    private readonly ObservableCollection<string> _selectedTypeLabels = [];
-    private readonly Dictionary<string, string> _typeCodesByLabel = new(StringComparer.CurrentCultureIgnoreCase);
-    private readonly StoryProject _typeSuggestions = new();
+    public static IReadOnlyList<string> DefaultRelationTypes { get; } =
+        DefaultRelationTypeGroups.SelectMany(group => group.Types).ToList();
 
     internal CharacterTargetInput TargetInput { get; }
     internal RelationTypeInput RelationTypesInput { get; }
@@ -186,10 +252,7 @@ public sealed class CharacterRelationWindow : Window
     internal Button SaveButton { get; }
 
     public StoryEntity? TargetCharacter => TargetInput.SelectedCharacter;
-    public IReadOnlyList<string> RelationTypes => _selectedTypeLabels
-        .Select(label => _typeCodesByLabel.TryGetValue(label, out string? code) ? code : label)
-        .Distinct(StringComparer.CurrentCultureIgnoreCase)
-        .ToList();
+    public string RelationType => RelationTypesInput.SelectedValue ?? "";
     public string RelationDescription => DescriptionInput.Text.Trim();
 
     public CharacterRelationWindow(StoryEntity source, IEnumerable<StoryEntity> targets, IEnumerable<string> existingTypes)
@@ -210,20 +273,26 @@ public sealed class CharacterRelationWindow : Window
         panel.Children.Add(TargetInput);
 
         panel.Children.Add(new TextBlock { Text = Loc.T("Relation type"), Margin = new Thickness(0, 12, 0, 4) });
-        _typeSuggestions.Tags.Clear();
-        foreach (string type in DefaultRelationTypes.Concat(existingTypes)
+        var typeChoices = DefaultRelationTypeGroups
+            .SelectMany(group => group.Types.Select(type => new RelationTypeChoice(group.Name, type)))
+            .ToList();
+        foreach (string type in existingTypes
             .Where(type => !string.IsNullOrWhiteSpace(type))
             .Select(type => type.Trim())
-            .Distinct(StringComparer.CurrentCultureIgnoreCase))
-        {
-            string label = DefaultRelationTypes.Contains(type, StringComparer.OrdinalIgnoreCase) ? Loc.T(type) : type;
-            if (_typeSuggestions.Tags.Contains(label, StringComparer.CurrentCultureIgnoreCase)) continue;
-            _typeSuggestions.Tags.Add(label);
-            _typeCodesByLabel[label] = type;
-        }
-        RelationTypesInput = new RelationTypeInput(_typeSuggestions.Tags, _selectedTypeLabels);
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .Where(type => !DefaultRelationTypes.Contains(type, StringComparer.CurrentCultureIgnoreCase)))
+            typeChoices.Add(new RelationTypeChoice("CUSTOM", type));
+        RelationTypesInput = new RelationTypeInput(typeChoices);
         RelationTypesInput.SelectionChanged += (_, _) => UpdateSaveButton();
         panel.Children.Add(RelationTypesInput);
+        var relationHint = new TextBlock
+        {
+            Text = Loc.T("Max 15 chars. Type to search or create custom."),
+            FontSize = 11,
+            Margin = new Thickness(3, 3, 0, 0)
+        };
+        relationHint.SetResourceReference(ForegroundProperty, "MutedBrush");
+        panel.Children.Add(relationHint);
 
         panel.Children.Add(new TextBlock { Text = Loc.T("Description"), Margin = new Thickness(0, 12, 0, 4) });
         panel.Children.Add(DescriptionInput);
@@ -237,7 +306,7 @@ public sealed class CharacterRelationWindow : Window
         SaveButton = new Button { Content = Loc.T("Add"), MinWidth = 86, IsDefault = true, IsEnabled = false };
         SaveButton.Click += (_, _) =>
         {
-            if (TargetCharacter is null || RelationTypes.Count == 0) return;
+            if (TargetCharacter is null || string.IsNullOrWhiteSpace(RelationType)) return;
             DialogResult = true;
         };
         var cancel = new Button { Content = Loc.T("Cancel"), MinWidth = 86, IsCancel = true };
@@ -260,13 +329,8 @@ public sealed class CharacterRelationWindow : Window
 
     internal void SelectTargetForTest(StoryEntity target) => TargetInput.Select(target);
 
-    internal void AddTypeForTest(string type)
-    {
-        string label = DefaultRelationTypes.Contains(type, StringComparer.OrdinalIgnoreCase) ? Loc.T(type) : type;
-        _typeCodesByLabel[label] = type;
-        RelationTypesInput.Select(label);
-    }
+    internal void AddTypeForTest(string type) => RelationTypesInput.Select(type);
 
     private void UpdateSaveButton() => SaveButton.IsEnabled =
-        TargetCharacter is not null && _selectedTypeLabels.Count > 0;
+        TargetCharacter is not null && !string.IsNullOrWhiteSpace(RelationType);
 }
