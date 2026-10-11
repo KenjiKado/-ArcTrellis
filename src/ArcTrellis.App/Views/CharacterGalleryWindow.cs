@@ -9,8 +9,9 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 using Microsoft.Win32;
+using Ellipse = System.Windows.Shapes.Ellipse;
+using Shape = System.Windows.Shapes.Shape;
 
 namespace ArcTrellis.App.Views;
 
