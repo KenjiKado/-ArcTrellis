@@ -41,19 +41,23 @@ var stableScene = stableProject.Scenes[0];
 var stableCharacter = stableProject.Characters[0];
 var stableScenes = stableProject.Scenes;
 var stableTags = stableScene.Tags;
+var stableGallery = stableCharacter.GalleryImages;
 var stableSnapshot = projectService.Deserialize(projectService.Serialize(stableProject));
 stableSnapshot.Scenes[0].Tags.Add("History probe");
 stableSnapshot.Books[0].Chapters[0].Tags.Add("Chapter history probe");
 stableSnapshot.Characters[0].Tags.Add("Character history probe");
+stableSnapshot.Characters[0].GalleryImages.Add(@"C:\Pictures\history-probe.png");
 int resets = 0;
 stableScenes.CollectionChanged += (_, e) => { if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset) resets++; };
 stableTags.CollectionChanged += (_, e) => { if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset) resets++; };
 ProjectReconciler.Apply(stableProject, stableSnapshot);
 Check(ReferenceEquals(stableBook, stableProject.Books[0]) && ReferenceEquals(stableChapter, stableBook.Chapters[0])
     && ReferenceEquals(stableScene, stableProject.Scenes[0]) && ReferenceEquals(stableCharacter, stableProject.Characters[0])
-    && ReferenceEquals(stableScenes, stableProject.Scenes) && ReferenceEquals(stableTags, stableScene.Tags), "history retains bound objects and collections across editors");
+    && ReferenceEquals(stableScenes, stableProject.Scenes) && ReferenceEquals(stableTags, stableScene.Tags)
+    && ReferenceEquals(stableGallery, stableCharacter.GalleryImages), "history retains bound objects and collections across editors");
 Check(resets == 0 && stableTags.Contains("History probe") && stableChapter.Tags.Contains("Chapter history probe")
-    && stableCharacter.Tags.Contains("Character history probe"), "tag history applies collection deltas without reset notifications");
+    && stableCharacter.Tags.Contains("Character history probe") && stableGallery.Contains(@"C:\Pictures\history-probe.png"),
+    "tag and gallery history apply collection deltas without reset notifications");
 ProjectReconciler.Apply(stableProject, roundTrip);
 Check(projectService.Serialize(stableProject) == projectService.Serialize(roundTrip), "in-place history restores the complete serialized state");
 stableSnapshot.Scenes.Move(0, stableSnapshot.Scenes.Count - 1);
@@ -98,7 +102,7 @@ var legacyProject = new StoryProject
     ]
 };
 var migratedLegacy = projectService.Deserialize(projectService.Serialize(legacyProject));
-Check(migratedLegacy.FormatVersion == 4 && migratedLegacy.Plotlines.Count == 2, "legacy shared plotlines migrate to one independent copy per book");
+Check(migratedLegacy.FormatVersion == 5 && migratedLegacy.Plotlines.Count == 2, "legacy shared plotlines migrate to one independent copy per book");
 Check(migratedLegacy.Scenes.All(scene => migratedLegacy.Plotlines.Any(plotline => plotline.Id == scene.PlotlineId && plotline.BookId == scene.BookId)), "legacy scenes retain their plotline in the correct book");
 var migratedFirstPlotline = migratedLegacy.Plotlines.Single(plotline => plotline.BookId == migratedLegacy.Books[0].Id);
 var migratedSecondPlotline = migratedLegacy.Plotlines.Single(plotline => plotline.BookId == migratedLegacy.Books[1].Id);
@@ -122,6 +126,18 @@ Check(subtitleMigrated.Books[0].Subtitle == "Establish the central promise", "le
 Check(subtitleMigrated.Books[0].Summary == "Establish the central promise", "subtitle migration preserves original summary");
 subtitleMigrated.Books[0].Subtitle = "";
 Check(projectService.Deserialize(projectService.Serialize(subtitleMigrated)).Books[0].Subtitle == "", "clearing a migrated subtitle persists");
+
+var legacyGalleryProject = templates.CreateBlank();
+legacyGalleryProject.FormatVersion = 4;
+legacyGalleryProject.Characters.Add(new StoryEntity
+{
+    Name = "Legacy portrait",
+    ImagePath = @"C:\Pictures\legacy-portrait.png"
+});
+var galleryMigrated = projectService.Deserialize(projectService.Serialize(legacyGalleryProject));
+Check(galleryMigrated.FormatVersion == 5 &&
+    galleryMigrated.Characters[0].GalleryImages.SequenceEqual([@"C:\Pictures\legacy-portrait.png"]),
+    "legacy character image path migrates into the gallery without data loss");
 
 string temp = Path.Combine(Path.GetTempPath(), "ArcTrellis-Smoke-" + Guid.NewGuid().ToString("N"));
 Directory.CreateDirectory(temp);

@@ -138,6 +138,9 @@ public sealed class ProjectService
             e.Tags ??= [];
             e.BookIds ??= [];
             e.Fields ??= [];
+            e.GalleryImages ??= [];
+            if (e.GalleryImages.Count == 0 && !string.IsNullOrWhiteSpace(e.ImagePath))
+                e.GalleryImages.Add(e.ImagePath);
         }
         if (p.FormatVersion < 3)
         {
@@ -150,7 +153,7 @@ public sealed class ProjectService
         if (p.FormatVersion < 4)
             foreach (Book book in p.Books)
                 if (string.IsNullOrEmpty(book.Subtitle)) book.Subtitle = book.Summary;
-        p.FormatVersion = 4;
+        p.FormatVersion = 5;
     }
 
     private static void MigrateLegacyPlotlines(StoryProject project, HashSet<Guid> validBookIds)

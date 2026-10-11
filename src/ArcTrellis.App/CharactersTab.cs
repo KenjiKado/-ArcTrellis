@@ -16,6 +16,9 @@ public partial class MainWindow
     private StoryEntity? _shownCharacterBooksOwner;
     private MultiChoiceInput? _characterBooksInput;
     private List<(Guid Id, string Title)> _shownCharacterBooks = [];
+    private StoryEntity? _shownCharacterGalleryOwner;
+    private List<string> _shownCharacterGalleryPaths = [];
+    private CharacterGalleryPreview? _characterGalleryPreview;
     private object?[]? _characterRelationState;
 
     private void RefreshCharacterOverview()
@@ -44,6 +47,7 @@ public partial class MainWindow
         }
 
         RefreshCharacterBooks(character);
+        RefreshCharacterGallery(character);
     }
 
     private static IEnumerable<string> SplitRelationTypes(string value) =>
@@ -158,6 +162,46 @@ public partial class MainWindow
         CharacterBooksHost.Content = input;
     }
 
+    private void RefreshCharacterGallery(StoryEntity? character)
+    {
+        if (character is null)
+        {
+            _shownCharacterGalleryOwner = null;
+            _shownCharacterGalleryPaths = [];
+            _characterGalleryPreview = null;
+            CharacterGalleryHost.Content = null;
+            return;
+        }
+
+        var paths = character.GalleryImages.ToList();
+        if (ReferenceEquals(_shownCharacterGalleryOwner, character) &&
+            _shownCharacterGalleryPaths.SequenceEqual(paths, StringComparer.OrdinalIgnoreCase) &&
+            _characterGalleryPreview is not null) return;
+
+        var preview = new CharacterGalleryPreview(paths);
+        preview.OpenRequested += (_, _) => OpenCharacterGallery(character);
+        _shownCharacterGalleryOwner = character;
+        _shownCharacterGalleryPaths = paths;
+        _characterGalleryPreview = preview;
+        CharacterGalleryHost.Content = preview;
+    }
+
+    private void OpenCharacterGallery(StoryEntity character)
+    {
+        if (!Vm.Project.Characters.Contains(character)) return;
+        var dialog = new CharacterGalleryWindow(character.Name, character.GalleryImages) { Owner = this };
+        dialog.ShowDialog();
+        Vm.SetCharacterGallery(character, dialog.ImagePaths);
+        RefreshCharacterGallery(character);
+    }
+
+    private void CharacterGalleryHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (Vm.SelectedCharacter is not { } character) return;
+        OpenCharacterGallery(character);
+        e.Handled = true;
+    }
+
     private void CheckCharactersTab(List<string> failures, string reportPath)
     {
         var legacyProject = new TemplateService().CreateBlank();
@@ -190,6 +234,92 @@ public partial class MainWindow
         checkVm.Redo();
         if (!person.BookIds.ToHashSet().SetEquals([firstBook.Id, secondBook.Id]))
             failures.Add("Redo did not restore selected character books");
+
+        string galleryDirectory = Path.Combine(Path.GetDirectoryName(reportPath)!, "gallery-smoke");
+        Directory.CreateDirectory(galleryDirectory);
+        var galleryPaths = new List<string>();
+        for (int index = 0; index < 6; index++)
+        {
+            string imagePath = Path.Combine(galleryDirectory, $"portrait-{index + 1}.png");
+            int stride = 64 * 4;
+            var pixels = new byte[stride * 64];
+            for (int pixel = 0; pixel < pixels.Length; pixel += 4)
+            {
+                pixels[pixel] = (byte)(60 + index * 20);
+                pixels[pixel + 1] = (byte)(90 + index * 12);
+                pixels[pixel + 2] = (byte)(170 - index * 12);
+                pixels[pixel + 3] = 255;
+            }
+            var bitmap = System.Windows.Media.Imaging.BitmapSource.Create(64, 64, 96, 96,
+                System.Windows.Media.PixelFormats.Bgra32, null, pixels, stride);
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+            using (var stream = File.Create(imagePath)) encoder.Save(stream);
+            galleryPaths.Add(imagePath);
+        }
+        checkVm.SetCharacterGallery(person, galleryPaths);
+        if (!person.GalleryImages.SequenceEqual(galleryPaths) || person.ImagePath != galleryPaths[^1])
+            failures.Add("Character gallery did not retain its ordered image paths");
+        checkVm.Undo();
+        if (person.GalleryImages.Count != 0) failures.Add("Undo did not remove character gallery images");
+        checkVm.Redo();
+        if (!person.GalleryImages.SequenceEqual(galleryPaths)) failures.Add("Redo did not restore character gallery images");
+        var compactGallery = new CharacterGalleryPreview(person.GalleryImages);
+        if (compactGallery.PreviewCount != 6 || compactGallery.HiddenImageCount != 1 ||
+            compactGallery.BadgeText != "+1" || compactGallery.ImagePreviewToolTipCount != 0 ||
+            !compactGallery.DisplayedPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse().Take(5)))
+            failures.Add("Character gallery preview order, hidden count, or tooltip behavior is incorrect");
+        var shortGallery = new CharacterGalleryPreview(galleryPaths.Take(3));
+        if (shortGallery.PreviewCount != 4 || shortGallery.BadgeText != "+" ||
+            !shortGallery.DisplayedPaths.SequenceEqual(galleryPaths.Take(3).Reverse()))
+            failures.Add("Character gallery preview does not end a short gallery with the add button");
+        var elevenPaths = galleryPaths.Concat(Enumerable.Range(7, 5)
+            .Select(index => Path.Combine(galleryDirectory, $"portrait-{index}.png"))).ToList();
+        var overflowGallery = new CharacterGalleryPreview(elevenPaths);
+        if (overflowGallery.HiddenImageCount != 6 || overflowGallery.BadgeText != "+6" ||
+            CharacterGalleryPreview.FormatHiddenCount(4_000) != "+4k" ||
+            CharacterGalleryPreview.FormatHiddenCount(4_500) != "+4.5k")
+            failures.Add("Character gallery overflow badge did not format its hidden-image count");
+
+        var galleryDialog = new CharacterGalleryWindow(person.Name, person.GalleryImages) { Owner = this };
+        galleryDialog.Show();
+        galleryDialog.UpdateLayout();
+        if (!galleryDialog.DisplayedGridPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse()))
+            failures.Add("Gallery grid does not show the newest image first");
+        if (galleryDialog.GalleryRightGap > 1)
+            failures.Add($"Gallery grid leaves {galleryDialog.GalleryRightGap:0.##} pixels unused on the right");
+        galleryDialog.Width = 760;
+        galleryDialog.Height = galleryDialog.MinHeight;
+        galleryDialog.UpdateLayout();
+        int repeatedColumns = galleryDialog.GalleryColumnCount;
+        double repeatedTileWidth = galleryDialog.GalleryTileWidth;
+        galleryDialog.Width = 900;
+        galleryDialog.Height = 600;
+        galleryDialog.UpdateLayout();
+        galleryDialog.Width = 760;
+        galleryDialog.Height = galleryDialog.MinHeight;
+        galleryDialog.UpdateLayout();
+        if (galleryDialog.GalleryColumnCount != repeatedColumns ||
+            Math.Abs(galleryDialog.GalleryTileWidth - repeatedTileWidth) > 0.5)
+            failures.Add("Gallery resize did not return to the same column count and image width");
+        galleryDialog.Width = 940;
+        galleryDialog.Height = 680;
+        galleryDialog.UpdateLayout();
+        string droppedImage = Path.Combine(galleryDirectory, "dropped.png");
+        File.Copy(galleryPaths[0], droppedImage, true);
+        if (galleryDialog.AddFilesForTest([droppedImage]) != 1 || galleryDialog.GridItemCount != 7 ||
+            galleryDialog.DisplayedGridPaths.FirstOrDefault() != droppedImage)
+            failures.Add("Gallery did not add a dropped Windows image to its grid");
+        galleryDialog.SelectForTest(droppedImage);
+        galleryDialog.DeleteSelectedForTest();
+        galleryDialog.UpdateLayout();
+        if (galleryDialog.ImagePaths.Contains(droppedImage, StringComparer.OrdinalIgnoreCase) ||
+            !File.Exists(droppedImage) || galleryDialog.GridItemCount != 6 ||
+            galleryDialog.RenderedGridItemCount != 6)
+            failures.Add("Gallery Delete removed the source file or retained its gallery reference");
+        SaveVisualPng(galleryDialog,
+            Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-character-gallery.png"));
+        galleryDialog.Close();
 
         var allBooksInput = new MultiChoiceInput("In Books",
             checkVm.Project.Books.Select(book => (book.Id, book.Title)), [], includeAll: true);
@@ -299,6 +429,7 @@ public partial class MainWindow
         UpdateLayout();
         if (CharacterEditor.IsEnabled) failures.Add("Empty character selection left the editor active");
         Vm.SelectedCharacter = existing;
+        Vm.SetCharacterGallery(existing, galleryPaths);
         RefreshAll();
         UpdateLayout();
         if (!CharacterEditor.IsEnabled || !Equals(CharacterCategorySelector.SelectedValue, existing.Category))
@@ -306,6 +437,10 @@ public partial class MainWindow
 
         if (_characterBooksInput is null || !Vm.Project.Books.All(book => _characterBooksInput.Choices.ContainsKey(book.Id)))
             failures.Add("Character books multiselect does not offer every project book");
+        if (CharacterGalleryHost.Content is not CharacterGalleryPreview shownGallery ||
+            shownGallery.PreviewCount != 6 || shownGallery.BadgeText != "+1" ||
+            !shownGallery.DisplayedPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse().Take(5)))
+            failures.Add("Selected character did not show newest-first circular gallery previews and the count badge");
         if (CharacterRelationsTable.RowHeight != 44 ||
             CharacterRelationsTable.RowStyle is null || CharacterRelationsTable.CellStyle is null)
             failures.Add("Character relations table does not match the Chapters scene table style");
