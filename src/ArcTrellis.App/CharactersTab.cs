@@ -298,9 +298,11 @@ public partial class MainWindow
             if (!AddCharacterRelationButton.IsEnabled)
                 failures.Add("Character relation Add button is inactive for a selected character");
             UpdateLayout();
-            SaveVisualPng(CharacterRelationsTable,
-                Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-character-relations.png"));
             SaveVisualPng(this, Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-characters-tab.png"));
+            CharacterRelationsTable.BringIntoView();
+            UpdateLayout();
+            SaveVisualPng(this,
+                Path.Combine(Path.GetDirectoryName(reportPath)!, "ArcTrellis-character-relations.png"));
             Vm.Project.Relationships.Remove(relation);
             RefreshCharacterOverview();
         }
