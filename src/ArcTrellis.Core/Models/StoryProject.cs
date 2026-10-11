@@ -13,7 +13,7 @@ public sealed class StoryProject : ObservableObject
     private int _currentWordCount;
     private DateTime _modifiedUtc = DateTime.UtcNow;
 
-    public int FormatVersion { get; set; } = 4;
+    public int FormatVersion { get; set; } = 5;
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Title { get => _title; set => Set(ref _title, value); }
     public string Author { get => _author; set => Set(ref _author, value); }
@@ -155,6 +155,7 @@ public sealed class StoryEntity : ObservableObject
     public string Summary { get => _summary; set => Set(ref _summary, value); }
     public string Description { get => _description; set => Set(ref _description, value); }
     public string ImagePath { get => _imagePath; set => Set(ref _imagePath, value); }
+    public ObservableCollection<string> GalleryImages { get; set; } = [];
     public ObservableCollection<string> Tags { get; set; } = [];
     [JsonIgnore]
     public string TagsText

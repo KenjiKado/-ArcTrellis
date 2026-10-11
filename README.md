@@ -8,7 +8,7 @@ ArcTrellis is a native, local-first visual story planner for 64-bit Windows 10 a
 - Outline editor with sections/acts, chapter reordering, summaries, and word counts
 - Detailed scene cards with status, plotline, chapter, characters, tags, draft notes, and editing notes
 - Series dashboard, writing progress, per-book timelines, and a whole-series spine view
-- Searchable characters, places, and notes with categories, tags, images-by-path, and custom sheet fields
+- Searchable characters, places, and notes with categories, tags, and character image galleries
 - Character/world relationship records
 - Five editable starter templates, including a fully populated worked example
 - Local `.arctrellis` JSON project format, rotating backups, crash-recovery autosave, and structural undo/redo
@@ -18,7 +18,7 @@ ArcTrellis is a native, local-first visual story planner for 64-bit Windows 10 a
 
 ## Install for end users
 
-Run `ArcTrellis-Setup-1.3.28-win-x64.exe`. The installer does not need administrator rights by default. The desktop shortcut checkbox is selected by default; for an all-users install, the shortcut is placed on the shared desktop. The installer registers `.arctrellis` files and includes an uninstaller in Windows Settings. Both the installer and app support English and Russian; the app remembers the selected language.
+Run `ArcTrellis-Setup-1.3.29-win-x64.exe`. The installer does not need administrator rights by default. The desktop shortcut checkbox is selected by default; for an all-users install, the shortcut is placed on the shared desktop. The installer registers `.arctrellis` files and includes an uninstaller in Windows Settings. Both the installer and app support English and Russian; the app remembers the selected language.
 
 ## Build the release on Windows
 

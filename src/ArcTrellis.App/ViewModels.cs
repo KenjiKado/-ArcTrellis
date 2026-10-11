@@ -437,6 +437,22 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Dirty("Character books updated");
     }
 
+    public void SetCharacterGallery(StoryEntity character, IEnumerable<string> imagePaths)
+    {
+        if (!Project.Characters.Contains(character)) return;
+        var selected = imagePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (character.GalleryImages.SequenceEqual(selected, StringComparer.OrdinalIgnoreCase)) return;
+        Snapshot();
+        character.GalleryImages.Clear();
+        foreach (string path in selected) character.GalleryImages.Add(path);
+        character.ImagePath = selected.LastOrDefault() ?? "";
+        Dirty("Character gallery updated");
+    }
+
     public void DeleteEntity(ObservableCollection<StoryEntity> collection, StoryEntity? entity)
     {
         if (entity is null) return;
