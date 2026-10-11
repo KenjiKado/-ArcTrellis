@@ -211,6 +211,14 @@ public partial class MainWindow
         relationDialog.UpdateLayout();
         if (relationDialog.TargetInput.IsOpen)
             failures.Add("Target character autocomplete opened when the relation popup opened");
+        relationDialog.TargetInput.ToggleFieldForTest();
+        relationDialog.UpdateLayout();
+        if (!relationDialog.TargetInput.IsOpen)
+            failures.Add("The first target character field click did not open its dropdown");
+        relationDialog.TargetInput.ToggleFieldForTest();
+        relationDialog.UpdateLayout();
+        if (relationDialog.TargetInput.IsOpen)
+            failures.Add("The second target character field click did not close its dropdown");
         string[] writeoGroups =
             ["FAMILY", "ROMANTIC", "SOCIAL", "HIERARCHY", "CONFLICT", "ALLIANCE", "SUPERNATURAL", "PROFESSIONAL"];
         if (relationDialog.RelationTypesInput.Choices.Count < CharacterRelationWindow.DefaultRelationTypes.Count ||
@@ -278,10 +286,14 @@ public partial class MainWindow
         if (CharacterRelationsTable.RowHeight != 44 ||
             CharacterRelationsTable.RowStyle is null || CharacterRelationsTable.CellStyle is null)
             failures.Add("Character relations table does not match the Chapters scene table style");
-        if (CharacterRelationsTable.CanUserResizeColumns || CharacterRelationsTable.CanUserResizeRows ||
+        if (!CharacterRelationsTable.CanUserResizeColumns || CharacterRelationsTable.CanUserResizeRows ||
             CharacterRelationsTable.CanUserReorderColumns ||
+            CharacterRelationsTable.Columns.Count != 3 ||
+            !CharacterRelationsTable.Columns[0].CanUserResize ||
+            !CharacterRelationsTable.Columns[1].CanUserResize ||
+            CharacterRelationsTable.Columns[2].CanUserResize ||
             CharacterRelationsTable.HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled)
-            failures.Add("Character relations table still allows resizing or horizontal scrolling");
+            failures.Add("Character relations table does not resize only at its inner column dividers");
 
         var other = Vm.Project.Characters.FirstOrDefault(entity => entity.Id != existing.Id);
         if (other is not null)

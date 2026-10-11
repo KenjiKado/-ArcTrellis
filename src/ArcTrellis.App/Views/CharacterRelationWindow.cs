@@ -18,7 +18,7 @@ internal sealed class CharacterTargetInput : UserControl
     private readonly ListBox _suggestions = new() { MaxHeight = 210, BorderThickness = new Thickness(0), DisplayMemberPath = nameof(StoryEntity.Name) };
     private readonly Border _dropdown;
     private readonly Popup _popup = new() { AllowsTransparency = true, StaysOpen = false, Placement = PlacementMode.Bottom, Focusable = false };
-    private bool _committing;
+    private bool _committing, _fieldWasOpenOnPress, _closedOnFieldPress, _fieldPressInProgress;
 
     internal TextBox Input { get; } = new()
     {
@@ -32,6 +32,7 @@ internal sealed class CharacterTargetInput : UserControl
     internal IReadOnlyList<StoryEntity> Choices => _options;
     internal bool IsOpen => _popup.IsOpen;
     internal void CloseDropdown() => _popup.IsOpen = false;
+    internal void ToggleFieldForTest() => SetFieldDropdownOpen(!IsOpen);
     internal event EventHandler? SelectionChanged;
 
     internal CharacterTargetInput(IEnumerable<StoryEntity> options)
@@ -73,8 +74,29 @@ internal sealed class CharacterTargetInput : UserControl
             }
             RefreshSuggestions();
         };
-        Input.GotKeyboardFocus += (_, _) => RefreshSuggestions();
+        Input.GotKeyboardFocus += (_, _) =>
+        {
+            if (!_fieldPressInProgress && Mouse.LeftButton != MouseButtonState.Pressed)
+                RefreshSuggestions();
+        };
         Input.PreviewKeyDown += InputKeyDown;
+
+        bool FieldHit(DependencyObject? source) =>
+            ReferenceEquals(_frame, source) || DropdownChrome.Contains(Input, source);
+        _frame.AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left || !FieldHit(e.OriginalSource as DependencyObject)) return;
+            _fieldPressInProgress = true;
+            _fieldWasOpenOnPress = IsOpen;
+        }), true);
+        _frame.AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left || !FieldHit(e.OriginalSource as DependencyObject)) return;
+            bool close = IsOpen || _fieldWasOpenOnPress || _closedOnFieldPress;
+            _fieldPressInProgress = _fieldWasOpenOnPress = _closedOnFieldPress = false;
+            Dispatcher.BeginInvoke(new Action(() => SetFieldDropdownOpen(!close)),
+                DispatcherPriority.Background);
+        }), true);
         _frame.MouseDown += (_, e) =>
         {
             if (e.ChangedButton != MouseButton.Left) return;
@@ -82,15 +104,11 @@ internal sealed class CharacterTargetInput : UserControl
             Input.CaretIndex = Input.Text.Length;
             e.Handled = true;
         };
-        _frame.AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler((_, e) =>
+        _popup.Closed += (_, _) =>
         {
-            if (e.ChangedButton != MouseButton.Left ||
-                (!DropdownChrome.Contains(Input, e.OriginalSource as DependencyObject) && !ReferenceEquals(_frame, e.OriginalSource))) return;
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (Input.IsKeyboardFocusWithin) RefreshSuggestions();
-            }), DispatcherPriority.Background);
-        }), true);
+            if (Mouse.LeftButton == MouseButtonState.Pressed && DropdownChrome.PointerWithin(_frame))
+                _closedOnFieldPress = true;
+        };
         _suggestions.PreviewMouseLeftButtonDown += (_, e) =>
         {
             if (e.OriginalSource is DependencyObject source &&
@@ -118,6 +136,18 @@ internal sealed class CharacterTargetInput : UserControl
         SelectedCharacter = character;
         _popup.IsOpen = false;
         SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void SetFieldDropdownOpen(bool open)
+    {
+        if (!open)
+        {
+            CloseDropdown();
+            return;
+        }
+        Input.Focus();
+        Input.CaretIndex = Input.Text.Length;
+        RefreshSuggestions();
     }
 
     private void RefreshSuggestions()

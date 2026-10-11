@@ -353,7 +353,7 @@
                   <DataGrid x:Name="CharacterRelationsTable" AutoGenerateColumns="False" IsReadOnly="True"
                             CanUserAddRows="False" MinHeight="160" MinColumnWidth="120"
                             RowHeight="44" FontSize="14" CanUserSortColumns="False"
-                            CanUserResizeColumns="False" CanUserResizeRows="False" CanUserReorderColumns="False"
+                            CanUserResizeColumns="True" CanUserResizeRows="False" CanUserReorderColumns="False"
                             SelectionMode="Single" SelectionUnit="FullRow"
                             SelectionChanged="CharacterRelationsTable_SelectionChanged"
                             MouseDoubleClick="CharacterRelationsTable_MouseDoubleClick"
@@ -376,9 +376,9 @@
                       </Style>
                     </DataGrid.CellStyle>
                     <DataGrid.Columns>
-                      <DataGridTextColumn Header="Name" Binding="{Binding Other.Name}" Width="2*"/>
-                      <DataGridTextColumn Header="Relation type" Binding="{Binding Relation.Type}" Width="*"/>
-                      <DataGridTemplateColumn Header="Description" Width="2*">
+                      <DataGridTextColumn Header="Name" Binding="{Binding Other.Name}" Width="2*" CanUserResize="True"/>
+                      <DataGridTextColumn Header="Relation type" Binding="{Binding Relation.Type}" Width="*" CanUserResize="True"/>
+                      <DataGridTemplateColumn Header="Description" Width="2*" CanUserResize="False">
                         <DataGridTemplateColumn.CellTemplate>
                           <DataTemplate>
                             <TextBlock Text="{Binding Relation.Description}" TextWrapping="NoWrap"
