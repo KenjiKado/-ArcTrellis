@@ -17,7 +17,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         2 => SelectedChapter?.Id.ToString(), 3 => SelectedScene?.Id.ToString(),
         4 => SelectedCharacter?.Id.ToString(), 5 => SelectedPlace?.Id.ToString(),
-        6 => SelectedNote?.Id.ToString(), 7 => SelectedRelationship?.Id.ToString(), _ => "tab"
+        6 => SelectedNote?.Id.ToString(), _ => "tab"
     });
     private string HistoryScope
     {

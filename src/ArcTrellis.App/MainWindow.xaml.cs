@@ -273,7 +273,6 @@ public partial class MainWindow : Window
     {
         Title = Vm.WindowTitle;
         BuildTimeline();
-        RefreshRelations();
         RefreshChapterFilter();
         RefreshStats();
         RefreshSceneList();
@@ -675,13 +674,6 @@ public partial class MainWindow : Window
         Vm.SelectedPlotline = plotline;
     }
 
-    private void RefreshRelations()
-    {
-        var entities = Vm.Project.Characters.Concat(Vm.Project.Places).Concat(Vm.Project.Notes).ToList();
-        if (RelationFrom.ItemsSource is IEnumerable<StoryEntity> previous && previous.SequenceEqual(entities)) return;
-        RelationFrom.ItemsSource = entities; RelationTo.ItemsSource = entities;
-    }
-
     private async void AutosaveTimer_Tick(object? sender, EventArgs e)
     {
         if (!Vm.IsDirty) return;
@@ -868,8 +860,6 @@ public partial class MainWindow : Window
     private void DeletePlace_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("place")) { Vm.DeleteEntity(Vm.Project.Places, Vm.SelectedPlace); Vm.SelectedPlace = Vm.Project.Places.FirstOrDefault(); RefreshAll(); } }
     private void AddNote_Click(object sender, RoutedEventArgs e) { Vm.SelectedNote = Vm.AddEntity(Vm.Project.Notes, "Note"); RefreshAll(); }
     private void DeleteNote_Click(object sender, RoutedEventArgs e) { if (ConfirmDelete("note")) { Vm.DeleteEntity(Vm.Project.Notes, Vm.SelectedNote); Vm.SelectedNote = Vm.Project.Notes.FirstOrDefault(); RefreshAll(); } }
-    private void AddRelationship_Click(object sender, RoutedEventArgs e) { Vm.AddRelationship(); RefreshAll(); }
-    private void DeleteRelationship_Click(object sender, RoutedEventArgs e) { if (Vm.SelectedRelationship is { }) { Vm.DeleteRelationship(); RefreshCharacterOverview(); } }
     private void Search_Click(object sender, RoutedEventArgs e) => Vm.RunSearch();
     private TextBoxBase? FocusedTextEditor()
         => (Keyboard.FocusedElement as TextBoxBase ?? FocusManager.GetFocusedElement(this) as TextBoxBase) is { IsVisible: true } editor ? editor : null;
@@ -1173,6 +1163,7 @@ public partial class MainWindow : Window
             ApplyLocalization();
             UpdateLayout();
             if ((WorkspaceTabs.Items[0] as TabItem)?.Header?.ToString() != "Dashboard") failures.Add("English tab localization failed");
+            if (WorkspaceTabs.Items.OfType<TabItem>().Any(tab => tab.Header?.ToString() == "Relationships")) failures.Add("Standalone Relationships tab was not removed");
             if (FileMenuItem.Header?.ToString() != "File" || LightThemeItem.Header?.ToString() != "Light theme") failures.Add("English menu localization failed");
             var englishText = CollectVisibleText(this).ToList();
             if (!englishText.Contains("Scene card") || !englishText.Contains("Status")) failures.Add("English deferred content localization failed");
