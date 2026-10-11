@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Automation;
@@ -45,30 +46,35 @@ internal static class GalleryImageSupport
 
 internal sealed class CharacterGalleryPreview : UserControl
 {
+    private const int PreviewLimit = 5;
     private readonly StackPanel _previews = new() { Orientation = Orientation.Horizontal };
     internal IReadOnlyList<string> DisplayedPaths { get; }
+    internal int HiddenImageCount { get; }
+    internal string BadgeText { get; }
     internal int PreviewCount => _previews.Children.Count;
     internal event EventHandler? OpenRequested;
 
     internal CharacterGalleryPreview(IEnumerable<string> imagePaths)
     {
         var paths = imagePaths.Where(path => !string.IsNullOrWhiteSpace(path)).ToList();
-        DisplayedPaths = paths.TakeLast(5).ToList();
+        DisplayedPaths = paths.TakeLast(PreviewLimit).Reverse().ToList();
+        HiddenImageCount = Math.Max(0, paths.Count - DisplayedPaths.Count);
+        BadgeText = HiddenImageCount == 0 ? "+" : FormatHiddenCount(HiddenImageCount);
         Cursor = Cursors.Hand;
         Focusable = true;
         ToolTip = Loc.T("Gallery");
         AutomationProperties.SetName(this, Loc.T("Gallery"));
         Content = _previews;
 
-        if (DisplayedPaths.Count == 0) _previews.Children.Add(CreateCircle(null, "+", Loc.T("Add image"), false));
-        else
+        for (int index = 0; index < DisplayedPaths.Count; index++)
         {
-            for (int index = 0; index < DisplayedPaths.Count; index++)
-            {
-                string path = DisplayedPaths[index];
-                _previews.Children.Add(CreateCircle(path, "▧", Path.GetFileName(path), index > 0));
-            }
+            string path = DisplayedPaths[index];
+            _previews.Children.Add(CreateCircle(path, "▧", Path.GetFileName(path), index > 0));
         }
+        string badgeToolTip = HiddenImageCount == 0
+            ? Loc.T("Add image")
+            : string.Format(Loc.T("{0} more images"), HiddenImageCount);
+        _previews.Children.Add(CreateBadge(BadgeText, badgeToolTip, DisplayedPaths.Count > 0));
 
         MouseLeftButtonUp += (_, e) =>
         {
@@ -81,6 +87,21 @@ internal sealed class CharacterGalleryPreview : UserControl
             OpenRequested?.Invoke(this, EventArgs.Empty);
             e.Handled = true;
         };
+    }
+
+    internal static string FormatHiddenCount(int count)
+    {
+        if (count < 1000) return $"+{Math.Max(0, count)}";
+        if (count < 1_000_000) return $"+{FormatCompact(count, 1_000)}k";
+        if (count < 1_000_000_000) return $"+{FormatCompact(count, 1_000_000)}m";
+        return $"+{FormatCompact(count, 1_000_000_000)}b";
+    }
+
+    private static string FormatCompact(int count, double unit)
+    {
+        double scaled = count / unit;
+        scaled = scaled < 10 ? Math.Floor(scaled * 10) / 10 : Math.Floor(scaled);
+        return scaled.ToString(scaled % 1 == 0 ? "0" : "0.#", CultureInfo.InvariantCulture);
     }
 
     private static Grid CreateCircle(string? path, string fallback, string toolTip, bool overlap)
@@ -124,6 +145,43 @@ internal sealed class CharacterGalleryPreview : UserControl
         Panel.SetZIndex(surface, overlap ? 1 : 0);
         return surface;
     }
+
+    private static Grid CreateBadge(string text, string toolTip, bool overlap)
+    {
+        const double size = 56;
+        var circle = new Ellipse
+        {
+            Width = size,
+            Height = size,
+            StrokeThickness = 2,
+            ToolTip = toolTip
+        };
+        circle.SetResourceReference(Shape.FillProperty, "MutedBrush");
+        circle.SetResourceReference(Shape.StrokeProperty, "PanelBrush");
+
+        var label = new TextBlock
+        {
+            Text = text,
+            FontSize = text.Length >= 4 ? 15 : 18,
+            FontWeight = FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false
+        };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "PanelBrush");
+
+        var surface = new Grid
+        {
+            Width = size,
+            Height = size,
+            Margin = overlap ? new Thickness(-10, 0, 0, 0) : new Thickness(0),
+            ToolTip = toolTip
+        };
+        surface.Children.Add(circle);
+        surface.Children.Add(label);
+        Panel.SetZIndex(surface, 2);
+        return surface;
+    }
 }
 
 public sealed class CharacterGalleryWindow : Window
@@ -143,6 +201,8 @@ public sealed class CharacterGalleryWindow : Window
     internal Button DeleteImageButton { get; }
     internal IReadOnlyList<string> ImagePaths => _paths;
     internal int GridItemCount => _images.Children.Count;
+    internal IReadOnlyList<string> DisplayedGridPaths => _images.Children.Cast<FrameworkElement>()
+        .Select(item => item.Tag).OfType<string>().ToList();
     internal int RenderedGridItemCount => _images.Children.Cast<FrameworkElement>()
         .Count(item => item.IsVisible && item.ActualWidth > 0 && item.ActualHeight > 0);
 
@@ -258,7 +318,7 @@ public sealed class CharacterGalleryWindow : Window
             _selectedPaths.Clear();
             _selectedPaths.Add(selectedPath);
         }
-        foreach (string path in _paths)
+        foreach (string path in _paths.AsEnumerable().Reverse())
         {
             var item = CreateImageTile(path);
             item.Tag = path;

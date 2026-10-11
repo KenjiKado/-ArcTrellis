@@ -45,6 +45,7 @@ public static class Loc
         ["Story bible entry"] = "Запись энциклопедии", ["Name"] = "Имя", ["Category"] = "Категория", ["One-line summary"] = "Краткое резюме", ["Details"] = "Подробности",
         ["Books"] = "Книги", ["In Books"] = "В книгах", ["All"] = "Все",
         ["Gallery"] = "Галерея", ["Add image"] = "Добавить изображение",
+        ["{0} more images"] = "Ещё изображений: {0}",
         ["Drop images here"] = "Перетащите изображения сюда",
         ["No images yet"] = "Изображений пока нет",
         ["Image files"] = "Файлы изображений",

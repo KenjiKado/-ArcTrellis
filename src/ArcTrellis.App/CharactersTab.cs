@@ -265,16 +265,31 @@ public partial class MainWindow
         checkVm.Redo();
         if (!person.GalleryImages.SequenceEqual(galleryPaths)) failures.Add("Redo did not restore character gallery images");
         var compactGallery = new CharacterGalleryPreview(person.GalleryImages);
-        if (compactGallery.PreviewCount != 5 ||
-            !compactGallery.DisplayedPaths.SequenceEqual(galleryPaths.TakeLast(5)))
-            failures.Add("Character gallery preview does not show the five most recent images");
+        if (compactGallery.PreviewCount != 6 || compactGallery.HiddenImageCount != 1 ||
+            compactGallery.BadgeText != "+1" ||
+            !compactGallery.DisplayedPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse().Take(5)))
+            failures.Add("Character gallery preview does not show the five newest images first and the hidden count");
+        var shortGallery = new CharacterGalleryPreview(galleryPaths.Take(3));
+        if (shortGallery.PreviewCount != 4 || shortGallery.BadgeText != "+" ||
+            !shortGallery.DisplayedPaths.SequenceEqual(galleryPaths.Take(3).Reverse()))
+            failures.Add("Character gallery preview does not end a short gallery with the add button");
+        var elevenPaths = galleryPaths.Concat(Enumerable.Range(7, 5)
+            .Select(index => Path.Combine(galleryDirectory, $"portrait-{index}.png"))).ToList();
+        var overflowGallery = new CharacterGalleryPreview(elevenPaths);
+        if (overflowGallery.HiddenImageCount != 6 || overflowGallery.BadgeText != "+6" ||
+            CharacterGalleryPreview.FormatHiddenCount(4_000) != "+4k" ||
+            CharacterGalleryPreview.FormatHiddenCount(4_500) != "+4.5k")
+            failures.Add("Character gallery overflow badge did not format its hidden-image count");
 
         var galleryDialog = new CharacterGalleryWindow(person.Name, person.GalleryImages) { Owner = this };
         galleryDialog.Show();
         galleryDialog.UpdateLayout();
+        if (!galleryDialog.DisplayedGridPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse()))
+            failures.Add("Gallery grid does not show the newest image first");
         string droppedImage = Path.Combine(galleryDirectory, "dropped.png");
         File.Copy(galleryPaths[0], droppedImage, true);
-        if (galleryDialog.AddFilesForTest([droppedImage]) != 1 || galleryDialog.GridItemCount != 7)
+        if (galleryDialog.AddFilesForTest([droppedImage]) != 1 || galleryDialog.GridItemCount != 7 ||
+            galleryDialog.DisplayedGridPaths.FirstOrDefault() != droppedImage)
             failures.Add("Gallery did not add a dropped Windows image to its grid");
         galleryDialog.SelectForTest(droppedImage);
         galleryDialog.DeleteSelectedForTest();
@@ -404,9 +419,9 @@ public partial class MainWindow
         if (_characterBooksInput is null || !Vm.Project.Books.All(book => _characterBooksInput.Choices.ContainsKey(book.Id)))
             failures.Add("Character books multiselect does not offer every project book");
         if (CharacterGalleryHost.Content is not CharacterGalleryPreview shownGallery ||
-            shownGallery.PreviewCount != 5 ||
-            !shownGallery.DisplayedPaths.SequenceEqual(galleryPaths.TakeLast(5)))
-            failures.Add("Selected character did not show the five circular gallery previews");
+            shownGallery.PreviewCount != 6 || shownGallery.BadgeText != "+1" ||
+            !shownGallery.DisplayedPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse().Take(5)))
+            failures.Add("Selected character did not show newest-first circular gallery previews and the count badge");
         if (CharacterRelationsTable.RowHeight != 44 ||
             CharacterRelationsTable.RowStyle is null || CharacterRelationsTable.CellStyle is null)
             failures.Add("Character relations table does not match the Chapters scene table style");
