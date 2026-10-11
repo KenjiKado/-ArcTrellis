@@ -5,6 +5,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace ArcTrellis.App.Views;
@@ -18,6 +19,10 @@ internal sealed class RelationTypeInput : UserControl
     private readonly Dictionary<string, Button> _buttons =
         new(StringComparer.CurrentCultureIgnoreCase);
     private readonly Dictionary<string, StackPanel> _groupPanels =
+        new(StringComparer.CurrentCultureIgnoreCase);
+    private readonly Dictionary<string, Border> _groupHeaders =
+        new(StringComparer.CurrentCultureIgnoreCase);
+    private readonly Dictionary<string, Ellipse> _optionDots =
         new(StringComparer.CurrentCultureIgnoreCase);
     private readonly StackPanel _choiceRows = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly Border _dropdown =
@@ -55,6 +60,11 @@ internal sealed class RelationTypeInput : UserControl
     internal string? SelectedValue { get; private set; }
     internal bool IsOpen => _popup.IsOpen;
     internal Border DropdownSurface => _dropdown;
+    internal int ColoredDotCount => _optionDots.Count;
+    internal bool HasSeparatedGroupHeaders => _groupHeaders.Count > 0 &&
+        _groupHeaders.Values.All(header =>
+            header.BorderThickness.Top > 0 && header.BorderThickness.Bottom > 0 &&
+            header.Background is not null);
     internal event EventHandler? SelectionChanged;
 
     internal RelationTypeInput(IEnumerable<RelationTypeChoice> options)
@@ -275,21 +285,37 @@ internal sealed class RelationTypeInput : UserControl
         if (_buttons.ContainsKey(option.Value)) return;
         _options.Add(option);
         var group = EnsureGroup(option.Group);
+        var dot = new Ellipse
+        {
+            Width = 8,
+            Height = 8,
+            Margin = new Thickness(2, 0, 10, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Fill = GroupBrush(option.Group)
+        };
         var text = new TextBlock
         {
             Text = option.Value,
             TextWrapping = TextWrapping.Wrap,
-            MaxWidth = 430
+            MaxWidth = 410,
+            VerticalAlignment = VerticalAlignment.Center
         };
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        row.Children.Add(dot);
+        row.Children.Add(text);
         var button = new Button
         {
             Tag = option.Value,
-            Content = text,
+            Content = row,
             HorizontalContentAlignment = HorizontalAlignment.Left,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Background = Brushes.Transparent,
             BorderThickness = new Thickness(0),
-            Padding = new Thickness(8, 5, 8, 5),
+            Padding = new Thickness(8, 6, 8, 6),
             Cursor = Cursors.Hand
         };
         button.Click += (_, _) => Select(option.Value);
@@ -299,25 +325,65 @@ internal sealed class RelationTypeInput : UserControl
             e.Handled = true;
         };
         _buttons.Add(option.Value, button);
+        _optionDots.Add(option.Value, dot);
         group.Children.Add(button);
     }
 
     private StackPanel EnsureGroup(string name)
     {
         if (_groupPanels.TryGetValue(name, out var existing)) return existing;
-        var panel = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch };
-        var header = new TextBlock
+        var panel = new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 4, 0, 0)
+        };
+        var accent = new Border
+        {
+            Width = 4,
+            Height = 14,
+            CornerRadius = new CornerRadius(2),
+            Background = GroupBrush(name),
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        var title = new TextBlock
         {
             Text = name.ToUpperInvariant(),
             FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(7, 9, 7, 3)
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center
         };
-        header.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+        title.SetResourceReference(TextBlock.ForegroundProperty, "MutedBrush");
+        var heading = new StackPanel { Orientation = Orientation.Horizontal };
+        heading.Children.Add(accent);
+        heading.Children.Add(title);
+        var header = new Border
+        {
+            Child = heading,
+            BorderThickness = new Thickness(0, 1, 0, 1),
+            Padding = new Thickness(8, 7, 8, 7),
+            Margin = new Thickness(0, 1, 0, 3)
+        };
+        header.SetResourceReference(Border.BackgroundProperty, "HoverBrush");
+        header.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         panel.Children.Add(header);
         _groupPanels.Add(name, panel);
+        _groupHeaders.Add(name, header);
         _choiceRows.Children.Insert(Math.Max(0, _choiceRows.Children.Count - 2), panel);
         return panel;
     }
+
+    private static Brush GroupBrush(string group) => group.ToUpperInvariant() switch
+    {
+        "FAMILY" => new SolidColorBrush(Color.FromRgb(91, 124, 250)),
+        "ROMANTIC" => new SolidColorBrush(Color.FromRgb(236, 72, 153)),
+        "SOCIAL" => new SolidColorBrush(Color.FromRgb(20, 184, 166)),
+        "HIERARCHY" => new SolidColorBrush(Color.FromRgb(139, 92, 246)),
+        "CONFLICT" => new SolidColorBrush(Color.FromRgb(239, 68, 68)),
+        "ALLIANCE" => new SolidColorBrush(Color.FromRgb(34, 197, 94)),
+        "SUPERNATURAL" => new SolidColorBrush(Color.FromRgb(168, 85, 247)),
+        "PROFESSIONAL" => new SolidColorBrush(Color.FromRgb(245, 158, 11)),
+        _ => new SolidColorBrush(Color.FromRgb(148, 163, 184))
+    };
 
     private void FilterChoices(string text)
     {

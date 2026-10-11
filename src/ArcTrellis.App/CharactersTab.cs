@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using ArcTrellis.App.Views;
 using ArcTrellis.Core.Models;
 using ArcTrellis.Core.Services;
@@ -65,12 +66,35 @@ public partial class MainWindow
         var relation = Vm.AddCharacterRelationship(source, target, [dialog.RelationType], dialog.RelationDescription);
         if (relation is null) return;
         RefreshCharacterOverview();
-        if (CharacterRelationsTable.ItemsSource is IEnumerable<CharacterRelationRow> rows &&
-            rows.FirstOrDefault(row => ReferenceEquals(row.Relation, relation)) is { } selected)
-        {
-            CharacterRelationsTable.SelectedItem = selected;
-            CharacterRelationsTable.ScrollIntoView(selected);
-        }
+        SelectCharacterRelation(relation);
+    }
+
+    private void CharacterRelationsTable_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left ||
+            e.OriginalSource is not DependencyObject sourceVisual ||
+            ItemsControl.ContainerFromElement(CharacterRelationsTable, sourceVisual) is not DataGridRow ||
+            CharacterRelationsTable.SelectedItem is not CharacterRelationRow row ||
+            Vm.SelectedCharacter is not { } source) return;
+
+        var targets = Vm.Project.Characters.Where(character => character.Id != source.Id).ToList();
+        var existingTypes = Vm.Project.Relationships.SelectMany(relation => SplitRelationTypes(relation.Type))
+            .Distinct(StringComparer.CurrentCultureIgnoreCase);
+        var dialog = new CharacterRelationWindow(source, targets, existingTypes, row.Relation) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.TargetCharacter is not { } target) return;
+        if (!Vm.UpdateCharacterRelationship(row.Relation, source, target,
+                dialog.RelationType, dialog.RelationDescription)) return;
+        RefreshCharacterOverview();
+        SelectCharacterRelation(row.Relation);
+        e.Handled = true;
+    }
+
+    private void SelectCharacterRelation(Relationship relation)
+    {
+        if (CharacterRelationsTable.ItemsSource is not IEnumerable<CharacterRelationRow> rows ||
+            rows.FirstOrDefault(row => ReferenceEquals(row.Relation, relation)) is not { } selected) return;
+        CharacterRelationsTable.SelectedItem = selected;
+        CharacterRelationsTable.ScrollIntoView(selected);
     }
 
     private void DeleteCharacterRelation_Click(object sender, RoutedEventArgs e)
@@ -173,7 +197,11 @@ public partial class MainWindow
             ["Friend"], "Complicated history");
         if (createdRelation is null || createdRelation.Type != "Friend" ||
             createdRelation.Description != "Complicated history")
-            failures.Add("Character relationship creation lost selected types or description");
+            failures.Add("Character relationship creation lost selected type or description");
+        else if (!checkVm.UpdateCharacterRelationship(createdRelation, person, relationTarget,
+                     "Rival", "Now competing") ||
+                 createdRelation.Type != "Rival" || createdRelation.Description != "Now competing")
+            failures.Add("Character relationship editing did not update the selected relation");
         checkVm.DeleteRelationship(createdRelation);
         if (createdRelation is not null && checkVm.Project.Relationships.Contains(createdRelation))
             failures.Add("Character relationship deletion did not remove the selected relation");
@@ -189,6 +217,9 @@ public partial class MainWindow
             !relationDialog.RelationTypesInput.Choices.Contains("Friend", StringComparer.CurrentCultureIgnoreCase) ||
             !relationDialog.RelationTypesInput.Groups.Take(writeoGroups.Length).SequenceEqual(writeoGroups))
             failures.Add("Relation type field does not expose the ordered Writeo-style grouped select options");
+        if (!relationDialog.RelationTypesInput.HasSeparatedGroupHeaders ||
+            relationDialog.RelationTypesInput.ColoredDotCount != relationDialog.RelationTypesInput.Choices.Count)
+            failures.Add("Relation type groups or colored option dots are not visually distinct");
         relationDialog.SelectTargetForTest(relationTarget);
         relationDialog.AddTypeForTest("Friend");
         relationDialog.AddTypeForTest("Custom bond");
@@ -207,6 +238,26 @@ public partial class MainWindow
         relationDialog.RelationTypesInput.CloseDropdown();
         relationDialog.Close();
 
+        var editableRelation = new Relationship
+        {
+            FromEntityId = person.Id,
+            ToEntityId = relationTarget.Id,
+            Type = "Friend",
+            Description = "Existing description"
+        };
+        var editDialog = new CharacterRelationWindow(person, [relationTarget], ["Friend"], editableRelation)
+            { Owner = this };
+        editDialog.Show();
+        editDialog.UpdateLayout();
+        if (!editDialog.IsEditing || editDialog.Title != Loc.T("Edit relation") ||
+            editDialog.SaveButton.Content?.ToString() != Loc.T("Save") ||
+            !ReferenceEquals(editDialog.TargetCharacter, relationTarget) ||
+            editDialog.RelationType != "Friend" ||
+            editDialog.RelationDescription != "Existing description" ||
+            editDialog.TargetInput.IsOpen)
+            failures.Add("Edit relation popup was not pre-populated or did not use Save");
+        editDialog.Close();
+
         WorkspaceTabs.SelectedIndex = 4;
         var existing = Vm.Project.Characters.FirstOrDefault();
         if (existing is null) existing = Vm.AddEntity(Vm.Project.Characters, "Character");
@@ -222,6 +273,9 @@ public partial class MainWindow
 
         if (_characterBooksInput is null || !Vm.Project.Books.All(book => _characterBooksInput.Choices.ContainsKey(book.Id)))
             failures.Add("Character books multiselect does not offer every project book");
+        if (CharacterRelationsTable.RowHeight != 44 ||
+            CharacterRelationsTable.RowStyle is null || CharacterRelationsTable.CellStyle is null)
+            failures.Add("Character relations table does not match the Chapters scene table style");
 
         var other = Vm.Project.Characters.FirstOrDefault(entity => entity.Id != existing.Id);
         if (other is not null)

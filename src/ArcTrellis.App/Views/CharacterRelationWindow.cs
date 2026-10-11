@@ -250,14 +250,17 @@ public sealed class CharacterRelationWindow : Window
         VerticalScrollBarVisibility = ScrollBarVisibility.Auto
     };
     internal Button SaveButton { get; }
+    internal bool IsEditing { get; }
 
     public StoryEntity? TargetCharacter => TargetInput.SelectedCharacter;
     public string RelationType => RelationTypesInput.SelectedValue ?? "";
     public string RelationDescription => DescriptionInput.Text.Trim();
 
-    public CharacterRelationWindow(StoryEntity source, IEnumerable<StoryEntity> targets, IEnumerable<string> existingTypes)
+    public CharacterRelationWindow(StoryEntity source, IEnumerable<StoryEntity> targets,
+        IEnumerable<string> existingTypes, Relationship? relation = null)
     {
-        Title = Loc.T("Add relation");
+        IsEditing = relation is not null;
+        Title = Loc.T(IsEditing ? "Edit relation" : "Add relation");
         Width = 560;
         SizeToContent = SizeToContent.Height;
         ResizeMode = ResizeMode.NoResize;
@@ -268,7 +271,8 @@ public sealed class CharacterRelationWindow : Window
 
         var panel = new StackPanel { Margin = new Thickness(20) };
         panel.Children.Add(new TextBlock { Text = Loc.T("Target Character"), Margin = new Thickness(0, 0, 0, 4) });
-        TargetInput = new CharacterTargetInput(targets.Where(character => character.Id != source.Id));
+        var targetOptions = targets.Where(character => character.Id != source.Id).ToList();
+        TargetInput = new CharacterTargetInput(targetOptions);
         TargetInput.SelectionChanged += (_, _) => UpdateSaveButton();
         panel.Children.Add(TargetInput);
 
@@ -303,7 +307,7 @@ public sealed class CharacterRelationWindow : Window
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 18, 0, 0)
         };
-        SaveButton = new Button { Content = Loc.T("Add"), MinWidth = 86, IsDefault = true, IsEnabled = false };
+        SaveButton = new Button { Content = Loc.T(IsEditing ? "Save" : "Add"), MinWidth = 86, IsDefault = true, IsEnabled = false };
         SaveButton.Click += (_, _) =>
         {
             if (TargetCharacter is null || string.IsNullOrWhiteSpace(RelationType)) return;
@@ -314,6 +318,16 @@ public sealed class CharacterRelationWindow : Window
         actions.Children.Add(cancel);
         panel.Children.Add(actions);
         Content = panel;
+
+        if (relation is not null)
+        {
+            Guid targetId = relation.FromEntityId == source.Id ? relation.ToEntityId : relation.FromEntityId;
+            if (targetOptions.FirstOrDefault(character => character.Id == targetId) is { } target)
+                TargetInput.Select(target);
+            RelationTypesInput.Select(relation.Type);
+            DescriptionInput.Text = relation.Description;
+            UpdateSaveButton();
+        }
 
         Loaded += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
         {
