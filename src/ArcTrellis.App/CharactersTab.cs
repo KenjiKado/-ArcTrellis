@@ -181,6 +181,11 @@ public partial class MainWindow
         var relationDialog = new CharacterRelationWindow(person, [relationTarget], ["Custom bond"]) { Owner = this };
         relationDialog.Show();
         relationDialog.UpdateLayout();
+        if (relationDialog.TargetInput.IsOpen)
+            failures.Add("Target character autocomplete opened when the relation popup opened");
+        if (relationDialog.RelationTypesInput.Choices.Count < CharacterRelationWindow.DefaultRelationTypes.Count ||
+            !relationDialog.RelationTypesInput.Choices.Contains(Loc.T("Friend"), StringComparer.CurrentCultureIgnoreCase))
+            failures.Add("Relation type field does not expose the preset multiselect options");
         relationDialog.SelectTargetForTest(relationTarget);
         relationDialog.AddTypeForTest("Friend");
         relationDialog.AddTypeForTest("Custom bond");

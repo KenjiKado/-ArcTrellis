@@ -31,6 +31,8 @@ internal sealed class CharacterTargetInput : UserControl
     };
     internal StoryEntity? SelectedCharacter { get; private set; }
     internal IReadOnlyList<StoryEntity> Choices => _options;
+    internal bool IsOpen => _popup.IsOpen;
+    internal void CloseDropdown() => _popup.IsOpen = false;
     internal event EventHandler? SelectionChanged;
 
     internal CharacterTargetInput(IEnumerable<StoryEntity> options)
@@ -81,6 +83,15 @@ internal sealed class CharacterTargetInput : UserControl
             Input.CaretIndex = Input.Text.Length;
             e.Handled = true;
         };
+        _frame.AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left ||
+                (!DropdownChrome.Contains(Input, e.OriginalSource as DependencyObject) && !ReferenceEquals(_frame, e.OriginalSource))) return;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (Input.IsKeyboardFocusWithin) RefreshSuggestions();
+            }), DispatcherPriority.Background);
+        }), true);
         _suggestions.PreviewMouseLeftButtonDown += (_, e) =>
         {
             if (e.OriginalSource is DependencyObject source &&
@@ -163,7 +174,7 @@ public sealed class CharacterRelationWindow : Window
     private readonly StoryProject _typeSuggestions = new();
 
     internal CharacterTargetInput TargetInput { get; }
-    internal TagInput RelationTypesInput { get; }
+    internal RelationTypeInput RelationTypesInput { get; }
     internal TextBox DescriptionInput { get; } = new()
     {
         AcceptsReturn = true,
@@ -210,26 +221,8 @@ public sealed class CharacterRelationWindow : Window
             _typeSuggestions.Tags.Add(label);
             _typeCodesByLabel[label] = type;
         }
-        RelationTypesInput = new TagInput { Project = _typeSuggestions, Tags = _selectedTypeLabels };
-        RelationTypesInput.AddHandler(TagInput.TagEditRequestedEvent, new EventHandler<TagEditEventArgs>((_, e) =>
-        {
-            string value = e.Tag.Trim();
-            if (value.Length == 0) return;
-            if (e.Remove)
-            {
-                foreach (string match in _selectedTypeLabels
-                    .Where(type => string.Equals(type, value, StringComparison.CurrentCultureIgnoreCase)).ToList())
-                    _selectedTypeLabels.Remove(match);
-            }
-            else if (!_selectedTypeLabels.Contains(value, StringComparer.CurrentCultureIgnoreCase))
-            {
-                _selectedTypeLabels.Add(value);
-                if (!_typeSuggestions.Tags.Contains(value, StringComparer.CurrentCultureIgnoreCase))
-                    _typeSuggestions.Tags.Add(value);
-            }
-            e.Handled = true;
-            UpdateSaveButton();
-        }));
+        RelationTypesInput = new RelationTypeInput(_typeSuggestions.Tags, _selectedTypeLabels);
+        RelationTypesInput.SelectionChanged += (_, _) => UpdateSaveButton();
         panel.Children.Add(RelationTypesInput);
 
         panel.Children.Add(new TextBlock { Text = Loc.T("Description"), Margin = new Thickness(0, 12, 0, 4) });
@@ -253,11 +246,11 @@ public sealed class CharacterRelationWindow : Window
         panel.Children.Add(actions);
         Content = panel;
 
-        Loaded += (_, _) =>
+        Loaded += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
         {
-            TargetInput.Input.Focus();
-            TargetInput.Input.SelectionLength = 0;
-        };
+            TargetInput.CloseDropdown();
+            Keyboard.ClearFocus();
+        }), DispatcherPriority.ContextIdle);
         SourceInitialized += (_, _) =>
         {
             ThemeChrome.Apply(this, Application.Current.Resources["PageBrush"] is SolidColorBrush brush && brush.Color.R < 64);
@@ -270,10 +263,8 @@ public sealed class CharacterRelationWindow : Window
     internal void AddTypeForTest(string type)
     {
         string label = DefaultRelationTypes.Contains(type, StringComparer.OrdinalIgnoreCase) ? Loc.T(type) : type;
-        if (!_selectedTypeLabels.Contains(label, StringComparer.CurrentCultureIgnoreCase))
-            _selectedTypeLabels.Add(label);
         _typeCodesByLabel[label] = type;
-        UpdateSaveButton();
+        RelationTypesInput.Select(label);
     }
 
     private void UpdateSaveButton() => SaveButton.IsEnabled =
