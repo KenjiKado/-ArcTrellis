@@ -351,12 +351,13 @@
                     <Button x:Name="DeleteCharacterRelationButton" Content="Delete" Click="DeleteCharacterRelation_Click" IsEnabled="False"/>
                   </StackPanel>
                   <DataGrid x:Name="CharacterRelationsTable" AutoGenerateColumns="False" IsReadOnly="True"
-                            CanUserAddRows="False" MinHeight="160" MinColumnWidth="120"
+                            CanUserAddRows="False" MinHeight="160"
                             RowHeight="44" FontSize="14" CanUserSortColumns="False"
+                            CanUserResizeColumns="False" CanUserResizeRows="False" CanUserReorderColumns="False"
                             SelectionMode="Single" SelectionUnit="FullRow"
                             SelectionChanged="CharacterRelationsTable_SelectionChanged"
                             MouseDoubleClick="CharacterRelationsTable_MouseDoubleClick"
-                            VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                            VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <DataGrid.RowStyle>
                       <Style TargetType="DataGridRow">
                         <Setter Property="Background" Value="{DynamicResource PanelBrush}"/>
@@ -377,7 +378,14 @@
                     <DataGrid.Columns>
                       <DataGridTextColumn Header="Name" Binding="{Binding Other.Name}" Width="2*"/>
                       <DataGridTextColumn Header="Relation type" Binding="{Binding Relation.Type}" Width="*"/>
-                      <DataGridTextColumn Header="Description" Binding="{Binding Relation.Description}" Width="2*"/>
+                      <DataGridTemplateColumn Header="Description" Width="2*">
+                        <DataGridTemplateColumn.CellTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Relation.Description}" TextWrapping="NoWrap"
+                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Relation.Description}"/>
+                          </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                      </DataGridTemplateColumn>
                     </DataGrid.Columns>
                   </DataGrid>
                 </StackPanel>

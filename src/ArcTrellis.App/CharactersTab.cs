@@ -278,11 +278,15 @@ public partial class MainWindow
         if (CharacterRelationsTable.RowHeight != 44 ||
             CharacterRelationsTable.RowStyle is null || CharacterRelationsTable.CellStyle is null)
             failures.Add("Character relations table does not match the Chapters scene table style");
+        if (CharacterRelationsTable.CanUserResizeColumns || CharacterRelationsTable.CanUserResizeRows ||
+            CharacterRelationsTable.CanUserReorderColumns ||
+            CharacterRelationsTable.HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled)
+            failures.Add("Character relations table still allows resizing or horizontal scrolling");
 
         var other = Vm.Project.Characters.FirstOrDefault(entity => entity.Id != existing.Id);
         if (other is not null)
         {
-            var relation = new Relationship { FromEntityId = existing.Id, ToEntityId = other.Id, Type = "Friend", Description = "Trusted" };
+            var relation = new Relationship { FromEntityId = existing.Id, ToEntityId = other.Id, Type = "Friend", Description = "Trusted confidant with a long shared history that must stay inside the Description column without creating horizontal scrolling." };
             Vm.Project.Relationships.Add(relation);
             RefreshCharacterOverview();
             if (CharacterRelationsTable.ItemsSource is not IEnumerable<CharacterRelationRow> rows ||
