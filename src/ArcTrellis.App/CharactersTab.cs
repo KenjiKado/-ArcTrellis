@@ -154,7 +154,10 @@ public partial class MainWindow
         input.SelectionChanged += (_, _) =>
         {
             if (ReferenceEquals(Vm.SelectedCharacter, character))
+            {
                 Vm.SetCharacterBooks(character, input.SelectedIds);
+                RefreshCharacterFilter();
+            }
         };
         _characterBooksInput = input;
         _shownCharacterBooksOwner = character;

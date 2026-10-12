@@ -52,6 +52,7 @@ public partial class MainWindow
         if (_sceneFilter?.IsOpen == true) { CloseSceneFilter(); return; }
         if (Vm.SelectedBook is not { } book) return;
         CloseChapterFilter();
+        CloseCharacterFilter();
         _sceneFilterStatusChecks.Clear();
         _sceneFilterDraftTags = new(Vm.SceneTagFilter);
         var fields = new StackPanel { Margin = new Thickness(12, 12, 12, 6) };

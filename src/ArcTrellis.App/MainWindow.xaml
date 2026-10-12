@@ -12,6 +12,7 @@
     <CollectionViewSource x:Key="SceneListView" Source="{Binding BookScenes}" Filter="SceneList_Filter">
       <CollectionViewSource.GroupDescriptions><PropertyGroupDescription PropertyName="ChapterId"/></CollectionViewSource.GroupDescriptions>
     </CollectionViewSource>
+    <CollectionViewSource x:Key="CharacterListView" Source="{Binding Project.Characters}" Filter="CharacterList_Filter"/>
     <local:ScenePlotlineConverter x:Key="ScenePlotlineConverter"/>
     <local:StatusTextConverter x:Key="StatusTextConverter"/>
     <local:NonNegativeIntegerConverter x:Key="NonNegativeIntegerConverter"/>
@@ -312,11 +313,12 @@
             <Grid.ColumnDefinitions><ColumnDefinition Width="300"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
             <Border Style="{StaticResource Card}" Margin="0,0,12,0">
               <DockPanel>
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+                <Grid DockPanel.Dock="Top" Margin="-3,0,-3,7"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                   <Button Content="＋ Character" Click="AddCharacter_Click"/>
-                  <Button Content="Delete" Click="DeleteCharacter_Click"/>
-                </StackPanel>
-                <ListBox x:Name="CharacterList" ItemsSource="{Binding Project.Characters}" IsSynchronizedWithCurrentItem="False"
+                  <Button Grid.Column="1" Content="Delete" Click="DeleteCharacter_Click"/>
+                  <Button x:Name="CharacterFilterButton" Grid.Column="2" ToolTip="Filter characters" AutomationProperties.Name="Filter characters" Click="CharacterFilter_Click" Width="34" Padding="7,5"><Path Data="M 1,1 L 15,1 L 9.5,7 L 9.5,13 L 6.5,15 L 6.5,7 Z" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.5" Fill="Transparent" Width="16" Height="16" Stretch="Uniform"/></Button>
+                </Grid>
+                <ListBox x:Name="CharacterList" ItemsSource="{Binding Source={StaticResource CharacterListView}}" IsSynchronizedWithCurrentItem="False"
                          SelectedValuePath="Id" SelectedValue="{Binding SelectedCharacterId}" DisplayMemberPath="Name"/>
               </DockPanel>
             </Border>
