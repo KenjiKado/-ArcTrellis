@@ -60,12 +60,13 @@ public partial class MainWindow : Window
         {
             if (!IsChapterFilterInteraction(e.OriginalSource as DependencyObject)) CloseChapterFilter();
             if (!IsSceneFilterInteraction(e.OriginalSource as DependencyObject)) CloseSceneFilter();
+            if (!IsCharacterFilterInteraction(e.OriginalSource as DependencyObject)) CloseCharacterFilter();
         };
         Deactivated += (_, _) => Dispatcher.BeginInvoke(new Action(() =>
         {
             // Clicking a floating suggestion can activate its own popup HWND.
             if (DropdownChrome.ForegroundBelongsToApp()) return;
-            CloseChapterFilter(); CloseSceneFilter();
+            CloseChapterFilter(); CloseSceneFilter(); CloseCharacterFilter();
         }), DispatcherPriority.Input);
         Vm.PropertyChanged += (_, args) =>
         {
@@ -77,12 +78,19 @@ public partial class MainWindow : Window
                 Dispatcher.BeginInvoke(new Action(RefreshSceneList), DispatcherPriority.Loaded);
             if (args.PropertyName == nameof(MainViewModel.SelectedCharacter))
                 Dispatcher.BeginInvoke(new Action(RefreshCharacterOverview), DispatcherPriority.Loaded);
+            if (args.PropertyName == nameof(MainViewModel.HasCharacterFilters))
+                Dispatcher.BeginInvoke(new Action(RefreshCharacterFilter), DispatcherPriority.Loaded);
         };
         AddHandler(TextCompositionManager.PreviewTextInputEvent, new TextCompositionEventHandler(NumericTextBox_PreviewTextInput));
         AddHandler(DataObject.PastingEvent, new DataObjectPastingEventHandler(NumericTextBox_Pasting));
         AddHandler(TagInput.TagEditRequestedEvent, new EventHandler<TagEditEventArgs>((_, e) =>
         {
-            if (e.Source is TagInput { Tags: { } tags }) { Vm.EditTag(tags, e.Tag, e.Remove); e.Handled = true; }
+            if (e.Source is TagInput { Tags: { } tags } input)
+            {
+                Vm.EditTag(tags, e.Tag, e.Remove);
+                if (input.DataContext is StoryEntity character && Vm.Project.Characters.Contains(character)) RefreshCharacterFilter();
+                e.Handled = true;
+            }
         }));
         AddHandler(CharacterInput.CharacterEditRequestedEvent, new EventHandler<CharacterEditEventArgs>((_, e) =>
         {
@@ -164,6 +172,7 @@ public partial class MainWindow : Window
         if (!ReferenceEquals(e.OriginalSource, WorkspaceTabs)) return;
         CloseChapterFilter();
         CloseSceneFilter();
+        CloseCharacterFilter();
         Vm.ActiveTab = WorkspaceTabs.SelectedIndex;
         if (WorkspaceTabs.SelectedIndex == 4) RefreshCharacterOverview();
         Dispatcher.BeginInvoke(new Action(ApplyLocalization), DispatcherPriority.Loaded);
@@ -241,6 +250,7 @@ public partial class MainWindow : Window
             if (source is Chapter) RefreshChapterFilter();
             if (source is Scene) Dispatcher.BeginInvoke(new Action(RefreshSceneList), DispatcherPriority.Background);
             if (source is Relationship) RefreshCharacterOverview();
+            if (source is StoryEntity character && Vm.Project.Characters.Contains(character)) RefreshCharacterFilter();
         }
     }
 
@@ -276,6 +286,7 @@ public partial class MainWindow : Window
         RefreshChapterFilter();
         RefreshStats();
         RefreshSceneList();
+        RefreshCharacterFilter();
         RefreshCharacterOverview();
         Loc.Apply(this);
     }
@@ -1587,6 +1598,7 @@ public partial class MainWindow : Window
             CheckStableTagHistory(failures);
             CheckSceneFilters(failures, reportPath);
             CheckCharactersTab(failures, reportPath);
+            CheckCharacterFilters(failures, reportPath);
             Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
             File.WriteAllText(reportPath, failures.Count == 0 ? "PASS" : "FAIL: " + string.Join("; ", failures));
         }

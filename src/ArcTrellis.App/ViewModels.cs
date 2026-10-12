@@ -149,6 +149,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public HashSet<string> SceneTagFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<Guid> SceneCharacterFilter { get; private set; } = [];
     public bool HasSceneFilters => SceneStatusFilter.Count > 0 || SceneChapterFilter.Count > 0 || ScenePlotlineFilter.Count > 0 || SceneTagFilter.Count > 0 || SceneCharacterFilter.Count > 0;
+    public HashSet<string> CharacterCategoryFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<Guid> CharacterBookFilter { get; private set; } = [];
+    public HashSet<string> CharacterTagFilter { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
+    public bool HasCharacterFilters => CharacterCategoryFilter.Count > 0 || CharacterBookFilter.Count > 0 || CharacterTagFilter.Count > 0;
     public void SetSceneFilters(IEnumerable<string> statuses, IEnumerable<Guid> chapters, IEnumerable<Guid> plotlines, IEnumerable<string> tags, IEnumerable<Guid>? characters = null)
     {
         SceneStatusFilter = statuses.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -164,6 +168,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
         && (ScenePlotlineFilter.Count == 0 || ScenePlotlineFilter.Contains(scene.PlotlineId))
         && SceneTagFilter.IsSubsetOf(scene.Tags)
         && SceneCharacterFilter.IsSubsetOf(scene.CharacterIds);
+    public void SetCharacterFilters(IEnumerable<string> categories, IEnumerable<Guid> books, IEnumerable<string> tags)
+    {
+        CharacterCategoryFilter = categories.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        CharacterBookFilter = books.ToHashSet();
+        CharacterTagFilter = tags.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Raise(nameof(HasCharacterFilters));
+    }
+    public bool MatchesCharacterFilter(StoryEntity character) =>
+        (CharacterCategoryFilter.Count == 0 || CharacterCategoryFilter.Contains(character.Category))
+        && CharacterBookFilter.IsSubsetOf(character.BookIds)
+        && CharacterTagFilter.IsSubsetOf(character.Tags);
     public void SetChapterFilters(IEnumerable<string> statuses, IEnumerable<string> tags)
     {
         ChapterStatusFilter = statuses.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -236,6 +251,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _history.Clear(); _pendingSnapshot = _pendingScope = _pinnedScope = _pinnedSelection = null;
         SetChapterFilters([], []);
         SetSceneFilters([], [], [], []);
+        SetCharacterFilters([], [], []);
         SelectDefaults();
         IsDirty = false;
         HistoryReset?.Invoke(this, EventArgs.Empty);
@@ -280,6 +296,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Guid deletedBookId = SelectedBook.Id;
         Project.Books.Remove(SelectedBook); Renumber(Project.Books);
         foreach (var character in Project.Characters) character.BookIds.Remove(deletedBookId);
+        SetCharacterFilters(CharacterCategoryFilter, CharacterBookFilter.Where(id => id != deletedBookId), CharacterTagFilter);
         SelectedBook = Project.Books.OrderBy(x => x.Order).FirstOrDefault(); Dirty("Book deleted");
     }
 

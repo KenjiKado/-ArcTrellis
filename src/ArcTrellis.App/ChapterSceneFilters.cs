@@ -64,6 +64,8 @@ public partial class MainWindow
     private void ChapterFilter_Click(object sender, RoutedEventArgs e)
     {
         if (_chapterFilter?.IsOpen == true) { CloseChapterFilter(); return; }
+        CloseSceneFilter();
+        CloseCharacterFilter();
         _filterStatusChecks.Clear();
         _filterDraftTags = new(Vm.ChapterTagFilter);
         var panel = new StackPanel { Width = 340, Margin = new Thickness(12) };
