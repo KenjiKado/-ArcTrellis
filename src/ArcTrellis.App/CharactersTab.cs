@@ -283,6 +283,7 @@ public partial class MainWindow
 
         var galleryDialog = new CharacterGalleryWindow(person.Name, person.GalleryImages) { Owner = this };
         galleryDialog.Show();
+        galleryDialog.InitializeGridForTest();
         galleryDialog.UpdateLayout();
         if (!galleryDialog.DisplayedGridPaths.SequenceEqual(galleryPaths.AsEnumerable().Reverse()))
             failures.Add("Gallery grid does not show the newest image first");
